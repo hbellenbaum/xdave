@@ -4,5 +4,10 @@
 			"path": "."
 		}
 	],
-	"settings": {}
+	"settings": {
+		"black-formatter.args": [
+			"--line-length",
+			"119"
+		]
+	}
 }

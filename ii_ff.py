@@ -1,4 +1,5 @@
 # Ionic form factors
+from constants import BOHR_RADIUS
 from numpy import zeros, arange
 
 
@@ -14,20 +15,33 @@ class ScreeningConstants(object):
     x-ray term values and and the calculation of atomic scattering factors", Zeitschift für Kristallographie 1, 81
     (1932).
     """
+
     _ZA_max = 29
 
     @classmethod
-    def c1s(cls, ZA, Zb):
-        s = zeros((cls._ZA_max, cls._ZA_max), dtype=float)
-        s[1, 1:2]   = 0.190e0
-        s[2, 1:3]   = 0.190e0
-        s[3, 1:4]   = 0.190e0
-        s[4, 1:5]   = 0.190e0
-        s[5, 1:6]   = 0.190e0
-        s[6, 1:7]   = 0.190e0
-        s[7, 1:8]   = 0.190e0
-        s[8, 1:9]   = 0.190e0
-        s[9, 1:10]  = 0.190e0
+    def get_all_screening_constants(self, ZA, Zb):
+        return (
+            self.c1s(ZA, Zb),
+            self.c2s(ZA, Zb),
+            self.c2p(ZA, Zb),
+            self.c3s(ZA, Zb),
+            self.c3p(ZA, Zb),
+            self.c4s(ZA, Zb),
+            self.c3d(ZA, Zb),
+        )
+
+    @classmethod
+    def c1s(self, ZA, Zb):
+        s = zeros((self._ZA_max, self._ZA_max), dtype=float)
+        s[1, 1:2] = 0.190e0
+        s[2, 1:3] = 0.190e0
+        s[3, 1:4] = 0.190e0
+        s[4, 1:5] = 0.190e0
+        s[5, 1:6] = 0.190e0
+        s[6, 1:7] = 0.190e0
+        s[7, 1:8] = 0.190e0
+        s[8, 1:9] = 0.190e0
+        s[9, 1:10] = 0.190e0
         s[10, 1:11] = 0.190e0
         s[11, 1:12] = 0.190e0
         s[12, 1:13] = 0.190e0
@@ -47,7 +61,8 @@ class ScreeningConstants(object):
         s[26, 1:27] = 0.190e0
         s[27, 1:28] = 0.190e0
         s[28, 1:29] = 0.190e0
-        return s[ZA - 1, Zb - 1]
+        return s[ZA - 1, Zb - 1] 
+    
 
     @classmethod
     def c2s(cls, ZA, Zb):
@@ -115,14 +130,14 @@ class ScreeningConstants(object):
         return s[ZA - 1, Zb - 1]
 
     @classmethod
-    def c2p(cls, ZA, Zb):
-        s = zeros((cls._ZA_max, cls._ZA_max), dtype=float)
-        s[4, 4:5]   = 2.500e0
-        s[5, 4:6]   = [2.500e0, 2.910e0]
-        s[6, 4:7]   = [2.500e0, 2.910e0, 3.330e0]
-        s[7, 4:8]   = [2.500e0, 2.910e0, 3.330e0, 3.740e0]
-        s[8, 4:9]   = [2.500e0, 2.910e0, 3.330e0, 3.740e0, 4.160e0]
-        s[9, 4:10]  = [2.500e0, 2.910e0, 3.330e0, 3.740e0, 4.160e0, 4.570e0]
+    def c2p(self, ZA, Zb):
+        s = zeros((self._ZA_max, self._ZA_max), dtype=float)
+        s[4, 4:5] = 2.500e0
+        s[5, 4:6] = [2.500e0, 2.910e0]
+        s[6, 4:7] = [2.500e0, 2.910e0, 3.330e0]
+        s[7, 4:8] = [2.500e0, 2.910e0, 3.330e0, 3.740e0]
+        s[8, 4:9] = [2.500e0, 2.910e0, 3.330e0, 3.740e0, 4.160e0]
+        s[9, 4:10] = [2.500e0, 2.910e0, 3.330e0, 3.740e0, 4.160e0, 4.570e0]
         s[10, 4:11] = [2.500e0, 2.910e0, 3.330e0, 3.740e0, 4.160e0, 4.570e0, 4.570e0]
         s[11, 4:12] = [2.500e0, 2.910e0, 3.330e0, 3.740e0, 4.160e0, 4.570e0, 4.570e0, 4.570e0]
         s[12, 4:13] = [2.500e0, 2.910e0, 3.330e0, 3.740e0, 4.160e0, 4.570e0, 4.570e0, 4.570e0,
@@ -172,8 +187,8 @@ class ScreeningConstants(object):
         return s[ZA - 1, Zb - 1]
 
     @classmethod
-    def c3s(cls, ZA, Zb):
-        s = zeros((cls._ZA_max, cls._ZA_max), dtype=float)
+    def c3s(self, ZA, Zb):
+        s = zeros((self._ZA_max, self._ZA_max), dtype=float)
         s[10, 10:11] = 6.600e0
         s[11, 10:12] = [6.600e0, 6.960e0]
         s[12, 10:13] = [6.600e0, 6.960e0, 7.310e0]
@@ -210,8 +225,8 @@ class ScreeningConstants(object):
         return s[ZA - 1, Zb - 1]
 
     @classmethod
-    def c3p(cls, ZA, Zb):
-        s = zeros((cls._ZA_max, cls._ZA_max), dtype=float)
+    def c3p(self, ZA, Zb):
+        s = zeros((self._ZA_max, self._ZA_max), dtype=float)
         s[12, 12:13] = 8.700e0
         s[13, 12:14] = [8.700e0, 9.140e0]
         s[14, 12:15] = [8.700e0, 9.140e0, 9.580e0]
@@ -242,8 +257,8 @@ class ScreeningConstants(object):
         return s[ZA - 1, Zb - 1]
 
     @classmethod
-    def c4s(cls, ZA, Zb):
-        s = zeros((cls._ZA_max, cls._ZA_max), dtype=float)
+    def c4s(self, ZA, Zb):
+        s = zeros((self._ZA_max, self._ZA_max), dtype=float)
         s[18, 18:19] = 1.340e1
         s[19, 18:20] = [1.340e1, 1.390e1]
         s[20, 18:21] = [1.340e1, 1.390e1, 1.466e1]
@@ -261,8 +276,8 @@ class ScreeningConstants(object):
         return s[ZA - 1, Zb - 1]
 
     @classmethod
-    def c3d(cls, ZA, Zb):
-        s = zeros((cls._ZA_max, cls._ZA_max), dtype=float)
+    def c3d(self, ZA, Zb):
+        s = zeros((self._ZA_max, self._ZA_max), dtype=float)
         s[20, 20:21] = 1.470e1
         s[21, 20:22] = [1.470e1, 1.503e1]
         s[22, 20:23] = [1.470e1, 1.503e1, 1.536e1]
@@ -276,8 +291,7 @@ class ScreeningConstants(object):
         return s[ZA - 1, Zb - 1]
 
 
-
-class PaulingShermanIonicFormFactor():
+class PaulingShermanIonicFormFactor:
 
     def __init__(self) -> None:
         self.screening_table = ScreeningConstants()
@@ -316,8 +330,8 @@ class PaulingShermanIonicFormFactor():
             exit(1)
 
         return Z_eff_nl
-    
-    def calculate_form_factor(self, Z, Zb, k):
+
+    def calculate_form_factor(self, Z, Z_b, k): # ZA, Zb, 
         # In order to get the correct charge-state we also have to cast the charge states to ints
         Z_b = int(Z_b)
         Z = int(Z)
@@ -325,5 +339,77 @@ class PaulingShermanIonicFormFactor():
         if Z_b == 0:
             return ff
 
+        c1s = self.screening_table.c1s(Z, Z_b)
+        c2s = self.screening_table.c2s(Z, Z_b)
+        c2p = self.screening_table.c2p(Z, Z_b)
+        c3s = self.screening_table.c3s(Z, Z_b)
+        c3p = self.screening_table.c3p(Z, Z_b)
+        c4s = self.screening_table.c4s(Z, Z_b)
+        c3d = self.screening_table.c3d(Z, Z_b)
 
+        if Z_b > 0:
+            c1s = min([2, Z_b])
+        if Z_b > 2:
+            c2s = min([2, Z_b - 2])
+        if Z_b > 4:
+            c2p = min([6, Z_b - 4])
+        if Z_b > 10:
+            c3s = min([2, Z_b - 10])
+        if Z_b > 12:
+            c3p = min([6, Z_b - 12])
+        if Z_b > 18:
+            c4s = min([2, Z_b - 18])
+        if Z_b > 20:
+            c3d = min([10, Z_b - 20])
 
+        # Add the 1s form-factor
+        if c1s > 0:
+            n = 1
+            l = 0
+            Znl = self.calculate_effective_charge_state(Z, Z_b, n, l)
+            xnl = n * BOHR_RADIUS * k / (2.0 * Znl)
+            ff += c1s / (1 + xnl**2) ** 2
+
+        if c2s > 0:
+            n = 2
+            l = 0
+            Znl = self.calculate_effective_charge_state(Z, Z_b, n, l)
+            xnl = n * BOHR_RADIUS * k / (2.0 * Znl)
+            ff += c2s * (1.0 - 2.0 * xnl**2.0) * (1.0 - xnl**2.0) / (1.0 + xnl**2) ** 4.0
+
+        if c2p > 0:
+            n = 2
+            l = 1
+            Znl = self.calculate_effective_charge_state(Z, Z_b, n, l)
+            xnl = n * BOHR_RADIUS * k / (2.0 * Znl)
+            ff += c2p * (1.0 - xnl**2.0) / (1.0 + xnl**2.0) ** 4.0
+
+        if c3s > 0:
+            n = 3
+            l = 0
+            Znl = self.calculate_effective_charge_state(Z, Z_b, n, l)
+            xnl = n * BOHR_RADIUS * k / (2.0 * Znl)
+            ff += c3s * (1.0 - 6.0 * xnl**2.0 + 3.0 * xnl**4.0) * (1.0 - 3.0 * xnl**2.0) * (3.0 - xnl**2.0) / (3.0 * (1.0 + xnl**2.0) ** 6.0)
+
+        if c3p > 0:
+            n = 3
+            l = 1
+            Znl = self.calculate_effective_charge_state(Z, Z_b, n, l)
+            xnl = n * BOHR_RADIUS * k / (2.0 * Znl)
+            ff += c3p * (1.0 - 6.0 * xnl**2.0 + 3.0 * xnl**4.0) * (1.0 - 3.0 * xnl**2.0) * (3.0 - xnl**2.0) / (3.0 * (1.0 + xnl**2.0) ** 6.0)
+
+        if c4s > 0:
+            n = 4
+            l = 0
+            Znl = self.calculate_effective_charge_state(Z, Z_b, n, l)
+            xnl = n * BOHR_RADIUS * k / (2.0 * Znl)
+            ff += c4s * (1.0 - 1.2 * xnl**2.0 + 1.8e1 * xnl**4.0 - 4.0 * xnl**6.0) * (1.0 - xnl**2.0) * (1.0 - 6.0 * xnl**2.0 + xnl**4.0) / (1.0 + xnl**2.0) ** 8.0
+
+        if c3d > 0:
+            n = 3
+            l = 2
+            Znl = self.calculate_effective_charge_state(Z, Z_b, n, l)
+            xnl = n * BOHR_RADIUS * k / (2.0 * Znl)
+            ff += c3d * (1.0 - 3.0 * xnl**2.0) * (3.0 - xnl**2.0) / (3.0 * (1.0 + xnl**2.0) ** 6.0)
+
+        return ff

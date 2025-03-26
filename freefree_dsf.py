@@ -1,5 +1,6 @@
 from constants import *
 from plasma_state import PlasmaState
+from models import ModelOptions
 import numpy as np
 
 
@@ -18,27 +19,30 @@ def effective_coulomb_potential(ionisation, wave_number):
     return V_aa
 
 
-def lindhard_func(x):
-    return x + 0.5 * (1 - x**2) * np.log((x + 1) / (x - 1))
-
 
 def lindhard_rpa(state: PlasmaState, wave_number):
+    """
+    Limiting case for full degeneracy
+    """
     z = state.frequency / (4 * state.fermi_frequency())
     q = (wave_number / 2) / state.fermi_wave_number()
     x_pos = z / q + q
     x_neg = z / q - q
-    func = (
+
+    def func(x):
+        return x + 0.5 * (1 - x**2) * np.log((x + 1) / (x - 1))
+    pol_func = (
         3
         * state.electron_number_density
         / (4 * state.fermi_energy() * q)
-        * (lindhard_func(x_pos) - lindhard_func(x_neg))
+        * (func(x_pos) - func(x_neg))
     )
-    return func
+    return pol_func
 
 
 class FreeFreeDSF:
 
-    def __init__(self, state: PlasmaState, wave_number) -> None:
+    def __init__(self, state: PlasmaState, wave_number, models: ModelOptions) -> None:
         self.state = state
         self.wave_number = wave_number
 
