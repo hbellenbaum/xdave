@@ -37,11 +37,12 @@ def effective_coulomb_potential(ionisation, wave_number):
 
 class FreeFreeDSF:
 
-    def __init__(self, state: PlasmaState) -> None:
+    def __init__(self, state: PlasmaState, models: ModelOptions) -> None:
         self.state = state
+        self.polarisation_model = models.polarisation_model
 
-    def get_dsf(self, k, w, lfc, model):
-        pol_func = self.polarisation_function(k, w, model=model)
+    def get_dsf(self, k, w, lfc):
+        pol_func = self.polarisation_function(k, w)
         potential_func = 4 * np.pi * COULOMB_CONSTANT * ELEMENTARY_CHARGE**2 / k**2
         dielectric_func = 1 - potential_func * pol_func
         S_EG = (
@@ -52,13 +53,13 @@ class FreeFreeDSF:
         )
         return S_EG
 
-    def polarisation_function(self, k, w, model="LINDHARD"):
-        if model == "LINDHARD":
-            return self.lindhard_pol_func(k=k, w=w)
-        elif model == "FIT":
+    def polarisation_function(self, k, w):  # , model="LINDHARD"):
+        if self.polarisation_model == "LINDHARD":
+            return self.lindhard_pol_func_dc(k=k, w=w)
+        elif self.polarisation_model == "DANDREA_FIT":
             return self.dandrea_fit(k=k, omega=w)
         else:
-            raise NotImplementedError(f"Model {model} not recognized. Try LINDHARD for now.")
+            raise NotImplementedError(f"Model {self.polarisation_model} not recognized. Try LINDHARD for now.")
 
     def lindhard_pol_func(self, k, w):
         EF = self.state.fermi_energy(self.state.electron_number_density, ELECTRON_MASS)
@@ -84,31 +85,22 @@ class FreeFreeDSF:
         pol_func = prefactor * (func_left - func_right)
         return pol_func
 
-    def lindhard_pol_func_tc(self, k, w):
-        EF = self.state.fermi_energy(self.state.electron_number_density)
+    def lindhard_pol_func_dc(self, k, w):
+        EF = self.state.fermi_energy(self.state.electron_number_density, ELECTRON_MASS)
         kF = self.state.fermi_wave_number(self.state.electron_number_density)
-        q0 = k / kF
-        nu0 = w / EF
-        nu = nu0.astype("complex128")
+        q0 = 0.5 * k / kF
+        w0 = 0.25 * w / (EF * q0)
 
-        qplus_sq = nu + q0**2
-        qminus_sq = nu - q0**2
-        xplus = (nu + q0**2) / 2.0 / q0
-        xminus = (nu - q0**2) / 2.0 / q0
-        result = (
-            1
-            - (4 * q0**2 - qminus_sq**2) / 8 / q0**3 * log(-1 * (1 + xminus) / (1 - xminus))
-            + (4 * q0**2 - qplus_sq**2) / 8 / q0**3 * log(-1 * (1 + xplus) / (1 - xplus))
-        )
+        def lindhard_func(x):
+            real_part = -x - 1 / 2 * (1 - x**2) * np.log(np.abs((x + 1) / (x - 1)))
+            im_part = HALF_PI * (1 - x**2) * np.heaviside(1.0 - x**2, 1.0)
+            return real_part + 1.0j * im_part
 
-        # log(a+ib) = log(sqrt(a*a+b+b))+ i arg(a+ib)
-        # numpy complex log pole cut convention makes this tricky
-        # so for a<0 and b<=0, then arg approx -pi,
-        # but for a<0 and b>0, then arg approx +pi
-        if np.allclose(nu0.imag, 0.0):
-            result = np.conjugate(result)
+        G_plus = lindhard_func(w0 + q0)
+        G_minus = lindhard_func(w0 - q0)
+        pol_func = 3 / 2 * self.state.electron_number_density / EF * (G_plus - G_minus) / (4 * q0)
 
-        return result
+        return pol_func
 
     def dandrea_fit(self, k, omega):
         _cJ = [+3.2488e03, -6.9147e02, -3.2027e06, -4.5356e03, -4.6240e05]
@@ -221,19 +213,15 @@ def test():
 
     lfc = 0
     Te = 30 * eV_TO_K
-    rho = 1.0 * g_per_cm3_TO_kg_per_m3
+    rho = 0.1 * g_per_cm3_TO_kg_per_m3
     charge_state = 1.0
     atomic_number = 1
     atomic_mass = 1.0
-    # k = 1.02e9  # e11  # 1/m
-    scattering_angle = 30
-    E0 = 2.96 * eV_TO_J
-    k = 2 * E0 / (DIRAC_CONSTANT * SPEED_OF_LIGHT) * np.sin(scattering_angle / 2)
-    k2 = 2 * E0 / (DIRAC_CONSTANT * SPEED_OF_LIGHT) * np.sin(60 / 2)
-    k3 = 2 * E0 / (DIRAC_CONSTANT * SPEED_OF_LIGHT) * np.sin(120 / 2)
+    E0 = 4.0e3 * eV_TO_J
+    angles_rad = np.array([10, 30, 45, 60, 80, 100, 120, 140]) * np.pi / 180
+    ks = 2 * E0 / (DIRAC_CONSTANT * SPEED_OF_LIGHT) * np.sin(angles_rad / 2)
 
-    omega_array = np.linspace(-100, 700, 500) * eV_TO_J  # + 8.5 * eV_TO_J
-    ks = [k, k2, k3]  # [1.0e8, 1.0e9, 1.0e10, 1.0e11, 1.0e12]
+    omega_array = np.linspace(-70, 100, 500) * eV_TO_J  # + 8.5 * eV_TO_J
     state = PlasmaState(
         electron_temperature=Te,
         ion_temperature=Te,
@@ -243,24 +231,51 @@ def test():
         atomic_mass=atomic_mass,
         atomic_number=atomic_number,
     )
-
-    fig, ax = plt.subplots(1, 1, figsize=(7, 4))
-    for k in ks:
+    model = "LINDHARD"
+    models = ModelOptions(polarisation_model=model)
+    colors = ["magenta", "crimson", "orange", "dodgerblue", "lightgreen", "lightgray", "yellow", "cyan"]
+    fig, axes = plt.subplots(1, 2, figsize=(7, 4))
+    i = 0
+    for k, c in zip(ks, colors):
         dsfs = []
+        pols = []
         for omega in omega_array:
-            kernel = FreeFreeDSF(state=state)  # , models=ModelOptions)
-            dsf = kernel.get_dsf(k=k, w=omega, lfc=lfc, model="FIT")
+            kernel = FreeFreeDSF(state=state, models=models)
+            dsf = kernel.get_dsf(k=k, w=omega, lfc=lfc)
+            pol_func = kernel.polarisation_function(k=k, w=omega)
             # print(dsf)
             dsfs.append(dsf)
+            pols.append(pol_func)
 
         # plt.figure()
-        ax.plot(omega_array * J_TO_eV, dsfs, label=f"k={k}")
-    ax.legend()
-    ax.set_xlabel(r"$\omega$ [eV]")
-    ax.set_ylabel(r"$S_{ff}$")
+        pols = np.array(pols)
+        axes[0].plot(
+            omega_array[::-1] * J_TO_eV, dsfs[::-1], label=f"$\\theta$={angles_rad[i] * 180 / np.pi:.2f}", c=c
+        )
+        axes[1].plot(
+            omega_array[::-1] * J_TO_eV,
+            pols[::-1].real,
+            label=f"Re: $\\theta$={angles_rad[i] * 180 / np.pi:.2f}",
+            ls="dashed",
+            c=c,
+        )
+        axes[1].plot(
+            omega_array[::-1] * J_TO_eV,
+            pols[::-1].imag,
+            label=f"Im: $\\theta$={angles_rad[i] * 180 / np.pi:.2f}",
+            ls="dotted",
+            c=c,
+        )
+        i += 1
+    axes[0].legend()
+    axes[0].set_xlabel(r"$\omega$ [eV]")
+    axes[0].set_ylabel(r"$S_{ff}$")
+    axes[1].legend()
+    axes[1].set_xlabel(r"$\omega$ [eV]")
+    axes[1].set_ylabel(r"§\PI_{ee}$")
     plt.tight_layout()
     plt.show()
-    fig.savefig("initial_ff_results.pdf")
+    fig.savefig(f"initial_ff_results_model={model}.pdf")
 
 
 if __name__ == "__main__":
