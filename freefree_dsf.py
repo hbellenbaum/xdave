@@ -19,22 +19,6 @@ def effective_coulomb_potential(ionisation, wave_number):
     return V_aa
 
 
-# def lindhard_rpa(state: PlasmaState, wave_number):
-#     """
-#     Limiting case for full degeneracy
-#     """
-#     z = state.frequency / (4 * state.fermi_frequency())
-#     q = (wave_number / 2) / state.fermi_wave_number()
-#     x_pos = z / q + q
-#     x_neg = z / q - q
-
-#     def func(x):
-#         return x + 0.5 * (1 - x**2) * np.log((x + 1) / (x - 1))
-
-#     pol_func = 3 * state.electron_number_density / (4 * state.fermi_energy() * q) * (func(x_pos) - func(x_neg))
-#     return pol_func
-
-
 class FreeFreeDSF:
 
     def __init__(self, state: PlasmaState, models: ModelOptions) -> None:
@@ -98,7 +82,7 @@ class FreeFreeDSF:
 
         G_plus = lindhard_func(w0 + q0)
         G_minus = lindhard_func(w0 - q0)
-        pol_func = 3 / 2 * self.state.electron_number_density / EF * (G_plus - G_minus) / (4 * q0)
+        pol_func = 3 * self.state.electron_number_density / (4 * EF * q0) * (G_plus - G_minus)  # / (4 * q0)
 
         return pol_func
 
@@ -218,10 +202,10 @@ def test():
     atomic_number = 1
     atomic_mass = 1.0
     E0 = 4.0e3 * eV_TO_J
-    angles_rad = np.array([10, 30, 45, 60, 80, 100, 120, 140]) * np.pi / 180
+    angles_rad = np.array([10, 30, 60, 120]) * np.pi / 180  # , 20, 30, 45, 60, 80, 100, 120, 140
     ks = 2 * E0 / (DIRAC_CONSTANT * SPEED_OF_LIGHT) * np.sin(angles_rad / 2)
 
-    omega_array = np.linspace(-70, 100, 500) * eV_TO_J  # + 8.5 * eV_TO_J
+    omega_array = np.linspace(-100, 100, 2000) * eV_TO_J  # + 8.5 * eV_TO_J
     state = PlasmaState(
         electron_temperature=Te,
         ion_temperature=Te,
@@ -231,12 +215,19 @@ def test():
         atomic_mass=atomic_mass,
         atomic_number=atomic_number,
     )
-    model = "LINDHARD"
+    model = "DANDREA_FIT"
+    if model == "LINDHARD":
+        mcss_model = "LINDHARD_RPA"
+    elif model == "DANDREA_FIT":
+        mcss_model = "DANDREA_RPA_FIT"
     models = ModelOptions(polarisation_model=model)
     colors = ["magenta", "crimson", "orange", "dodgerblue", "lightgreen", "lightgray", "yellow", "cyan"]
-    fig, axes = plt.subplots(1, 2, figsize=(7, 4))
+    fig, ax0 = plt.subplots(figsize=(14, 10))
+    # xmins = np.array([])
     i = 0
     for k, c in zip(ks, colors):
+        angle = angles_rad[i] * 180 / np.pi
+        angle = int(np.round(angle, 0))
         dsfs = []
         pols = []
         for omega in omega_array:
@@ -248,31 +239,42 @@ def test():
             pols.append(pol_func)
 
         # plt.figure()
+
+        mcss_fn = f"mcss_tests/mcss_outputs_model={mcss_model}/mcss_ff_test_angle={angle}.csv"
+        En, Es, _, wff, wbf, Pff, Pbf, Pel, tot = np.genfromtxt(mcss_fn, unpack=True, delimiter=",", skip_header=1)
         pols = np.array(pols)
-        axes[0].plot(
-            omega_array[::-1] * J_TO_eV, dsfs[::-1], label=f"$\\theta$={angles_rad[i] * 180 / np.pi:.2f}", c=c
-        )
-        axes[1].plot(
+        # print(np.max(wff) / eV_TO_J)
+        # print(np.max(dsfs) * eV_TO_J)
+
+        ax0.plot(En[::-1], wff[::-1] / np.max(wff), label="MCSS", c=c, ls="dotted")
+        ax0.plot(
             omega_array[::-1] * J_TO_eV,
-            pols[::-1].real,
-            label=f"Re: $\\theta$={angles_rad[i] * 180 / np.pi:.2f}",
-            ls="dashed",
+            np.array(dsfs[::-1]) / np.max(dsfs),
+            label=f"$\\theta$={angles_rad[i] * 180 / np.pi:.2f}",
             c=c,
         )
-        axes[1].plot(
-            omega_array[::-1] * J_TO_eV,
-            pols[::-1].imag,
-            label=f"Im: $\\theta$={angles_rad[i] * 180 / np.pi:.2f}",
-            ls="dotted",
-            c=c,
-        )
+        # ax1.plot(
+        #     omega_array[::-1] * J_TO_eV,
+        #     pols[::-1].real,
+        #     label=f"Re: $\\theta$={angles_rad[i] * 180 / np.pi:.2f}",
+        #     ls="dashed",
+        #     c=c,
+        # )
+        # ax1.plot(
+        #     omega_array[::-1] * J_TO_eV,
+        #     pols[::-1].imag,
+        #     label=f"Im: $\\theta$={angles_rad[i] * 180 / np.pi:.2f}",
+        #     ls="dotted",
+        #     c=c,
+        # )
         i += 1
-    axes[0].legend()
-    axes[0].set_xlabel(r"$\omega$ [eV]")
-    axes[0].set_ylabel(r"$S_{ff}$")
-    axes[1].legend()
-    axes[1].set_xlabel(r"$\omega$ [eV]")
-    axes[1].set_ylabel(r"§\PI_{ee}$")
+    ax0.legend()
+    ax0.set_xlim(-100, 100)
+    ax0.set_xlabel(r"$\omega$ [eV]")
+    ax0.set_ylabel(r"$S_{ff}$")
+    # axes[1].legend()
+    # axes[1].set_xlabel(r"$\omega$ [eV]")
+    # axes[1].set_ylabel(r"§\PI_{ee}$")
     plt.tight_layout()
     plt.show()
     fig.savefig(f"initial_ff_results_model={model}.pdf")

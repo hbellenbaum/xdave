@@ -2,3 +2,7 @@
 *.csv
 *.vscode
 __pycache__/
+**.pdf
+**.png
+**.deck
+**.txt
