@@ -14,9 +14,7 @@ class PlasmaState:
         mass_density,
         charge_state,
         atomic_mass,
-        # frequency,
         atomic_number,
-        # wave_number,
     ) -> None:
         self.electron_temperature = electron_temperature
         self.ion_temperature = ion_temperature
@@ -26,10 +24,10 @@ class PlasmaState:
         mi = self.atomic_mass
         self.ion_number_density = mass_density / mi
         self.electron_number_density = charge_state * self.ion_number_density
-        # self.frequency = frequency
-        # self.wave_number = wave_number
         self.AN = atomic_number
-        # self.scattering_number = scattering_number
+        self.free_electron_number_density = None
+        self.bound_electron_number_density = None
+        self.total_electron_number_density = None
 
     def initiliase():
         return

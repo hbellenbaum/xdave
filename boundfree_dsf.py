@@ -1,4 +1,5 @@
 from ii_ff import PaulingShermanIonicFormFactor, ScreeningConstants
+from ipd import get_ipd
 from plasma_state import PlasmaState
 from unit_conversions import *
 from constants import *
@@ -19,11 +20,15 @@ class BoundFreeDSF:
         self.ff_model = PaulingShermanIonicFormFactor()
         self.screening_constants = ScreeningConstants
 
-    def get_dsf(self, ZA, Zb, k, w, Eb, model="SCHUMACHER"):
-        if model == "SCHUMACHER":
-            Sce = self.schuhmacher_ia(ZA, Zb, k, w, Eb)
+    def get_dsf(self, ZA, Zb, k, w, Eb, bf_model="SCHUMACHER", ipd_model="NONE"):
+        ipd = 0.0
+        if ipd_model is not "NONE":
+            ipd = get_ipd(state=self.state, model=ipd_model)
+        Eb_eff = Eb - ipd
+        if bf_model == "SCHUMACHER":
+            Sce = self.schuhmacher_ia(ZA, Zb, k, w, Eb_eff)
         else:
-            raise NotImplementedError(f"Model {model} not recognised. Try SCHUMACHER :)")
+            raise NotImplementedError(f"Model {bf_model} not recognised. Try SCHUMACHER :)")
         return Sce
 
     def _shell_amplitude(self, Znl, n, l):
@@ -225,7 +230,7 @@ def test():
     omega_array = np.linspace(-30, 230, 500) * eV_TO_J  # + 8.5 * eV_TO_J
     ks = [5.0e8, 1.0e9, 2.5e9, 5.0e9, 1.0e10, 2.5e10]
     EB = np.array([-217.7185861, -153.896205, -18.21115, -9.322699]) * eV_TO_J
-    # EB = np.array([-1]) * eV_TO_J  ### HAS TO BE A NEGATIVE NUMBER!!!
+    # EB = np.array([-1]) * eV_TO_J  ### HAS TO BE A NEGATIVE NUMBER!!!x
     # EB = np.array([-100])
     # EB = np.array([13.6])
     state = PlasmaState(
@@ -233,7 +238,6 @@ def test():
         ion_temperature=Te,
         mass_density=rho,
         charge_state=charge_state,
-        # frequency=omega,
         atomic_mass=atomic_mass,
         atomic_number=atomic_number,
     )

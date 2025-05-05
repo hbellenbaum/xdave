@@ -215,7 +215,7 @@ def test():
         atomic_mass=atomic_mass,
         atomic_number=atomic_number,
     )
-    model = "DANDREA_FIT"
+    model = "LINDHARD"
     if model == "LINDHARD":
         mcss_model = "LINDHARD_RPA"
     elif model == "DANDREA_FIT":
