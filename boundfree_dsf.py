@@ -21,10 +21,15 @@ class BoundFreeDSF:
         self.screening_constants = ScreeningConstants
 
     def get_dsf(self, ZA, Zb, k, w, Eb, bf_model="SCHUMACHER", ipd_model="NONE"):
+
+        # Calculate IPD
+        # TODO(Hannah): decide what convention to stick with: negative or positive IPD/ binding energy
         ipd = 0.0
         if ipd_model is not "NONE":
             ipd = get_ipd(state=self.state, model=ipd_model)
         Eb_eff = Eb - ipd
+
+        # Load correct bf model
         if bf_model == "SCHUMACHER":
             Sce = self.schuhmacher_ia(ZA, Zb, k, w, Eb_eff)
         else:
