@@ -5,6 +5,37 @@ from unit_conversions import *
 # from fermi_integrals import
 
 
+def get_rho_T_from_rs_theta(rs, theta, atomic_mass=1.00784):
+    """
+    Calculates the mass density and electron temperature in cgs for a given rs and theta.
+    Inputs:
+        - rs: units of Bohr radius
+        - theta: non-dimensional temperature
+        - atomic_mass: in amu, note that the default is Hydrogen
+    Outputs:
+        - mass density rho: g/cc
+        - temperature T: eV
+    """
+    fermi_energy = DIRAC_CONSTANT**2 / (2 * ELECTRON_MASS) * (9 * np.pi / (4 * (rs * BOHR_RADIUS) ** 3)) ** (2 / 3)
+    Te = fermi_energy * theta / BOLTZMANN_CONSTANT
+    T = Te * K_TO_eV
+
+    m_atm = atomic_mass * 1.6605e-27
+    rho = 3 / (4 * np.pi * (rs * BOHR_RADIUS) ** 3) * m_atm / 1000
+
+    return rho, T
+
+
+def get_rs_theta_from_rho_T(rho, T, atomic_mass=1.00784):
+    m_atm = atomic_mass * 1.6605e-27
+    rs = (m_atm / 1000 * 3 / (4 * np.pi * rho)) ** (1 / 3) * 1 / BOHR_RADIUS
+
+    fermi_energy = DIRAC_CONSTANT**2 / (2 * ELECTRON_MASS) * (9 * np.pi / (4 * (rs * BOHR_RADIUS) ** 3)) ** (2 / 3)
+    Te_K = T * eV_TO_K
+    theta = Te_K * BOLTZMANN_CONSTANT / fermi_energy
+    return rs, theta
+
+
 class PlasmaState:
 
     def __init__(
@@ -16,18 +47,23 @@ class PlasmaState:
         atomic_mass,
         atomic_number,
     ) -> None:
+
+        # This should all be in SI units
         self.electron_temperature = electron_temperature
         self.ion_temperature = ion_temperature
+        if electron_temperature == ion_temperature:
+            self.temperature = electron_temperature
+
         self.mass_density = mass_density
         self.atomic_mass = atomic_mass * ATOMIC_MASS_UNIT
         self.charge_state = charge_state
         mi = self.atomic_mass
         self.ion_number_density = mass_density / mi
         self.electron_number_density = charge_state * self.ion_number_density
-        self.AN = atomic_number
-        self.free_electron_number_density = None
-        self.bound_electron_number_density = None
-        self.total_electron_number_density = None
+        self.atomic_number = atomic_number
+        self.free_electron_number_density = charge_state * self.ion_number_density
+        self.bound_electron_number_density = (atomic_number - charge_state) * self.ion_number_density
+        self.total_electron_number_density = self.free_electron_number_density + self.bound_electron_number_density
 
     def initiliase():
         return
@@ -44,8 +80,8 @@ class PlasmaState:
     def fermi_energy(self, number_density, mass):
         return 0.5 * DIRAC_CONSTANT_SQR * np.cbrt(3.0 * PI_SQR * number_density) ** 2 / mass
 
-    def fermi_frequency(self, number_density):
-        return self.fermi_energy(number_density) / DIRAC_CONSTANT
+    def fermi_frequency(self, number_density, mass):
+        return self.fermi_energy(number_density, mass) / DIRAC_CONSTANT
 
     def fermi_wave_number(self, number_density):
         return np.cbrt(3.0 * PI_SQR * number_density)

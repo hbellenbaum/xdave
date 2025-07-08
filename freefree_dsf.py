@@ -3,7 +3,7 @@ from unit_conversions import *
 from maths import log1pexp
 
 # from fermi_integrals import fermi_integral
-from plasma_state import PlasmaState
+from plasma_state import PlasmaState, get_rho_T_from_rs_theta
 from models import ModelOptions
 import numpy as np
 
@@ -28,7 +28,10 @@ class FreeFreeDSF:
     def get_dsf(self, k, w, lfc):
         pol_func = self.polarisation_function(k, w)
         potential_func = 4 * np.pi * COULOMB_CONSTANT * ELEMENTARY_CHARGE**2 / k**2
-        dielectric_func = 1 - potential_func * pol_func
+        if self.polarisation_model == "NUMERICAL":
+            dielectric_func = self.rpa_numerical_dielectric_func(k, w)
+        else:
+            dielectric_func = 1 - potential_func * pol_func
         S_EG = (
             1
             / (1 - np.exp(-w / (BOLTZMANN_CONSTANT * self.state.electron_temperature)))
@@ -42,6 +45,8 @@ class FreeFreeDSF:
             return self.lindhard_pol_func_dc(k=k, w=w)
         elif self.polarisation_model == "DANDREA_FIT":
             return self.dandrea_fit(k=k, omega=w)
+        elif self.polarisation_model == "NUMERICAL":
+            return 0.0
         else:
             raise NotImplementedError(f"Model {self.polarisation_model} not recognized. Try LINDHARD for now.")
 
@@ -85,6 +90,77 @@ class FreeFreeDSF:
         pol_func = 3 * self.state.electron_number_density / (4 * EF * q0) * (G_plus - G_minus)  # / (4 * q0)
 
         return pol_func
+
+    def rpa_numerical_dielectric_func(self, k, w):
+        ## taken from Eqn. (5.5) in K. W\"unsch PhD Thesis (2011)
+        kF = self.state.fermi_wave_number(self.state.electron_number_density)
+        wF = self.state.fermi_frequency(self.state.electron_number_density, ELECTRON_MASS)
+
+        im_part = self._im_dielectric_rpa(k, w)
+        real_part = self._real_dielectric_rpa(k, w)
+        dielectric_function = complex(real_part, im_part)
+        # suspectibility_func =
+        # Pi_aa_0_MB = self.state.electron_number_density / (BOLTZMANN_CONSTANT * self.state.electron_temperature)
+        # pol_func = Pi_aa_0_MB * (Re_X_kw + 1.0j * Im_X_kw) / (4.0 * F_p0p5 * q)
+        return dielectric_function
+
+    def _im_dielectric_rpa(self, k, w):
+        kF = self.state.fermi_wave_number(self.state.electron_number_density)
+        EF = self.state.fermi_energy(self.state.electron_number_density, ELECTRON_MASS)
+        vF = DIRAC_CONSTANT * kF / ELECTRON_MASS
+        u = w / (k * vF * DIRAC_CONSTANT)
+        z = k / (2 * kF)
+
+        beta = 1 / (BOLTZMANN_CONSTANT * self.state.electron_temperature)
+        mu = self.state.chemical_potential(
+            self.state.electron_temperature, self.state.electron_number_density, ELECTRON_MASS
+        )
+
+        D = EF * beta
+        eta = mu  # * beta
+        chi02 = 1 / (PI * kF * BOHR_RADIUS)
+
+        xpos = (u + z) ** 2
+        xneg = (u - z) ** 2
+
+        log_term = (1 + np.exp(eta - D * xneg)) / (1 + np.exp(eta - D * xpos))
+        im_part = PI * chi02 / (3 * z**3) * np.log(log_term)
+        return im_part
+
+    def _real_dielectric_rpa(self, k, w):
+        from scipy import integrate
+
+        kF = self.state.fermi_wave_number(self.state.electron_number_density)
+        EF = self.state.fermi_energy(self.state.electron_number_density, ELECTRON_MASS)
+        vF = DIRAC_CONSTANT * kF / ELECTRON_MASS
+        u = w / (k * vF * DIRAC_CONSTANT)
+        z = k / (2 * kF)
+
+        beta = 1 / (BOLTZMANN_CONSTANT * self.state.electron_temperature)
+        mu = self.state.chemical_potential(
+            self.state.electron_temperature, self.state.electron_number_density, ELECTRON_MASS
+        )
+
+        D = EF * beta
+        eta = mu * beta
+
+        def g_pos(y):
+            x = u + z
+            int_term = y / (np.exp(D * y**2 - eta) + 1) * np.log(abs((x + y) / (x - y)))
+            return int_term
+
+        def g_neg(y):
+            x = u - z
+            int_term = y / (np.exp(D * y**2 - eta) + 1) * np.log(abs((x + y) / (x - y)))
+            return int_term
+
+        int_pos = integrate.quad(g_pos, 0, np.inf)[0]
+        int_neg = integrate.quad(g_neg, 0, np.inf)[0]
+
+        chi02 = 1 / (PI * kF * BOHR_RADIUS)
+        real_part = 1 + chi02 / (4 * z**2) * (int_pos - int_neg)
+
+        return real_part
 
     def dandrea_fit(self, k, omega):
         _cJ = [+3.2488e03, -6.9147e02, -3.2027e06, -4.5356e03, -4.6240e05]
@@ -280,5 +356,191 @@ def test():
     fig.savefig(f"initial_ff_results_model={model}.pdf")
 
 
+def test2():
+    import matplotlib.pyplot as plt
+    from utils import calculate_angle
+
+    rs = 2
+    theta = 1
+    rho, Te = get_rho_T_from_rs_theta(rs=rs, theta=theta)
+    ks = np.array((0.5,)) / BOHR_RADIUS  # np.array((0.5, 1.0, 2.0, 4.0)) / BOHR_RADIUS
+    rho *= g_per_cm3_TO_kg_per_m3
+    Te *= eV_TO_K
+    charge_state = 1.0
+    atomic_mass = 1.0
+    atomic_number = 1.0
+    lfc = 0.0
+
+    omega_array = np.linspace(-150, 300, 5000) * eV_TO_J  # + 8.5 * eV_TO_J
+    state = PlasmaState(
+        electron_temperature=Te,
+        ion_temperature=Te,
+        mass_density=rho,
+        charge_state=charge_state,
+        # frequency=omega,
+        atomic_mass=atomic_mass,
+        atomic_number=atomic_number,
+    )
+    model = "DANDREA_FIT"
+    if model == "LINDHARD":
+        mcss_model = "LINDHARD_RPA"
+    elif model == "DANDREA_FIT":
+        mcss_model = "DANDREA_RPA_FIT"
+    elif model == "NUMERICAL_RPA":
+        mcss_model = "NUMERICAL_RPA"
+    models = ModelOptions(polarisation_model=model)
+    colors = ["magenta", "crimson", "orange", "dodgerblue", "lightgreen", "lightgray", "yellow", "cyan"]
+    fig, ax0 = plt.subplots(figsize=(14, 10))
+    i = 0
+    Hz_TO_eV = 4.1357e-15  # eV
+
+    norm_factor = PLANCK_CONSTANT  # Hz_TO_eV / J_TO_eV
+    # norm_factor *= DIRAC_CONSTANT
+
+    print(f"\nNormalised using factor = {norm_factor}\n")
+
+    for k, c in zip(ks, colors):
+        q = k * BOHR_RADIUS
+        angle = calculate_angle(q=q, energy=8.0e3)
+        angle = int(np.round(angle, 0))
+        dsfs = []
+        dsfs = np.zeros_like(omega_array)
+        for i in range(0, len(omega_array)):  # omega in omega_array:
+            omega = omega_array[i]
+            kernel = FreeFreeDSF(state=state, models=models)
+            dsf = kernel.get_dsf(k=k, w=omega, lfc=lfc)
+            dsfs[i] = dsf
+
+        # Run MCSS
+        mcss_fn = f"mcss_tests/mcss_outputs_model={mcss_model}/mcss_ff_test_angle={angle}.csv"
+        En, Es, _, wff, wbf, Pff, Pbf, Pel, tot = np.genfromtxt(mcss_fn, unpack=True, delimiter=",", skip_header=1)
+
+        # Compare results
+        dsfs *= norm_factor
+        ax0.plot(
+            omega_array[::-1] * J_TO_eV,
+            np.array(dsfs[::-1]),  # / np.max(dsfs[::-1])
+            label=f"$q$={q}",
+            c=c,
+        )
+
+        fname = f"validation/ff_dsf/4hannah_rs_{int(rs)}_theta_{int(theta)}_{q}.txt"
+        dat_j = np.genfromtxt(fname=fname, skip_header=22)
+        # print(dat_j)
+        norm_Jan = 1 / (RYDBERG_TO_eV * eV_TO_J)  # RYDBERG_TO_eV *
+        norm_mcss = 1 / (eV_TO_J)
+        print(wff)
+        twinx = ax0.twinx()
+        twinx.plot(En[::-1], wff[::-1] * norm_mcss, label="MCSS", c=c, ls="dotted")  # / np.max(wff)
+        twinx.plot(dat_j[:, 0] * RYDBERG_TO_eV, dat_j[:, 4] * norm_Jan, c=c, ls="dashed", label=f"RPA: q={q}")
+        #  / np.max(dat_j[:, 4])  #  / RYBBERG_TO_eV
+        # twinx.plot(dat_j[:, 0] * RYBBERG_TO_eV, dat_j[:, 5] / np.max(dat_j[:, 5]), c=c, ls="dotted", label=f"LFC: q={q}")
+        # i += 1
+
+        print(
+            f"Maxima:\n"
+            f"Jan: {np.max(dat_j[:, 4] * norm_Jan)} 1/J[?] ---> MCSS: {np.max(wff) * norm_mcss} [1/J] ---> me: {np.max(dsfs)} [wrong]\n"
+            f"Ratio:  {np.max(dat_j[:, 4] * norm_Jan) / np.max(dsfs)}\n"
+            f"1/ratio: {np.max(dsfs) / np.max(dat_j[:, 4] * norm_Jan)}\n"
+        )
+        #  / RYBBERG_TO_eV
+
+    ax0.legend()
+    # ax0.set_xlim(-100, 100)
+    ax0.set_xlabel(r"$\omega$ [eV]")
+    ax0.set_ylabel(r"$S_{ff}$ [mystery]")
+    twinx.set_ylabel(r"$S_{ff}$ [1/J]")
+    twinx.legend(loc="upper left")
+    # axes[1].legend()
+    # axes[1].set_xlabel(r"$\omega$ [eV]")
+    # axes[1].set_ylabel(r"§\PI_{ee}$")
+    plt.tight_layout()
+    plt.show()
+    fig.savefig(f"ff_comparison_rs={rs}_theta={theta}.pdf", dpi=200)
+    plt.close()
+    # fig.savefig(f"ff_results_model={model}.pdf")
+
+
+def test3():
+    import matplotlib.pyplot as plt
+
+    rs = 2
+    theta = 1
+    rho, Te = get_rho_T_from_rs_theta(rs=rs, theta=theta)
+    ks = np.array((0.5, 1.0, 2.0, 4.0)) / BOHR_RADIUS  #  0.5, 1.0, 2.0, 4.0
+    rho *= g_per_cm3_TO_kg_per_m3
+    Te *= eV_TO_K
+    charge_state = 1.0
+    atomic_mass = 1.0
+    atomic_number = 1.0
+    lfc = 0.0
+
+    models = ModelOptions(polarisation_model="NUMERICAL")
+
+    omega_array = np.linspace(-150, 300, 500) * eV_TO_J  # + 8.5e3 * eV_TO_J
+    state = PlasmaState(
+        electron_temperature=Te,
+        ion_temperature=Te,
+        mass_density=rho,
+        charge_state=charge_state,
+        # frequency=omega,
+        atomic_mass=atomic_mass,
+        atomic_number=atomic_number,
+    )
+
+    # models = ModelOptions(polarisation_model=model)
+    fig, axes = plt.subplots(1, 3, figsize=(14, 8))
+    colors = ["magenta", "crimson", "orange", "dodgerblue", "lightgreen", "lightgray", "yellow", "cyan"]
+
+    for k, cs in zip(ks, colors):
+        # int_terms = []
+        real_dielectrics = np.zeros_like(omega_array)
+        im_dielectric = np.zeros_like(omega_array)
+        dsfs = np.zeros_like(omega_array)
+        q = k * BOHR_RADIUS
+        for i in range(0, len(omega_array)):
+            w = omega_array[i]
+            kernel = FreeFreeDSF(state=state, models=models)
+            # int_term = kernel._real_dielectric_rpa(k=k, w=w)
+            dsf = kernel.get_dsf(k=k, w=w, lfc=lfc)
+            dielectric_func = kernel.rpa_numerical_dielectric_func(k, w)
+            real_dielectrics[i] = np.real(dielectric_func)
+            im_dielectric[i] = np.imag(dielectric_func)
+            # print(int_term)
+            # int_terms.append(int_term)
+            dsfs[i] = dsf
+        # axes[0].plot(omega_array, real_dielectrics, label=f"k={k}")
+        # axes[1].plot(omega_array, im_dielectric, label=f"k={k}")
+        # dsfs = dsfs[np.isfinite]
+        idx = np.argwhere(np.isnan(dsfs))
+        dsfs_new = np.delete(dsfs, idx)
+        omega_new = np.delete(omega_array, idx)
+        dsfs_new *= DIRAC_CONSTANT / J_TO_eV
+        axes[0].plot(omega_new * J_TO_eV, dsfs_new, label=f"k={k}", c=cs)  #  /  np.max(dsfs_new)
+        axes[1].plot(omega_array * J_TO_eV, real_dielectrics, label=f"k={k}", c=cs)
+        axes[2].plot(omega_array * J_TO_eV, im_dielectric, label=f"k={k}", c=cs)
+
+        fname = f"validation/ff_dsf/4hannah_rs_{int(rs)}_theta_{int(theta)}_{q}.txt"
+        dat_j = np.genfromtxt(fname=fname, skip_header=22)
+        # print(dat_j)
+        twinx = axes[0].twinx()
+        twinx.plot(
+            dat_j[:, 0] * RYDBERG_TO_eV, dat_j[:, 4] / RYDBERG_TO_eV, ls="dashed", label=f"RPA: q={q}", c=cs
+        )  # / np.max(dat_j[:, 4])
+        # ax0.plot(dat_j[:, 0] * RYBBERG_TO_eV, dat_j[:, 5] / np.max(dat_j[:, 5]), c=c, ls="dotted", label=f"LFC: q={q}")
+
+    axes[0].set_xlabel(r"$\omega$ [eV]")
+    axes[0].set_ylabel(r"DSF")
+    axes[1].set_xlabel(r"$\omega$ [eV]")
+    axes[1].set_ylabel(r"$Re\{\epsilon^{RPA}\}$")
+    axes[2].set_xlabel(r"$\omega$ [eV]")
+    axes[2].set_ylabel(r"$Im\{\epsilon^{RPA}\}$")
+    axes[2].legend()
+    plt.tight_layout()
+    plt.show()
+    fig.savefig("ff_dsf_test3.pdf", dpi=200)
+
+
 if __name__ == "__main__":
-    test()
+    # test3()
+    test2()

@@ -1,6 +1,15 @@
 # from numpy import PI
 # from constants.physics import ELEMENTARY_CHARGE, BOLTZMANN_CONSTANT
-from constants import DIRAC_CONSTANT, ELEMENTARY_CHARGE, BOLTZMANN_CONSTANT, PI
+from constants import (
+    DIRAC_CONSTANT,
+    ELEMENTARY_CHARGE,
+    BOLTZMANN_CONSTANT,
+    PI,
+    ELECTRON_MASS,
+    ELEMENTARY_CHARGE_SQR,
+    VACUUM_PERMITTIVITY,
+    PLANCK_CONSTANT_SQR,
+)
 
 
 ###############
@@ -17,6 +26,12 @@ rad_TO_deg = 180.0 / PI
 
 J_TO_eV = 1.0 / ELEMENTARY_CHARGE
 eV_TO_J = ELEMENTARY_CHARGE
+RYDBERG_TO_eV = (
+    ELECTRON_MASS
+    * ELEMENTARY_CHARGE
+    * ELEMENTARY_CHARGE_SQR
+    / (8 * VACUUM_PERMITTIVITY * VACUUM_PERMITTIVITY * PLANCK_CONSTANT_SQR)
+)
 
 
 ################
@@ -44,6 +59,7 @@ pm_TO_m = 1e-12
 m_TO_fm = 1e15
 fm_TO_m = 1e-15
 
+aB_TO_A = 0.529177249
 
 
 ######################
@@ -54,8 +70,7 @@ kg_per_m3_TO_g_per_cm3 = 1e-3
 g_per_cm3_TO_kg_per_m3 = 1e3
 
 amu_TO_kg = 1.66053906660e-27
-kg_TO_amu = 1. / amu_TO_kg
-
+kg_TO_amu = 1.0 / amu_TO_kg
 
 
 ########################
@@ -69,7 +84,6 @@ per_m3_TO_per_A3 = 1e-30
 per_A3_TO_per_m3 = 1e30
 
 
-
 ###############
 # -- Speed -- #
 ###############
@@ -81,15 +95,12 @@ m_per_s_TO_cm_per_us = 1e-4
 cm_per_us_TO_m_per_s = 1e4
 
 
-
 #####################
 # -- Temperature -- #
 #####################
 
 eV_TO_K = ELEMENTARY_CHARGE / BOLTZMANN_CONSTANT
 K_TO_eV = BOLTZMANN_CONSTANT / ELEMENTARY_CHARGE
-
-
 
 
 ##############
@@ -107,7 +118,6 @@ ns_TO_s = 1e-9
 
 s_TO_ps = 1e12
 ps_TO_s = 1e-12
-
 
 
 ################
