@@ -33,6 +33,11 @@ RYDBERG_TO_eV = (
     / (8 * VACUUM_PERMITTIVITY * VACUUM_PERMITTIVITY * PLANCK_CONSTANT_SQR)
 )
 
+J_TO_erg = 10000000
+erg_TO_J = 1 / J_TO_eV
+erg_TO_eV = 624150647996.32
+eV_TO_erg = 1 / erg_TO_eV
+
 
 ################
 # -- Length -- #
@@ -101,6 +106,9 @@ cm_per_us_TO_m_per_s = 1e4
 
 eV_TO_K = ELEMENTARY_CHARGE / BOLTZMANN_CONSTANT
 K_TO_eV = BOLTZMANN_CONSTANT / ELEMENTARY_CHARGE
+
+K_TO_erg = 1.38064878066922e-16
+erg_TO_K = 1 / K_TO_erg
 
 
 ##############

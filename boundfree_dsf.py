@@ -21,11 +21,21 @@ class BoundFreeDSF:
         self.screening_constants = ScreeningConstants
 
     def get_dsf(self, ZA, Zb, k, w, Eb, bf_model="SCHUMACHER", ipd_model="NONE"):
+        """
+        Inputs:
+            - ZA: Net charge state
+            - Zb: Number of bound electrons
+            - k: wave number
+            - w: frequency
+            - Eb: binding energy (array)
+            - bf_model: str
+            - ipd_model: str
+        """
 
         # Calculate IPD
         # TODO(Hannah): decide what convention to stick with: negative or positive IPD/ binding energy
         ipd = 0.0
-        if ipd_model is not "NONE":
+        if ipd_model != "NONE":
             ipd = get_ipd(state=self.state, model=ipd_model)
         Eb_eff = Eb - ipd
 
@@ -92,7 +102,7 @@ class BoundFreeDSF:
             w_freq = w / DIRAC_CONSTANT  # convert the energy range to an actual frequency: E = \hbar \omega
 
             # Compton frequency
-            wC = PLANCK_CONSTANT * k**2 / (2 * ELECTRON_MASS)
+            wC = DIRAC_CONSTANT * k**2 / (2 * ELECTRON_MASS)  # units of s^{-1} = Hz
 
             # dimensionless scattering wave number
             q = (w_freq - wC) / (SPEED_OF_LIGHT * k)
@@ -104,10 +114,14 @@ class BoundFreeDSF:
                 n = 1
                 l = 0
 
-                Znl = self.ff_model.calculate_effective_charge_state(ZA, Zb, n, l)
-                xnl = 1.0 / (1.0 + (n * q / (Znl * FINE_STRUCTURE_CONSTANT)) ** 2.0)
+                Znl = self.ff_model.calculate_effective_charge_state(ZA, Zb, n, l)  # [Znl] = [#]
+                # xnl = n * q / (Znl * FINE_STRUCTURE_CONSTANT)
+                xnl = 1.0 / (1.0 + (n * q / (Znl * FINE_STRUCTURE_CONSTANT)) ** 2.0)  # [xnl] =
+                # xnl = 1.0 / (1.0 + (n / (Znl * FINE_STRUCTURE_CONSTANT * SPEED_OF_LIGHT * k) * (w_freq - wC)) ** 2)
 
-                Jnl = self._shell_amplitude(Znl, n, l) * xnl**3.0 / 3.0
+                Jnl = self._shell_amplitude(Znl, n, l) * xnl**3 / 3  # * 0.17e16
+                # Jnl = self._shell_amplitude(Znl, n, l) / (3 * xnl**3)
+                # Jnl = self._shell_amplitude(Znl, n, l) * (1 + (q / (Znl * FINE_STRUCTURE_CONSTANT) ** 2)) ** 2 / 3
 
                 for i in range(c1s):
                     J = J + Jnl * np.heaviside(E + Eb[i], 1)  # np.heaviside(E, Eb[i])
@@ -120,7 +134,12 @@ class BoundFreeDSF:
                 Znl = self.ff_model.calculate_effective_charge_state(ZA, Zb, n, l)
                 xnl = 1.0 / (1.0 + (n * q / (Znl * FINE_STRUCTURE_CONSTANT)) ** 2.0)
 
-                Jnl = self._shell_amplitude(Znl, n, l) * 4.0 * (xnl**3.0 / 3.0 - xnl**4.0 + 4.0 * xnl**5.0 / 5.0)
+                Jnl = (
+                    self._shell_amplitude(Znl, n, l)
+                    * 4.0
+                    * (xnl**3.0 / 3.0 - xnl**4.0 + 4.0 * xnl**5.0 / 5.0)
+                    * 1.0e-6
+                )
 
                 for i in range(c2s):
                     # J = J + Jnl * np.heaviside(E, Eb[i + 2 - 1])
@@ -214,27 +233,52 @@ class BoundFreeDSF:
                     J = J + Jnl * np.heaviside(E + Eb[i + 20 - 1], 1)
 
             Sce = J / (SPEED_OF_LIGHT * k)
-            if w < 0:
-                Sce = np.exp(w / (BOLTZMANN_CONSTANT * self.state.electron_temperature)) * Sce
+            # print(f"{Sce}")
+
+            ##TODO(Hannah): this currently does not work, the code seems to think Sce is always zero for w < 0.
+        if E < 0:
+            #  * DIRAC_CONSTANT
+            print(Sce)
+            Sce = np.exp(E / (BOLTZMANN_CONSTANT * self.state.electron_temperature)) * Sce
+            print(f"{np.exp(w_freq * DIRAC_CONSTANT / (BOLTZMANN_CONSTANT * self.state.electron_temperature))}")
 
         return Sce
 
 
 def test():
     import matplotlib.pyplot as plt
+    from utils import calculate_q, load_mcss_result, calculate_angle
 
     # k_array = np.linspace(0, 5) / BOHR_RADIUS
-    omega_array = np.linspace(-100 * eV_TO_J, 100 * eV_TO_J)
-    Es = (np.linspace(-1e5, 1e5, endpoint=True, num=1000)) * eV_TO_J
+    # omega_array = np.linspace(-100 * eV_TO_J, 100 * eV_TO_J)
+    # Es = (np.linspace(-1e5, 1e5, endpoint=True, num=1000)) * eV_TO_J
     # k = 1.02e11
     Te = 10 * eV_TO_K
     rho = 0.1 * g_per_cm3_TO_kg_per_m3
-    charge_state = 2.0
+    charge_state = 0.0
     atomic_number = 1
     atomic_mass = 1.0
-    omega_array = np.linspace(-30, 230, 500) * eV_TO_J  # + 8.5 * eV_TO_J
-    ks = [5.0e8, 1.0e9, 2.5e9, 5.0e9, 1.0e10, 2.5e10]
-    EB = np.array([-217.7185861, -153.896205, -18.21115, -9.322699]) * eV_TO_J
+    beam_energy = 9.0e3
+
+    angles = np.array(
+        [
+            # 13,
+            30,
+            # 45,
+        ]
+    )  # , 30, 45, 60, 80, 100, 120, 140, 160])
+    ks = calculate_q(angle=angles, energy=beam_energy) / BOHR_RADIUS
+    omega_array = np.linspace(-40, 300, 500) * eV_TO_J  # + 8.5 * eV_TO_J
+    # ks = [5.0e8, 1.0e9, 2.5e9, 5.0e9, 1.0e10, 2.5e10]
+    # EB = np.array([-217.7185861, -153.896205, -18.21115, -9.322699]) * eV_TO_J
+    EB = (
+        np.array(
+            [
+                -13.6,  # -13.6,
+            ]
+        )
+        * eV_TO_J
+    )
     # EB = np.array([-1]) * eV_TO_J  ### HAS TO BE A NEGATIVE NUMBER!!!x
     # EB = np.array([-100])
     # EB = np.array([13.6])
@@ -247,25 +291,182 @@ def test():
         atomic_number=atomic_number,
     )
 
-    plt.figure()
-    for k in ks:
-        dsfs = []
+    colors = ["red", "green", "blue", "orange", "gray", "black", "yellow", "magenta", "purple"]
 
+    fig, ax = plt.subplots(1, 1, figsize=(8, 6))
+    for i in range(len(angles)):
+        dsfs = []
+        k = ks[i]
+        k = 1.1105316e000 / BOHR_RADIUS
+        k_bohr = k * BOHR_RADIUS
+        # angle = calculate_angle(q=k * BOHR_RADIUS, energy=beam_energy)
+        angle = angles[i]
+        c = colors[i]
         for omega in omega_array:
             # omega = E / PLANCK_CONSTANT
             kernel = BoundFreeDSF(state=state)  # , form_factor_model=PaulingShermanIonicFormFactor)
-            dsf = kernel.get_dsf(ZA=4, Zb=4, Eb=EB, w=omega, k=k)
+            dsf = kernel.get_dsf(ZA=1, Zb=1, Eb=EB, w=omega, k=k)
+
             # print(dsf)
             dsfs.append(dsf)
 
-        plt.semilogy(omega_array * J_TO_eV, dsfs, label=f"k={k}")
+        wC = PLANCK_CONSTANT * k**2 / (2 * ELECTRON_MASS)  # units of s^{-1} = Hz
+        EC = DIRAC_CONSTANT**2 * k**2 / (2 * ELECTRON_MASS * ELEMENTARY_CHARGE)
+        # wC = 0.0
+        print(f"Compton frequency: {wC * DIRAC_CONSTANT * J_TO_eV}")
+        print(f"Compton energy: {EC}")
+
+        idx = np.argwhere(np.isnan(dsfs))
+        # dsfs /= J_TO_eV
+        dsfs_new = np.delete(dsfs, idx)
+        omega_new = np.delete(omega_array, idx)
+        En, wff, wbf, ff, bf, el = load_mcss_result(
+            filename=f"mcss_tests/mcss_outputs_model=IA/mcss_bf_test_angle={angle:0.0f}.csv"
+        )
+        # ax.axvline(EC, ls="dashed")
+        ax.axvline(wC * DIRAC_CONSTANT * J_TO_eV, ls="dotted")
+        ax.plot(
+            omega_new * J_TO_eV,
+            np.array(dsfs_new),  # / np.max(dsfs_new),  * J_TO_eV
+            label=f"k={k_bohr:.2f}",
+            c=c,
+            ls="solid",
+        )  #  / J_TO_eV
+        twinx = ax.twinx()
+        twinx.plot(En, wbf, label=f"MCSS k={k_bohr:.2f}", c=c, ls="dashed")  #  / np.max(wbf)
+
+    for eb in EB:
+        # print(eb)
+        ax.axvline(np.abs(eb) * J_TO_eV, c="gray", ls="dotted")
+    ax.legend()
+    twinx.legend()
+    ax.set_xlim(-40, 300)
+    # ax.set_ylim(1.0e-8, 1.5e0)
+    plt.show()
+
+
+def test2():
+    from freefree_dsf import FreeFreeDSF
+    from models import ModelOptions
+    import matplotlib.pyplot as plt
+    from utils import calculate_q, load_mcss_result, calculate_angle
+
+    # k_array = np.linspace(0, 5) / BOHR_RADIUS
+    # omega_array = np.linspace(-100 * eV_TO_J, 100 * eV_TO_J)
+    # Es = (np.linspace(-1e5, 1e5, endpoint=True, num=1000)) * eV_TO_J
+    # k = 1.02e11
+    Te = 10 * eV_TO_K
+    rho = 0.1 * g_per_cm3_TO_kg_per_m3
+    charge_state = 0.0
+    atomic_number = 1
+    atomic_mass = 1.0
+    beam_energy = 9.0e3
+
+    angles = np.array(
+        [
+            120,
+            140,
+            160,
+        ]
+    )  # , 30, 45, 60, 80, 100, 120, 140, 160])
+    ks = calculate_q(angle=angles, energy=beam_energy) / BOHR_RADIUS
+    omega_array = np.linspace(-100, 800, 500) * eV_TO_J  # + 8.5 * eV_TO_J
+    # ks = [5.0e8, 1.0e9, 2.5e9, 5.0e9, 1.0e10, 2.5e10]
+    # EB = np.array([-217.7185861, -153.896205, -18.21115, -9.322699]) * eV_TO_J
+    EB = (
+        np.array(
+            [
+                -13.6,  # -13.6,
+            ]
+        )
+        * eV_TO_J
+    )
+    # EB = np.array([-1]) * eV_TO_J  ### HAS TO BE A NEGATIVE NUMBER!!!x
+    # EB = np.array([-100])
+    # EB = np.array([13.6])
+    state = PlasmaState(
+        electron_temperature=Te,
+        ion_temperature=Te,
+        mass_density=rho,
+        charge_state=0.5,
+        atomic_mass=atomic_mass,
+        atomic_number=atomic_number,
+    )
+
+    # state_ff = PlasmaState(
+    #     electron_temperature=Te,
+    #     ion_temperature=Te,
+    #     mass_density=rho,
+    #     charge_state=1.0,
+    #     atomic_mass=atomic_mass,
+    #     atomic_number=atomic_number,
+    # )
+
+    models = ModelOptions()
+
+    colors = ["red", "green", "blue", "orange", "gray", "black", "yellow", "magenta", "purple"]
+
+    fig, ax = plt.subplots(1, 1, figsize=(8, 6))
+    for i in range(len(angles)):
+        dsfs = []
+        dsfs_ff = []
+        k = ks[i]
+        k_bohr = k * BOHR_RADIUS
+        # angle = calculate_angle(q=k * BOHR_RADIUS, energy=beam_energy)
+        angle = angles[i]
+        c = colors[i]
+        for omega in omega_array:
+            # omega = E / PLANCK_CONSTANT
+            # state.charge_state = 0.0
+            kernel = BoundFreeDSF(state=state)  # , form_factor_model=PaulingShermanIonicFormFactor)
+            dsf = kernel.get_dsf(ZA=1, Zb=1, Eb=EB, w=omega, k=k)
+            # state.charge_state = 1.0
+            kernel_ff = FreeFreeDSF(state=state, models=models)
+            dsf_ff = kernel_ff.get_dsf(k=k, w=omega, lfc=0.0)
+
+            # print(dsf)
+            dsfs.append(dsf)
+            dsfs_ff.append(dsf_ff)
+
+        # print(dsfs_ff)
+
+        idx = np.argwhere(np.isnan(dsfs))
+        # dsfs /= J_TO_eV
+        dsfs_new = np.delete(dsfs, idx)
+        omega_new = np.delete(omega_array, idx)
+        idx_ff = np.argwhere(np.isnan(dsfs_ff))
+        # dsfs /= J_TO_eV
+        dsfs_ff_new = np.delete(dsfs_ff, idx_ff)
+        omega_ff_new = np.delete(omega_array, idx_ff)
+        En, wff, wbf, ff, bf, el = load_mcss_result(
+            filename=f"mcss_tests/mcss_outputs_model=IA/mcss_bf_test_Z=0.5_angle={angle:0.0f}.csv"
+        )
+        ax.semilogy(
+            omega_new * J_TO_eV,
+            np.array(state.charge_state * dsfs_new) / np.max(dsfs_new),  # ,  * J_TO_eV
+            label=f"k={k_bohr:.2f}",
+            c=c,
+            ls="solid",
+        )  #  / J_TO_eV
+        ax.semilogy(
+            omega_ff_new * J_TO_eV,
+            np.array(dsfs_ff_new) / np.max(dsfs_ff_new),  # ,  * J_TO_eV
+            label=f"FF: k={k_bohr:.2f}",
+            c=c,
+            ls="dotted",
+        )  #  / J_TO_eV
+        # twinx = ax.twinx()
+        ax.semilogy(En, wbf / np.max(wbf), label=f"MCSS k={k_bohr:.2f}", c=c, ls="dashed")  #  / np.max(wbf)
 
     for eb in EB:
         print(eb)
-        plt.axvline(np.abs(eb) * J_TO_eV, c="gray", ls="dotted")
-    plt.legend()
+        ax.axvline(np.abs(eb) * J_TO_eV, c="gray", ls="dotted")
+    ax.legend()
+    # ax.set_xlim(0, 800)
+    # ax.set_ylim(1.0e-8, 1.5e0)
     plt.show()
 
 
 if __name__ == "__main__":
     test()
+    # test2()

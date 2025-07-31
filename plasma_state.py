@@ -68,6 +68,11 @@ class PlasmaState:
     def initiliase():
         return
 
+    def fermi_temperature(self, mass, number_density):
+        TF = DIRAC_CONSTANT**2 / (mass * BOLTZMANN_CONSTANT) * 0.5 * (3 * PI_SQR) ** (2 / 3) * number_density**1.5
+        TF = self.fermi_energy(number_density, mass) / BOLTZMANN_CONSTANT
+        return TF
+
     def plasma_frequency(self, mass_density, atomic_mass):
         return np.sqrt(4 * np.pi * mass_density * ELEMENTARY_CHARGE_SQR / atomic_mass)
 
@@ -78,7 +83,7 @@ class PlasmaState:
         return number_density * self.thermal_de_broglie_wavelength(temperature, mass) ** 3
 
     def fermi_energy(self, number_density, mass):
-        return 0.5 * DIRAC_CONSTANT_SQR * np.cbrt(3.0 * PI_SQR * number_density) ** 2 / mass
+        return 0.5 * DIRAC_CONSTANT**2 * (3.0 * PI**2 * number_density) ** (2 / 3) / mass
 
     def fermi_frequency(self, number_density, mass):
         return self.fermi_energy(number_density, mass) / DIRAC_CONSTANT
@@ -109,6 +114,42 @@ class PlasmaState:
         return SQRT_TWO_PI * DIRAC_CONSTANT / np.sqrt(mass * BOLTZMANN_CONSTANT * temperature)
 
     def chemical_potential(self, temperature, number_density, mass):
+        from scipy.integrate import quad
+        from scipy.optimize import minimize, root_scalar
+
+        def f(mu_tilde, T_tilde):
+            integrand = lambda x: x**0.5 / (np.exp((x - mu_tilde) / T_tilde) + 1)
+            res, _ = quad(integrand, 0.0, np.inf, limit=100)
+            return res - 2 / 3
+
+        def solve_mu(T_tilde):
+            # result = minimize()
+            result = root_scalar(lambda mu: f(mu, T_tilde), bracket=[-10, 20], method="brentq")  # ,
+            return result.root
+
+        T_erg = temperature * K_TO_erg
+        EF_erg = self.fermi_energy(number_density, mass) * J_TO_erg
+
+        Theta = T_erg / EF_erg  # BOLTZMANN_CONSTANT *
+
+        mu_erg = EF_erg * solve_mu(T_tilde=Theta)  # multiply by E_F to remove normalization
+
+        # ideal fermi gas (theta < 0.2)
+        mu_erg_Low = EF_erg * (1 - (PI * Theta) ** 2 / 12 - (PI * Theta) ** 4 / 80)
+        print("Low T", mu_erg_Low)
+
+        # high temperature expansion
+        mu_erg_High = T_erg * log(4 / 3 / sqrt(PI) / sqrt(Theta**3))
+        print("High T", mu_erg_High)
+
+        return mu_erg, mu_erg_High, mu_erg_Low
+
+    def chemical_potential_classical(self, temperature, number_density, mass):
+        Tq = DIRAC_CONSTANT**2 / (mass * BOLTZMANN_CONSTANT) * 2 * PI * (number_density / 2) ** 2 / 3
+        mu_class = -3 / 2 * BOLTZMANN_CONSTANT * temperature * np.log(temperature / Tq)
+        return mu_class
+
+    def chemical_potential_ichimaru(self, temperature, number_density, mass):
         """
         Fit from Ichimaru (2018)
 
@@ -121,7 +162,7 @@ class PlasmaState:
         hbar = 6.582e-16  # eVs
         me = 5.685e-16  # s^2eV/(cm^2)
         # Calculate Ef in eV
-        ef = hbar**2 / (2 * me) * (3 * np.pi**2 * ne) ** (2 / 3)
+        ef = hbar**2 / (2 * me) * (3 * np.pi**2 * ne) ** (2 / 3)  # eV
 
         # ef = calc_ef(ne=ne)
         theta = Te_eV / ef  # calc_theta(ef=ef, Te=Te_eV)
