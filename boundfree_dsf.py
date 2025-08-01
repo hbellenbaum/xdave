@@ -240,8 +240,9 @@ class BoundFreeDSF:
 
               
         # Detailed balanced
-        neg_freq_cond = w<0
-        Sce[neg_freq_cond] = np.exp(-E[neg_freq_cond] / (BOLTZMANN_CONSTANT * self.state.electron_temperature)) * Sce[neg_freq_cond]
+        Sce = np.where(w<0,
+                        np.exp(-E / (BOLTZMANN_CONSTANT * self.state.electron_temperature))* Sce,
+                        Sce)
         
         return Sce
 
