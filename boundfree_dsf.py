@@ -37,7 +37,7 @@ class BoundFreeDSF:
         ipd = 0.0
         if ipd_model != "NONE":
             ipd = get_ipd(state=self.state, model=ipd_model)
-        Eb_eff = Eb - ipd
+        Eb_eff = Eb + ipd # "+ ipd" if Eb < 0 and IPD > 0
 
         # Load correct bf model
         if bf_model == "SCHUMACHER":
@@ -97,8 +97,8 @@ class BoundFreeDSF:
                 c4s = min([2, Zb - 18])
             if Zb > 20:
                 c3d = min([10, Zb - 20])
-
-            E = w  # * J_TO_eV  # PLANCK_CONSTANT *
+            
+            E = np.abs(w)  # * J_TO_eV  # PLANCK_CONSTANT *
             w_freq = w / DIRAC_CONSTANT  # convert the energy range to an actual frequency: E = \hbar \omega
 
             # Compton frequency
@@ -109,8 +109,7 @@ class BoundFreeDSF:
 
             J = 0.0
 
-            if c1s > 0.0:
-
+            if c1s > 0:
                 n = 1
                 l = 0
 
@@ -120,9 +119,11 @@ class BoundFreeDSF:
                 Jnl = self._shell_amplitude(Znl, n, l) * xnl**3 / 3
 
                 for i in range(c1s):
+                    if Eb[i] >= 0: continue
                     J = J + Jnl * np.heaviside(E + Eb[i], 1)  # np.heaviside(E, Eb[i])
 
             if c2s > 0:
+
 
                 n = 2
                 l = 0
@@ -138,8 +139,9 @@ class BoundFreeDSF:
                 )
 
                 for i in range(c2s):
+                    if Eb[i + 2] >= 0: continue
                     # J = J + Jnl * np.heaviside(E, Eb[i + 2 - 1])
-                    J = J + Jnl * np.heaviside(E + Eb[i + 2 - 1], 1)
+                    J = J + Jnl * np.heaviside(E + Eb[i + 2], 1)
 
             if c2p > 0:
 
@@ -152,8 +154,9 @@ class BoundFreeDSF:
                 Jnl = self._shell_amplitude(Znl, n, l) * (xnl**4.0 / 4.0 - xnl**5.0 / 5.0)
 
                 for i in range(c2p):
+                    if Eb[i + 4] >= 0: continue
                     # J = J + Jnl * np.heaviside(E, Eb[i + 4 - 1])
-                    J = J + Jnl * np.heaviside(E + Eb[i + 4 - 1], 1)
+                    J = J + Jnl * np.heaviside(E + Eb[i + 4], 1)
 
             if c3s > 0:
 
@@ -171,8 +174,9 @@ class BoundFreeDSF:
                 )
 
                 for i in range(c3s):
+                    if Eb[i + 10] >= 0: continue
                     # J = J + Jnl * np.heaviside(E, Eb[i + 10 - 1])
-                    J = J + Jnl * np.heaviside(E + Eb[i + 10 - 1], 1)
+                    J = J + Jnl * np.heaviside(E + Eb[i + 10], 1)
 
             if c3p > 0:
 
@@ -188,8 +192,9 @@ class BoundFreeDSF:
                 )
 
                 for i in range(c3p):
+                    if Eb[i + 12] >= 0: continue
                     # J = J + Jnl * np.heaviside(E, Eb[i + 12 - 1])
-                    J = J + Jnl * np.heaviside(E + Eb[i + 12 - 1], 1)
+                    J = J + Jnl * np.heaviside(E + Eb[i + 12], 1)
 
             if c4s > 0:
                 n = 4
@@ -212,8 +217,9 @@ class BoundFreeDSF:
                 )
 
                 for i in range(c4s):
+                    if Eb[i + 18] >= 0: continue
                     # J = J + Jnl * np.heaviside(E, Eb[i + 18 - 1])
-                    J = J + Jnl * np.heaviside(E + Eb[i + 18 - 1], 1)
+                    J = J + Jnl * np.heaviside(E + Eb[i + 18], 1)
 
             if c3d > 0:
 
@@ -224,20 +230,19 @@ class BoundFreeDSF:
                 xnl = 1.0 / (1.0 + (n * q / (Znl * FINE_STRUCTURE_CONSTANT)) ** 2.0)
                 Jnl = self._shell_amplitude(Znl, n, l) * (xnl**5.0 / 5.0 - xnl**6.0 / 3.0 + xnl**7.0 / 7.0)
 
-                for i in range(c3p):
+                for i in range(c3d):
+                    if Eb[i + 20] >= 0: continue
                     # J = J + Jnl * np.heaviside(E, Eb[i + 20 - 1])
-                    J = J + Jnl * np.heaviside(E + Eb[i + 20 - 1], 1)
+                    J = J + Jnl * np.heaviside(E + Eb[i + 20], 1)
 
             Sce = J / (SPEED_OF_LIGHT * k)
             # print(f"{Sce}")
 
-            ##TODO(Hannah): this currently does not work, the code seems to think Sce is always zero for w < 0.
-        if E < 0:
-            #  * DIRAC_CONSTANT
-            print(Sce)
-            Sce = np.exp(E / (BOLTZMANN_CONSTANT * self.state.electron_temperature)) * Sce
-            print(f"{np.exp(w_freq * DIRAC_CONSTANT / (BOLTZMANN_CONSTANT * self.state.electron_temperature))}")
-
+              
+        # Detailed balanced
+        neg_freq_cond = w<0
+        Sce[neg_freq_cond] = np.exp(-E[neg_freq_cond] / (BOLTZMANN_CONSTANT * self.state.electron_temperature)) * Sce[neg_freq_cond]
+        
         return Sce
 
 
