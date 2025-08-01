@@ -232,11 +232,13 @@ class BoundFreeDSF:
             # print(f"{Sce}")
 
             ##TODO(Hannah): this currently does not work, the code seems to think Sce is always zero for w < 0.
-        if E < 0:
-            #  * DIRAC_CONSTANT
-            print(Sce)
-            Sce = np.exp(E / (BOLTZMANN_CONSTANT * self.state.electron_temperature)) * Sce
-            print(f"{np.exp(w_freq * DIRAC_CONSTANT / (BOLTZMANN_CONSTANT * self.state.electron_temperature))}")
+        
+        # Detailed balanced
+        neg_freq_cond = E<0
+        Sce[neg_freq_cond] = np.exp(E[neg_freq_cond] / (BOLTZMANN_CONSTANT * self.state.electron_temperature)) * Sce[neg_freq_cond]
+            # #  * DIRAC_CONSTANT
+            # Sce = np.exp(E / (BOLTZMANN_CONSTANT * self.state.electron_temperature)) * Sce
+            # print(f"{np.exp(w_freq * DIRAC_CONSTANT / (BOLTZMANN_CONSTANT * self.state.electron_temperature))}")
 
         return Sce
 

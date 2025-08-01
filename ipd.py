@@ -95,7 +95,7 @@ def ipd_debye_hueckel(Zi, ne, ni, Te, Ti):
 
     delta_ipd = kappa_C * (Zi + 1) * UNIT_COULOMB_POTENTIAL
 
-    return delta_ipd * J_TO_eV
+    return delta_ipd
 
 
 def ipd_ion_sphere(Zi, ne, ni):
@@ -108,7 +108,7 @@ def ipd_ion_sphere(Zi, ne, ni):
     kappa = ((FOUR_PI * ne) / (3 * (Zi + 1)))**(1/3)
     delta_ipd = 1.5 * (Zi + 1) * UNIT_COULOMB_POTENTIAL * kappa
 
-    return delta_ipd * J_TO_eV
+    return delta_ipd
 
 
 def ipd_stewart_pyatt(Zi, ne, ni, Te, Ti):
@@ -135,7 +135,7 @@ def ipd_stewart_pyatt(Zi, ne, ni, Te, Ti):
     factor = (1 + s**3) ** (2 / 3) - s**2
     ipd_shift = 3 / 2 * (Zi + 1) * UNIT_COULOMB_POTENTIAL / r_IS * factor
 
-    return ipd_shift * J_TO_eV
+    return ipd_shift
 
 
 def ipd_ecker_kroell(Zi, ne, ni, Te, Ti, Zn):
@@ -168,7 +168,7 @@ def ipd_ecker_kroell(Zi, ne, ni, Te, Ti, Zn):
     # NOTE(TG): n_c is tested against total particle density in the system, not just ions
     ipd_shift = common_const * np.where(ni + ne <= n_c, kappa_D, C_EK * inv_R_EK)
 
-    return ipd_shift * J_TO_eV
+    return ipd_shift
 
 
 
@@ -306,4 +306,4 @@ def ipd_crowley(Zi, ne, ni, Te, Ti, ForceConst):
     #           When there are, use commented out formula
     SIPD = kTi/(2*Zstar) * ( hp + (Zi * h0_p_g0 )/(2 * Zmean) ) - kTe_w
 
-    return SIPD * J_TO_eV
+    return SIPD
