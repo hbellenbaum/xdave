@@ -150,6 +150,8 @@ class PlasmaState:
         return mu_class
 
     def chemical_potential_ichimaru(self, temperature, number_density, mass):
+        from scipy.special import gamma
+
         """
         Fit from Ichimaru (2018)
 

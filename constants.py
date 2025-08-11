@@ -172,3 +172,7 @@ UNIT_COULOMB_POTENTIAL_SQR = UNIT_COULOMB_POTENTIAL * UNIT_COULOMB_POTENTIAL
 
 # The constant \alpha = \cbrt(4/9\pi) is encountered often in function related to solid state physics.
 SOLID_STATE_ALPHA = cbrt(4.0 / NINE_PI)
+
+
+# COMPUTATIONAL CONSTANTS
+EPSILON = sys.float_info.epsilon

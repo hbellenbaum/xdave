@@ -39,3 +39,20 @@ def calculate_angle(q, energy):
 def load_mcss_result(filename):
     En, Es, lambda_s, wff, wbf, ff, bf, el, tot = np.genfromtxt(filename, skip_header=1, delimiter=",", unpack=True)
     return En[::-1], wff[::-1], wbf[::-1], ff, bf, el
+
+
+def get_mcss_wr_from_status_file(status_file):
+    WR_message = "The calculated weight of the Rayleigh feature is:"
+    # status_file = os.path.join(status_file)
+    fr = open(status_file, "r")
+    WR_mcss = None
+    for line in fr.readlines():
+        # print(line)
+        if WR_message in line:
+            WR_mcss = line.split(": ")[1]
+    return float(WR_mcss)
+
+
+def get_values_from_status_file(status_fn):
+
+    return
