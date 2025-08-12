@@ -68,7 +68,7 @@ class FreeFreeDSF:
             pol_func = self.dandrea_fit(k=k, omega=w)
             dielectric_func = 1 - potential_func * pol_func
         elif self.polarisation_model == "NUMERICAL":
-            dielectric_func = self.rpa_numerical_dielectric_func(k=k, w=w)
+            dielectric_func = self.rpa_numerical_dielectric_func(k=k, w=w)  # * potential_func
             # dielectric_func = self.rpa_numerical_dielectric_func_pontus(k=k, w=w)
         else:
             dielectric_func = self.rpa_numerical_dielectric_func(k=k, w=w)
@@ -380,9 +380,8 @@ class FreeFreeDSF:
         im_part = self._im_dielectric_rpa(k, w)  # [#]
         real_part = self._real_dielectric_rpa(k, w)
         dielectric_function = complex(real_part, im_part)
-        # suspectibility_func =
-        # Pi_aa_0_MB = self.state.electron_number_density / (BOLTZMANN_CONSTANT * self.state.electron_temperature)
-        # pol_func = Pi_aa_0_MB * (Re_X_kw + 1.0j * Im_X_kw) / (4.0 * F_p0p5 * q)
+
+        susceptibility = (real_part + 1.0j * im_part) / (4 * np.pi / k**2)
         return dielectric_function
 
     def _im_dielectric_rpa(self, k, w):
@@ -390,6 +389,7 @@ class FreeFreeDSF:
         kF = self.state.fermi_wave_number(self.state.electron_number_density)  # 1/m
         EF = self.state.fermi_energy(self.state.electron_number_density, ELECTRON_MASS)  # J
         vF = DIRAC_CONSTANT * kF / ELECTRON_MASS  # m/s
+        omega_p = self.state.plasma_frequency(self.state.mass_density, self.state.atomic_mass)
         u = w / (k * vF * DIRAC_CONSTANT)  # arb. Unit
         z = k / (2 * kF)  # dimensionless
 
@@ -401,6 +401,8 @@ class FreeFreeDSF:
         D = EF * beta  # dimensionless
         eta = mu * beta  # dimensionless
         chi02 = 1 / (PI * kF * BOHR_RADIUS)  # dimensionless
+        # chi02 = 3 / 16 * (DIRAC_CONSTANT * omega_p / EF) ** 2  # / DIRAC_CONSTANT
+        theta = 1 / D
 
         if z < 0.1:
             prefactor = (
@@ -420,17 +422,20 @@ class FreeFreeDSF:
             xneg = (u - z) ** 2  # Dimensionless
 
             log_term = (1 + np.exp(eta - D * xneg)) / (1 + np.exp(eta - D * xpos))  # [#]
-            im_part = 1 * PI * chi02 / (3 * z**3) * np.log(log_term)  #
+            im_part = 1 * PI * chi02 / (8 * z**2) * theta * np.log(log_term)  #
         return im_part
 
     def _real_dielectric_rpa(self, k, w):
         from scipy import integrate
+        import math
+        from plasmapy.formulary.mathematics import Fermi_integral
 
-        kF = self.state.fermi_wave_number(self.state.electron_number_density)
-        EF = self.state.fermi_energy(self.state.electron_number_density, ELECTRON_MASS)
-        vF = DIRAC_CONSTANT * kF / ELECTRON_MASS
-        u = w / (k * vF * DIRAC_CONSTANT)
-        z = k / (2 * kF)
+        kF = self.state.fermi_wave_number(self.state.electron_number_density)  # 1/m
+        EF = self.state.fermi_energy(self.state.electron_number_density, ELECTRON_MASS)  # J
+        TF = self.state.fermi_temperature(ELECTRON_MASS, self.state.electron_number_density)
+        vF = DIRAC_CONSTANT * kF / ELECTRON_MASS  # m/s
+        u = w / (k * vF * DIRAC_CONSTANT)  # * DIRAC_CONSTANT)  # arb. Unit
+        z = k / (2 * kF)  # dimensionless
 
         beta = 1 / (BOLTZMANN_CONSTANT * self.state.electron_temperature)
         mu = self.state.chemical_potential_ichimaru(
@@ -439,22 +444,66 @@ class FreeFreeDSF:
 
         D = EF * beta
         eta = mu * beta
+        theta = 1 / D  # BOLTZMANN_CONSTANT * self.state.electron_temperature / EF
+        t = self.state.electron_temperature * BOLTZMANN_CONSTANT / EF
 
-        def g_pos(y):
-            x = u + z
-            int_term = y / (np.exp(D * y**2 - eta) + 1) * np.log(abs((x + y) / (x - y)))
-            return int_term
+        # def g_pos(y):
+        #     x = u + z
+        #     int_term = y / (np.exp(D * y**2 - eta) + 1) * np.log(abs((x + y) / (x - y)))
+        #     return int_term
 
-        def g_neg(y):
-            x = u - z
-            int_term = y / (np.exp(D * y**2 - eta) + 1) * np.log(abs((x + y) / (x - y)))
-            return int_term
+        # def g_neg(y):
+        #     x = u - z
+        #     int_term = y / (np.exp(D * y**2 - eta) + 1) * np.log(abs((x + y) / (x - y)))
+        #     return int_term
 
-        int_pos = integrate.quad(g_pos, 0, np.inf)[0]
-        int_neg = integrate.quad(g_neg, 0, np.inf)[0]
+        # int_pos = integrate.quad(g_pos, 0, np.inf)[0]
+        # int_neg = integrate.quad(g_neg, 0, np.inf)[0]
+
+        # chi02 = 1 / (PI * kF * BOHR_RADIUS)
+        # real_part = 1 + chi02 / (4 * z**2) * (int_pos - int_neg)
+
+        u = w / (vF * k * DIRAC_CONSTANT)
+        kappa = k / (2 * kF)
+
+        lambda_neg = u - kappa
+        lambda_pos = u + kappa
+        alpha = (
+            self.state.chemical_potential(
+                self.state.electron_temperature, self.state.electron_number_density, ELECTRON_MASS
+            )[0]
+            / EF
+        )
+
+        def g_t(lambda_val, eps=1.0e-9):
+
+            A = lambda_val**2 / t
+            B = alpha / t
+
+            def f_prime(X):
+                # numerator = X_in * np.exp(A * X_in**2 - B)
+                # denominator = (1 + np.exp(A * X_in**2 - B)) ** 2
+                # return -2 * A * numerator / denominator
+                y = A * X**2 - B
+                return -(A * X) / (2 * np.cosh(y / 2) ** 2)
+
+            def integrand_u(u):
+                X = np.tan(np.pi * u / 2)
+                log_term = np.log(abs((X + 1) / (X - 1)))
+                bracket_term = -X + 0.5 * (1 - X**2) * log_term
+                dX_du = (np.pi / 2) * (1 / np.cos(np.pi * u / 2) ** 2)
+                # res =
+                return f_prime(X) * bracket_term * dX_du
+
+            # result, _ = integrate.quad(integrand_u, 0, 1, limit=500, points=[0.5])
+            # print(result)
+            res1, _ = integrate.quad(integrand_u, 0, 0.5 - eps, limit=300)
+            res2, _ = integrate.quad(integrand_u, 0.5 + eps, 1, limit=300)
+
+            return (lambda_val**2) * (res1 + res2)
 
         chi02 = 1 / (PI * kF * BOHR_RADIUS)
-        real_part = 1 + chi02 / (4 * z**2) * (int_pos - int_neg)
+        real_part = 1 + chi02 / (4 * z**3) * (g_t(lambda_pos) - g_t(lambda_neg))
 
         return real_part
 

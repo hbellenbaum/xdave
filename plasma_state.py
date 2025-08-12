@@ -136,11 +136,11 @@ class PlasmaState:
 
         # ideal fermi gas (theta < 0.2)
         mu_erg_Low = EF_erg * (1 - (PI * Theta) ** 2 / 12 - (PI * Theta) ** 4 / 80)
-        print("Low T", mu_erg_Low)
+        # print("Low T", mu_erg_Low)
 
         # high temperature expansion
         mu_erg_High = T_erg * log(4 / 3 / sqrt(PI) / sqrt(Theta**3))
-        print("High T", mu_erg_High)
+        # print("High T", mu_erg_High)
 
         return mu_erg, mu_erg_High, mu_erg_Low
 
