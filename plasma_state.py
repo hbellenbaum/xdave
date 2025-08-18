@@ -149,6 +149,26 @@ class PlasmaState:
         mu_class = -3 / 2 * BOLTZMANN_CONSTANT * temperature * np.log(temperature / Tq)
         return mu_class
 
+    def reduced_chemical_potential_tobias(self, theta):
+        mu = 0
+
+        C = 0.752252778063675
+
+        mu = theta * np.log(C / (theta**1.5)) + theta * np.log(1 + C / (theta**1.5) / (2**1.5))
+
+        if theta < 1.36:
+            a1 = 0.016
+            a2 = -0.957
+            a3 = -0.293
+            a4 = 0.209
+            mu = 1.0 + a1 * theta + a2 * (theta**2) + a3 * (theta**3) + a4 * (theta**4)
+
+        # print("chem_pot=", mu)
+
+        ############# chemical potential in units of k_BT ##############
+        eta = mu / theta
+        return eta
+
     def chemical_potential_ichimaru(self, temperature, number_density, mass):
         from scipy.special import gamma
 
