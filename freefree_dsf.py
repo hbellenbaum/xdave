@@ -32,18 +32,32 @@ class FreeFreeDSF:
         self.polarisation_model = models.polarisation_model
 
     def get_dsf(self, k, w, lfc):
-        dielectric_func = self.dielectric_function(k=k, w=w)
-        im_dielectric = -np.imag(dielectric_func) / ((np.real(dielectric_func)) ** 2 + (np.imag(dielectric_func)) ** 2)
+        # dielectric_func = self.dielectric_function(k=k, w=w)
+        # im_dielectric = -np.imag(dielectric_func) / ((np.real(dielectric_func)) ** 2 + (np.imag(dielectric_func)) ** 2)
 
-        S_EG = (
-            -1
+        # S_EG = (
+        #     -1
+        #     / (1 - np.exp(-w / (BOLTZMANN_CONSTANT * self.state.electron_temperature)))
+        #     * VACUUM_PERMITTIVITY
+        #     * k**2
+        #     / (PI * ELEMENTARY_CHARGE**2 * self.state.electron_number_density)
+        #     * im_dielectric
+        # )
+
+        chi0 = self.susceptibility_function(k=k, w=w)
+        Vee = 4 * np.pi * COULOMB_CONSTANT * ELEMENTARY_CHARGE**2 / k**2
+        chilfc = chi0 / (1 - Vee * (1 - lfc) * chi0)
+        im_suspectibility = np.imag(chilfc)
+        # chiee = np.imag(chi0)
+        S_EG_LFC = (
+            -(1)  # DIRAC_CONSTANT
+            / (PI * self.state.electron_number_density)  # * Vee)
+            * 1
             / (1 - np.exp(-w / (BOLTZMANN_CONSTANT * self.state.electron_temperature)))
-            * VACUUM_PERMITTIVITY
-            * k**2
-            / (PI * ELEMENTARY_CHARGE**2 * self.state.electron_number_density)
-            * im_dielectric  # * np.imag(1.0 / dielectric_func)
-        )  # DIRAC_CONSTANT
-        return S_EG
+            * im_suspectibility
+        )
+
+        return S_EG_LFC
 
     def dielectric_function(self, k, w):
         potential_func = 4 * np.pi * COULOMB_CONSTANT * ELEMENTARY_CHARGE**2 / k**2
@@ -58,27 +72,46 @@ class FreeFreeDSF:
             # dielectric_func = self.rpa_numerical_dielectric_func_pontus(k=k, w=w)
         else:
             dielectric_func = self.rpa_numerical_dielectric_func(k=k, w=w)
-            raise NotImplementedError(f"Model {self.polarisation_model} not recognized. Try LINDHARD for now.")
+            raise NotImplementedError(
+                f"Model {self.polarisation_model} not recognized. Overwriting using Numerical RPA."
+            )
 
         return dielectric_func
 
-    def polarisation_function(self, k, w):  # , model="LINDHARD"):
+    def susceptibility_function(self, k, w):
         if self.polarisation_model == "LINDHARD":
-            return self.lindhard_pol_func_dc(k=k, w=w)
+            susceptibility_func = self.lindhard_pol_func_dc(k=k, w=w)
         elif self.polarisation_model == "DANDREA_FIT":
-            return self.dandrea_fit(k=k, omega=w)
+            susceptibility_func = self.dandrea_fit(k=k, omega=w)
         elif self.polarisation_model == "NUMERICAL":
-            return 0.0
+            potential_func = 4 * np.pi * COULOMB_CONSTANT * ELEMENTARY_CHARGE**2 / k**2
+            dielectric_func = self.rpa_numerical_dielectric_func(k=k, w=w)  # * potential_func
+            susceptibility_func = (1 - dielectric_func) / potential_func
         else:
-            raise NotImplementedError(f"Model {self.polarisation_model} not recognized. Try LINDHARD for now.")
+            dielectric_func = self.rpa_numerical_dielectric_func(k=k, w=w)
+            susceptibility_func = (1 - dielectric_func) / potential_func
+            raise NotImplementedError(
+                f"Model {self.polarisation_model} not recognized. Overwriting using Numerical RPA."
+            )
+
+        return susceptibility_func
 
     def lindhard_pol_func(self, k, w):
+        """
+        Note to self: the definition of the plasma frequency has changed, I will need to check this.
+        """
         EF = self.state.fermi_energy(self.state.electron_number_density, ELECTRON_MASS)
         kF = self.state.fermi_wave_number(self.state.electron_number_density)
-        omega_p = self.state.plasma_frequency(self.state.mass_density, self.state.atomic_mass)
+        omega_p = self.state.plasma_frequency(
+            self.state.charge_state, self.state.electron_number_density, ELECTRON_MASS
+        )
         gamma = EF / (DIRAC_CONSTANT * omega_p)
-        Z = np.abs(k / (2 * kF))
-        U = w / (4 * Z * EF)
+
+        vF = DIRAC_CONSTANT * kF / ELECTRON_MASS  # m/s
+        U = w / (k * vF * DIRAC_CONSTANT)  # dimensionless
+        Z = k / (2 * kF)  # dimensionless
+        # Z = np.abs(k / (2 * kF))
+        # U = w / (4 * Z * EF)
         prefactor = -(3 * k**2 / (512 * PI * gamma**2 * Z**3 * ELEMENTARY_CHARGE_SQR * COULOMB_CONSTANT))
         input1 = (U - Z - 1) / (U - Z + 1)
         input2 = (U + Z - 1) / (U + Z + 1)
@@ -437,7 +470,7 @@ def test():
         dsfs2_new = np.delete(dsfs2, idx)
         omega_new = np.delete(omega_array, idx)
         # dsfs_new *= 1 / J_TO_eV  # DIRAC_CONSTANT
-        twinx = axes.twinx()
+        # twinx = axes.twinx()
         axes.plot(omega_new * J_TO_eV, dsfs_new / J_TO_eV, label=f"q={q} 1/aB", c=cs)  #  /  np.max(dsfs_new)
 
         # axes2[0].plot(omega_array * J_TO_eV, reals_dandrea, label=f"Fit")
@@ -474,7 +507,7 @@ def test():
     # axes2[0].legend()
     plt.tight_layout()
     plt.show()
-    fig.savefig("ff_dsf_test3.pdf", dpi=200)
+    # fig.savefig("ff_dsf_test3.pdf", dpi=200)
 
 
 if __name__ == "__main__":
