@@ -36,6 +36,16 @@ def get_rs_theta_from_rho_T(rho, T, atomic_mass=1.00784):
     return rs, theta
 
 
+def get_rs_theta_from_rho_T_SI(rho, T, atomic_mass=1.00784):
+    m_atm = atomic_mass  # * 1.6605e-27
+    rs = (m_atm * 3 / (4 * np.pi * rho)) ** (1 / 3) * 1 / BOHR_RADIUS
+
+    fermi_energy = DIRAC_CONSTANT**2 / (2 * ELECTRON_MASS) * (9 * np.pi / (4 * (rs * BOHR_RADIUS) ** 3)) ** (2 / 3)
+    # Te_K = T * eV_TO_K
+    theta = T * BOLTZMANN_CONSTANT / fermi_energy
+    return rs, theta
+
+
 class PlasmaState:
 
     def __init__(
@@ -65,6 +75,10 @@ class PlasmaState:
         self.bound_electron_number_density = (atomic_number - charge_state) * self.ion_number_density
         self.total_electron_number_density = self.free_electron_number_density + self.bound_electron_number_density
 
+        self.theta, self.rs = get_rs_theta_from_rho_T_SI(
+            rho=self.mass_density, T=self.electron_temperature, atomic_mass=self.atomic_mass
+        )
+
     def initiliase():
         return
 
@@ -73,8 +87,9 @@ class PlasmaState:
         TF = self.fermi_energy(number_density, mass) / BOLTZMANN_CONSTANT
         return TF
 
-    def plasma_frequency(self, mass_density, atomic_mass):
-        return np.sqrt(4 * np.pi * mass_density * ELEMENTARY_CHARGE_SQR / atomic_mass)
+    def plasma_frequency(self, charge, number_density, mass):
+        # return np.sqrt(4 * np.pi * mass_density * ELEMENTARY_CHARGE_SQR / (atomic_mass * VACUUM_PERMITTIVITY))
+        return np.sqrt(number_density / (mass * ELECTRIC_CONSTANT)) * abs(charge * ELEMENTARY_CHARGE)
 
     def mean_sphere_radius(self, number_density):
         return 1.0 / np.cbrt(FOUR_THIRDS_PI * number_density)
@@ -204,3 +219,8 @@ class PlasmaState:
 
     def alt_degeneracy_parameter(self, number_density, temperature, mass):
         return BOLTZMANN_CONSTANT * temperature / self.fermi_energy(number_density, mass)
+
+    def electron_plasma_parameter(self, number_density, temperature):
+        radius = (3 / (4 * PI * number_density)) ** (1 / 3)
+        Gamma_ee = ELEMENTARY_CHARGE**2 / (4 * PI * VACUUM_PERMITTIVITY * radius * BOLTZMANN_CONSTANT * temperature)
+        return Gamma_ee
