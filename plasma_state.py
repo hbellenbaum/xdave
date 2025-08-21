@@ -5,6 +5,31 @@ from unit_conversions import *
 # from fermi_integrals import
 
 
+def get_Z(Z):
+    Z_min = np.floor(Z)
+    Z_max = np.ceil(Z)
+    return Z_min, Z_max
+
+
+def get_frac(Z, Z_min, Z_max):
+    frac_min = 0
+    frac_max = 0
+
+    if Z_min != Z_max:
+        frac_max = (Z - Z_min) / (Z_max - Z_min)
+        frac_min = 1 - frac_max
+    else:
+        frac_max = 1.0
+        frac_min = 0.0
+    return frac_min, frac_max
+
+
+def get_fractions_from_Z(Z):
+    Z_min, Z_max = get_Z(Z)
+    frac_min, frac_max = get_frac(Z=Z, Z_min=Z_min, Z_max=Z_max)
+    return frac_min, frac_max
+
+
 def get_rho_T_from_rs_theta(rs, theta, atomic_mass=1.00784):
     """
     Calculates the mass density and electron temperature in cgs for a given rs and theta.
@@ -75,9 +100,11 @@ class PlasmaState:
         self.bound_electron_number_density = (atomic_number - charge_state) * self.ion_number_density
         self.total_electron_number_density = self.free_electron_number_density + self.bound_electron_number_density
 
-        self.theta, self.rs = get_rs_theta_from_rho_T_SI(
+        self.rs, self.theta = get_rs_theta_from_rho_T_SI(
             rho=self.mass_density, T=self.electron_temperature, atomic_mass=self.atomic_mass
         )
+        self.Zb = atomic_number - charge_state
+        # self.ZA =
 
     def initiliase():
         return

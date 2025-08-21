@@ -23,7 +23,7 @@ def test_chemical_potential():
         atomic_mass=atomic_mass,
         atomic_number=AN,
     )
-    n = state.electron_number_density
+    n = state.total_electron_number_density
 
     TF_erg = state.fermi_temperature(mass=ELECTRON_MASS, number_density=n) * K_TO_erg
     EF = state.fermi_energy(mass=ELECTRON_MASS, number_density=n)

@@ -86,19 +86,19 @@ class BoundFreeDSF:
             c3d = 0
 
             if Zb > 0:
-                c1s = min([2, Zb])
+                c1s = int(min([2, Zb]))
             if Zb > 2:
-                c2s = min([2, Zb - 2])
+                c2s = int(min([2, Zb - 2]))
             if Zb > 4:
-                c2p = min([6, Zb - 4])
+                c2p = int(min([6, Zb - 4]))
             if Zb > 10:
-                c3s = min([2, Zb - 2])
+                c3s = int(min([2, Zb - 2]))
             if Zb > 12:
-                c3p = min([6, Zb - 12])
+                c3p = int(min([6, Zb - 12]))
             if Zb > 18:
-                c4s = min([2, Zb - 18])
+                c4s = int(min([2, Zb - 18]))
             if Zb > 20:
-                c3d = min([10, Zb - 20])
+                c3d = int(min([10, Zb - 20]))
 
             E = np.abs(w)  # * J_TO_eV  # PLANCK_CONSTANT *
             w_freq = np.abs(w) / DIRAC_CONSTANT  # convert the energy range to an actual frequency: E = \hbar \omega
@@ -243,10 +243,10 @@ class BoundFreeDSF:
                     # J = J + Jnl * np.heaviside(E, Eb[i + 20 - 1])
                     J = J + Jnl * np.heaviside(E + Eb[i + 20], 1)
 
-        Sce = J / (SPEED_OF_LIGHT * k)
+            Sce = J / (SPEED_OF_LIGHT * k)
 
-        # Detailed balanced
-        Sce = np.where(w < 0, np.exp(-E / (BOLTZMANN_CONSTANT * self.state.electron_temperature)) * Sce, Sce)
+            # Detailed balanced
+            Sce = np.where(w < 0, np.exp(-E / (BOLTZMANN_CONSTANT * self.state.electron_temperature)) * Sce, Sce)
 
         return Sce
 
@@ -477,14 +477,46 @@ def test():
     ax.legend()
     ax.set_xlim(-40, 300)
     plt.show()
-    fig.savefig("bf_test_hydrogen.pdf")
+    # fig.savefig("bf_test_hydrogen.pdf")
 
 
 def test_be():
-    import matplotlib.pyplot as plt
-
     # Comparison to Fig. 2 Mattern and Seidel, Phys. Plasmas 20 (2013)
     # Be at q~10.2 1/A, phi = 171, Eb = 9890 eV
+    import matplotlib.pyplot as plt
+
+    # values from Fortman et al., PRL 108, 175006 (2012)
+    Te = 13 * eV_TO_K
+    ne = 1.8e24 * per_cm3_TO_per_m3
+    Zf = 2.0
+
+    rho = 0.1 * g_per_cm3_TO_kg_per_m3
+    charge_state = 0.0
+    atomic_number = 1
+    atomic_mass = 1.0
+    beam_energy = 9890  # eV
+    scattering_angle = 171  # degree
+    q_approx = 10.2  # 1/Angstrom
+
+    angles = np.array([13, 30, 45, 60, 80, 100, 120, 140, 160])
+    omega_array = np.linspace(-40, 300, 500) * eV_TO_J
+    EB = (
+        np.array(
+            [
+                -111.5,
+            ]
+        )
+        * eV_TO_J
+    )
+    state = PlasmaState(
+        electron_temperature=Te,
+        ion_temperature=Te,
+        mass_density=rho,
+        charge_state=charge_state,
+        atomic_mass=atomic_mass,
+        atomic_number=atomic_number,
+    )
+    models = ModelOptions(bf_model="SCHUMACHER")
 
     exp_data = np.genfromtxt(f"validation/bf_dsf/mattern2013/Be_Fig1.csv", delimiter=",")
     hm_data = np.genfromtxt(f"validation/bf_dsf/mattern2013/Be_HM.csv", delimiter=",")
@@ -493,16 +525,16 @@ def test_be():
     rsgf = np.genfromtxt(f"validation/bf_dsf/mattern2013/Be_RSGF.csv", delimiter=",")
     rsgf_core = np.genfromtxt(f"validation/bf_dsf/mattern2013/RSGF_Be_3.6_core.csv", delimiter=",")
 
-    plt.figure()
-    plt.scatter(exp_data[:, 0], exp_data[:, 1], label="Exp", c="k")
-    plt.plot(hm_data[:, 0], hm_data[:, 1], label="HM", c="magenta")
-    plt.plot(ia_data[:, 0], ia_data[:, 1], label="IA", c="navy")
-    plt.plot(pwffa[:, 0], pwffa[:, 1], label="PWFFA", c="crimson")
-    plt.plot(rsgf[:, 0], rsgf[:, 1], label="RSGF", c="orange", marker=".")
-    plt.plot(rsgf_core[:, 0], rsgf_core[:, 1], label="RSGF - core", c="darkgreen", marker=".")
-    plt.legend()
-    plt.ylim(-0.05, 0.35)
-    plt.show()
+    # plt.figure()
+    # plt.scatter(exp_data[:, 0], exp_data[:, 1], label="Exp", c="k")
+    # plt.plot(hm_data[:, 0], hm_data[:, 1], label="HM", c="magenta")
+    # plt.plot(ia_data[:, 0], ia_data[:, 1], label="IA", c="navy")
+    # plt.plot(pwffa[:, 0], pwffa[:, 1], label="PWFFA", c="crimson")
+    # plt.plot(rsgf[:, 0], rsgf[:, 1], label="RSGF", c="orange", marker=".")
+    # plt.plot(rsgf_core[:, 0], rsgf_core[:, 1], label="RSGF - core", c="darkgreen", marker=".")
+    # plt.legend()
+    # plt.ylim(-0.05, 0.35)
+    # plt.show()
 
 
 if __name__ == "__main__":

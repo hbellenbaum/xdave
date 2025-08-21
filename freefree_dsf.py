@@ -13,6 +13,7 @@ from scipy.integrate import quad
 from models import ModelOptions
 import numpy as np
 
+import warnings
 
 from plasmapy.formulary.mathematics import Fermi_integral as fdi
 
@@ -40,18 +41,19 @@ class FreeFreeDSF:
         #     / (1 - np.exp(-w / (BOLTZMANN_CONSTANT * self.state.electron_temperature)))
         #     * VACUUM_PERMITTIVITY
         #     * k**2
-        #     / (PI * ELEMENTARY_CHARGE**2 * self.state.electron_number_density)
+        #     / (PI * ELEMENTARY_CHARGE**2 * self.state.free_electron_number_density)
         #     * im_dielectric
         # )
+        if self.state.free_electron_number_density == 0.0:
+            return 0.0
 
         chi0 = self.susceptibility_function(k=k, w=w)
         Vee = 4 * np.pi * COULOMB_CONSTANT * ELEMENTARY_CHARGE**2 / k**2
         chilfc = chi0 / (1 - Vee * (1 - lfc) * chi0)
         im_suspectibility = np.imag(chilfc)
-        # chiee = np.imag(chi0)
         S_EG_LFC = (
             -(1)  # DIRAC_CONSTANT
-            / (PI * self.state.electron_number_density)  # * Vee)
+            / (PI * self.state.free_electron_number_density)  # * Vee)
             * 1
             / (1 - np.exp(-w / (BOLTZMANN_CONSTANT * self.state.electron_temperature)))
             * im_suspectibility
@@ -72,9 +74,7 @@ class FreeFreeDSF:
             # dielectric_func = self.rpa_numerical_dielectric_func_pontus(k=k, w=w)
         else:
             dielectric_func = self.rpa_numerical_dielectric_func(k=k, w=w)
-            raise NotImplementedError(
-                f"Model {self.polarisation_model} not recognized. Overwriting using Numerical RPA."
-            )
+            warnings.warn(f"Model {self.polarisation_model} not recognized. Overwriting using NUMERICAL.")
 
         return dielectric_func
 
@@ -88,11 +88,10 @@ class FreeFreeDSF:
             dielectric_func = self.rpa_numerical_dielectric_func(k=k, w=w)  # * potential_func
             susceptibility_func = (1 - dielectric_func) / potential_func
         else:
+            potential_func = 4 * np.pi * COULOMB_CONSTANT * ELEMENTARY_CHARGE**2 / k**2
             dielectric_func = self.rpa_numerical_dielectric_func(k=k, w=w)
             susceptibility_func = (1 - dielectric_func) / potential_func
-            raise NotImplementedError(
-                f"Model {self.polarisation_model} not recognized. Overwriting using Numerical RPA."
-            )
+            warnings.warn(f"Model {self.polarisation_model} not recognized. Overwriting using NUMERICAL.")
 
         return susceptibility_func
 
@@ -100,10 +99,10 @@ class FreeFreeDSF:
         """
         Note to self: the definition of the plasma frequency has changed, I will need to check this.
         """
-        EF = self.state.fermi_energy(self.state.electron_number_density, ELECTRON_MASS)
-        kF = self.state.fermi_wave_number(self.state.electron_number_density)
+        EF = self.state.fermi_energy(self.state.free_electron_number_density, ELECTRON_MASS)
+        kF = self.state.fermi_wave_number(self.state.free_electron_number_density)
         omega_p = self.state.plasma_frequency(
-            self.state.charge_state, self.state.electron_number_density, ELECTRON_MASS
+            self.state.charge_state, self.state.free_electron_number_density, ELECTRON_MASS
         )
         gamma = EF / (DIRAC_CONSTANT * omega_p)
 
@@ -130,8 +129,8 @@ class FreeFreeDSF:
         return pol_func
 
     def lindhard_pol_func_dc(self, k, w):
-        EF = self.state.fermi_energy(self.state.electron_number_density, ELECTRON_MASS)
-        kF = self.state.fermi_wave_number(self.state.electron_number_density)
+        EF = self.state.fermi_energy(self.state.free_electron_number_density, ELECTRON_MASS)
+        kF = self.state.fermi_wave_number(self.state.free_electron_number_density)
         q0 = 0.5 * k / kF
         w0 = 0.25 * w / (EF * q0)
 
@@ -142,14 +141,14 @@ class FreeFreeDSF:
 
         G_plus = lindhard_func(w0 + q0)
         G_minus = lindhard_func(w0 - q0)
-        pol_func = 3 * self.state.electron_number_density / (4 * EF * q0) * (G_plus - G_minus)  # / (4 * q0)
+        pol_func = 3 * self.state.free_electron_number_density / (4 * EF * q0) * (G_plus - G_minus)  # / (4 * q0)
 
         return pol_func
 
     def rpa_numerical_dielectric_func(self, k, w):
         ## taken from Eqn. (5.5) in K. W\"unsch PhD Thesis (2011)
-        # kF = self.state.fermi_wave_number(self.state.electron_number_density)
-        # wF = self.state.fermi_frequency(self.state.electron_number_density, ELECTRON_MASS)
+        # kF = self.state.fermi_wave_number(self.state.free_electron_number_density)
+        # wF = self.state.fermi_frequency(self.state.free_electron_number_density, ELECTRON_MASS)
 
         # if use_long_wavelength_limit:
         #     return
@@ -161,15 +160,15 @@ class FreeFreeDSF:
 
     def _im_dielectric_rpa(self, k, w):
 
-        kF = self.state.fermi_wave_number(self.state.electron_number_density)  # 1/m
-        EF = self.state.fermi_energy(self.state.electron_number_density, ELECTRON_MASS)  # J
+        kF = self.state.fermi_wave_number(self.state.free_electron_number_density)  # 1/m
+        EF = self.state.fermi_energy(self.state.free_electron_number_density, ELECTRON_MASS)  # J
         vF = DIRAC_CONSTANT * kF / ELECTRON_MASS  # m/s
         u = w / (k * vF * DIRAC_CONSTANT)  # dimensionless
         z = k / (2 * kF)  # dimensionless
 
         beta = 1 / (BOLTZMANN_CONSTANT * self.state.electron_temperature)
         mu = self.state.chemical_potential_ichimaru(
-            self.state.electron_temperature, self.state.electron_number_density, ELECTRON_MASS
+            self.state.electron_temperature, self.state.free_electron_number_density, ELECTRON_MASS
         )  # Joule
 
         D = EF * beta  # dimensionless
@@ -205,9 +204,9 @@ class FreeFreeDSF:
 
         w_freq = w / DIRAC_CONSTANT
 
-        kF = self.state.fermi_wave_number(self.state.electron_number_density)  # 1/m
-        EF = self.state.fermi_energy(self.state.electron_number_density, ELECTRON_MASS)  # J
-        TF = self.state.fermi_temperature(ELECTRON_MASS, self.state.electron_number_density)  # K
+        kF = self.state.fermi_wave_number(self.state.free_electron_number_density)  # 1/m
+        EF = self.state.fermi_energy(self.state.free_electron_number_density, ELECTRON_MASS)  # J
+        TF = self.state.fermi_temperature(ELECTRON_MASS, self.state.free_electron_number_density)  # K
         vF = DIRAC_CONSTANT * kF / ELECTRON_MASS  # m/s
 
         u = w_freq / (vF * k)  # [#]
@@ -218,17 +217,18 @@ class FreeFreeDSF:
 
         theta = t  # BOLTZMANN_CONSTANT * self.state.electron_temperature / EF
         mu = self.state.chemical_potential_ichimaru(
-            self.state.electron_temperature, self.state.electron_number_density, ELECTRON_MASS
+            self.state.electron_temperature, self.state.free_electron_number_density, ELECTRON_MASS
         )  # [J]
         alpha = mu / EF
         eta = self.state.reduced_chemical_potential_tobias(theta=theta)
         # alpha = eta * t
 
         def g_ancarni(lambda_val):
-            if lambda_val < 0.0:
-                return -g_t(-lambda_val)
-            else:
-                return g_t(lambda_val)
+            # if lambda_val < 0.0:
+            #     return -g_t(-lambda_val)
+            # else:
+            #     return g_t(lambda_val)
+            return np.where(lambda_val < 0.0, -g_t(-lambda_val), g_t(lambda_val))
 
         def g_t(lambda_val, eps=1.0e-9):
 
@@ -236,16 +236,31 @@ class FreeFreeDSF:
             B = alpha / t
 
             def f_prime(X):
+                # y = A * X**2 - B
+                # # scalar implementation; if X can be array, vectorize with np.where
+                # if y >= 0.0:
+                #     # exp(-y) is safe (<= 1)
+                #     exp_neg = np.exp(-y)
+                #     s = 1.0 / (1.0 + exp_neg)
+                # else:
+                #     # exp(y) is safe (<= 1)
+                #     exp_pos = np.exp(y)
+                #     s = exp_pos / (1.0 + exp_pos)
+                # return -2.0 * A * X * (s * (1.0 - s))
                 y = A * X**2 - B
-                # scalar implementation; if X can be array, vectorize with np.where
-                if y >= 0.0:
-                    # exp(-y) is safe (<= 1)
-                    exp_neg = np.exp(-y)
-                    s = 1.0 / (1.0 + exp_neg)
-                else:
-                    # exp(y) is safe (<= 1)
-                    exp_pos = np.exp(y)
-                    s = exp_pos / (1.0 + exp_pos)
+                s = np.empty_like(y)
+
+                pos_mask = y >= 0.0
+                neg_mask = ~pos_mask
+
+                # y >= 0 branch
+                exp_neg = np.exp(-y[pos_mask])
+                s[pos_mask] = 1.0 / (1.0 + exp_neg)
+
+                # y < 0 branch
+                exp_pos = np.exp(y[neg_mask])
+                s[neg_mask] = exp_pos / (1.0 + exp_pos)
+
                 return -2.0 * A * X * (s * (1.0 - s))
 
             def integrand_u(u):
@@ -255,8 +270,8 @@ class FreeFreeDSF:
                 dX_du = (np.pi / 2) * (1 / np.cos(np.pi * u / 2) ** 2)
                 return f_prime(X) * bracket_term * dX_du
 
-            res1, _ = integrate.quad(integrand_u, 0, 0.5 - eps, limit=300)
-            res2, _ = integrate.quad(integrand_u, 0.5 + eps, 1, limit=300)
+            res1, _ = integrate.quad_vec(integrand_u, 0, 0.5 - eps, limit=300)
+            res2, _ = integrate.quad_vec(integrand_u, 0.5 + eps, 1, limit=300)
 
             return (lambda_val**2) * (res1 + res2)
 
@@ -317,10 +332,10 @@ class FreeFreeDSF:
             +1.22324e01,
         ]
 
-        EF = self.state.fermi_energy(self.state.electron_number_density, ELECTRON_MASS)
-        kF = self.state.fermi_wave_number(self.state.electron_number_density)
+        EF = self.state.fermi_energy(self.state.free_electron_number_density, ELECTRON_MASS)
+        kF = self.state.fermi_wave_number(self.state.free_electron_number_density)
         Theta_e = self.state.alt_degeneracy_parameter(
-            self.state.electron_number_density, self.state.electron_temperature, ELECTRON_MASS
+            self.state.free_electron_number_density, self.state.electron_temperature, ELECTRON_MASS
         )
 
         sqrt_Theta_e = np.sqrt(Theta_e)
@@ -329,7 +344,7 @@ class FreeFreeDSF:
         w0 = 0.25 * omega / (EF * q0)  #  * DIRAC_CONSTANT
         w = w0 / sqrt_Theta_e
         eta = self.state.chemical_potential_ichimaru(
-            self.state.electron_temperature, self.state.electron_number_density, ELECTRON_MASS
+            self.state.electron_temperature, self.state.free_electron_number_density, ELECTRON_MASS
         )
         q = q0 / np.sqrt(Theta_e)
 
@@ -399,7 +414,7 @@ class FreeFreeDSF:
         Im_X_kw = SQRT_PI * (log1pexp(exp_arg_p) - log1pexp(exp_arg_m))
         delta_F = phi_function(w0 + q0) - phi_function(w0 - q0)
         Re_X_kw = -2.0 * F_m0p5 * delta_F / sqrt_Theta_e
-        Pi_aa_0_MB = self.state.electron_number_density / (BOLTZMANN_CONSTANT * self.state.electron_temperature)
+        Pi_aa_0_MB = self.state.free_electron_number_density / (BOLTZMANN_CONSTANT * self.state.electron_temperature)
         pol_func = Pi_aa_0_MB * (Re_X_kw + 1.0j * Im_X_kw) / (4.0 * F_p0p5 * q)
 
         return pol_func
@@ -423,7 +438,7 @@ def test():
     models = ModelOptions(polarisation_model="NUMERICAL")
     models2 = ModelOptions(polarisation_model="DANDREA_FIT")
 
-    omega_array = np.linspace(-100, 100, 500) * eV_TO_J  # + 8.5e3 * eV_TO_J
+    omega_array = np.linspace(-100, 100, 100) * eV_TO_J  # + 8.5e3 * eV_TO_J
     state = PlasmaState(
         electron_temperature=Te,
         ion_temperature=Te,
@@ -452,18 +467,18 @@ def test():
         # ims_rpa = np.zeros_like(omega_array)
         # reals_dandrea = np.zeros_like(omega_array)
         # reals_rpa = np.zeros_like(omega_array)
-        for i in range(0, len(omega_array)):
-            w = omega_array[i]
-            kernel = FreeFreeDSF(state=state, models=models)
-            kernel2 = FreeFreeDSF(state=state, models=models2)
-            # int_term = kernel._real_dielectric_rpa(k=k, w=w)
-            dsf = kernel.get_dsf(k=k, w=w, lfc=lfc)
-            dsf2 = kernel2.get_dsf(k=k, w=w, lfc=lfc)
-            # dielectric_func, im_part_rpa, real_part_rpa = kernel.rpa_numerical_dielectric_func(k, w)
-            # real_dielectrics[i] = np.real(dielectric_func)
-            # im_dielectric[i] = np.imag(dielectric_func)
-            dsfs[i] = dsf
-            dsfs2[i] = dsf2
+        # for i in range(0, len(omega_array)):
+        w = omega_array  # [i]
+        kernel = FreeFreeDSF(state=state, models=models)
+        kernel2 = FreeFreeDSF(state=state, models=models2)
+        # int_term = kernel._real_dielectric_rpa(k=k, w=w)
+        dsfs = kernel.get_dsf(k=k, w=w, lfc=lfc)
+        dsfs2 = kernel2.get_dsf(k=k, w=w, lfc=lfc)
+        # dielectric_func, im_part_rpa, real_part_rpa = kernel.rpa_numerical_dielectric_func(k, w)
+        # real_dielectrics[i] = np.real(dielectric_func)
+        # im_dielectric[i] = np.imag(dielectric_func)
+        # dsfs[i] = dsf
+        # dsfs2[i] = dsf2
 
         idx = np.argwhere(np.isnan(dsfs))
         dsfs_new = np.delete(dsfs, idx)
@@ -471,7 +486,7 @@ def test():
         omega_new = np.delete(omega_array, idx)
         # dsfs_new *= 1 / J_TO_eV  # DIRAC_CONSTANT
         # twinx = axes.twinx()
-        axes.plot(omega_new * J_TO_eV, dsfs_new / J_TO_eV, label=f"q={q} 1/aB", c=cs)  #  /  np.max(dsfs_new)
+        # axes.plot(omega_new * J_TO_eV, dsfs_new / J_TO_eV, label=f"q={q} 1/aB", c=cs)  #  /  np.max(dsfs_new)
 
         # axes2[0].plot(omega_array * J_TO_eV, reals_dandrea, label=f"Fit")
         # axes2[0].plot(omega_array * J_TO_eV, reals_rpa - 1, label=f"RPA")

@@ -56,3 +56,22 @@ def get_mcss_wr_from_status_file(status_file):
 def get_values_from_status_file(status_fn):
 
     return
+
+
+def laplace(tau, E, wff, wbf):
+    """
+    Laplace transform
+    """
+
+    F_wff = np.zeros(len(tau))
+    F_wbf = np.zeros(len(tau))
+
+    for i in range(0, len(tau)):
+
+        kernel_wff = np.exp(-tau[i] * E) * wff  # * omega_factor
+        kernel_wbf = np.exp(-tau[i] * E) * wbf  # * omega_factor
+        F_wff[i] = np.trapz(kernel_wff, E)  # * omega_new[i]
+        F_wbf[i] = np.trapz(kernel_wbf, E)  # * omega_new[i]
+
+    F_tot_inel = F_wff + F_wbf
+    return F_tot_inel, F_wff, F_wbf
