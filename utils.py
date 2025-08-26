@@ -2,6 +2,8 @@ import numpy as np
 from constants import DIRAC_CONSTANT, SPEED_OF_LIGHT, BOHR_RADIUS, PI
 from unit_conversions import eV_TO_J
 
+import os
+
 
 def calculate_q(angle, energy):
     # angle *= np.pi / 180.0
@@ -56,6 +58,90 @@ def get_mcss_wr_from_status_file(status_file):
 def get_values_from_status_file(status_fn):
 
     return
+
+
+HA_TO_eV = 27.211386  # hard-coded for now
+
+
+def load_itcf_from_file(N, q_index=0, skiprows=0, data_path=None):
+    """
+    Load PIMC data, i.e. ITCF from Tobias' data set
+    Note: no keys/ headers, all values are given in Hartree units
+
+    Parameters
+    ----------
+    N: int
+            number of particles in PIMC simulation to find correct file
+    rs: float
+            Wigner-Seitz radius of PIMC simulation
+    theta: float
+            non-dimensional temperature of PIMC simulation
+    q_index: int
+            index 0 to 100 for the chosen q-value
+    skiprows: float
+            default set to 0, don't change for the current file format
+    data_path: str
+            directory where data files are stored
+
+
+    Returns
+    ----------
+    float
+            q-value
+    array
+            array of tau values in 1/eV
+    array
+            array of ITCF values
+    array
+            array of statistical errors of the ITCF
+    float
+            proton-electron static structure factor corresponding to q
+    float
+            proton static structure factor corresponding to q
+    float
+            Rayleigh weight
+
+    """
+
+    path = data_path + f"/Tau_k_index{q_index}fermion_density_response_electron_{N}.res"
+    data = np.loadtxt(path, skiprows=skiprows)
+
+    # tau: first row in the ITCF file (for a given q) -> converted to 1/eV from 1/Hartree
+    tau_array = data[:, 0] * 1 / HA_TO_eV
+    # F: ITCF function for each tau (for a given q) -> directly compared to MCSS outputs
+    itcf_array = data[:, 1]
+    itcf_errors = data[:, 2]
+
+    # hard-coded, taken from the corresponding lines (according to index) in the filename
+    S_ei_from_file = np.loadtxt(
+        os.path.join(
+            data_path,
+            f"fermion_proton_electron_static_structure_factor_{N}.res",
+        ),
+        usecols=1,
+    )
+    S_ei = S_ei_from_file[q_index]
+
+    # load
+    S_ii_from_file = np.loadtxt(
+        os.path.join(data_path, f"fermion_proton_static_structure_factor_{N}.res"),
+        usecols=1,
+    )
+    S_ii = S_ii_from_file[q_index]
+
+    q_values = np.loadtxt(
+        os.path.join(
+            data_path,
+            f"fermion_proton_electron_static_structure_factor_{N}.res",
+        ),
+        usecols=0,
+    )
+    q_value = q_values[q_index]
+
+    # calculate Rayleigh weight
+    WR = S_ei**2 / S_ii
+
+    return q_value, tau_array, itcf_array, itcf_errors, S_ei, S_ii, WR
 
 
 def laplace(tau, E, wff, wbf):

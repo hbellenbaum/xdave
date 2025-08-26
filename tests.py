@@ -1,12 +1,15 @@
-from plasma_state import PlasmaState, get_rho_T_from_rs_theta
+from plasma_state import PlasmaState, get_rho_T_from_rs_theta, get_fractions_from_Z
 from models import ModelOptions
 from unit_conversions import *
 from constants import BOHR_RADIUS, PLANCK_CONSTANT
 from freefree_dsf import FreeFreeDSF
-from utils import calculate_angle
+from boundfree_dsf import BoundFreeDSF
+from utils import calculate_angle, calculate_q, load_itcf_from_file
+from xdave import xDave
 
 import numpy as np
 import matplotlib.pyplot as plt
+from scipy.signal import fftconvolve
 
 
 def test_chemical_potential():
@@ -232,6 +235,282 @@ def test_ff_mcss():
     plt.close()
 
 
+def test_lindhard():
+    rs = 2
+    theta = 1
+    rho, Te = get_rho_T_from_rs_theta(rs=rs, theta=theta)
+    ks = np.array((0.5, 1.0, 2.0, 4.0)) / BOHR_RADIUS
+    rho *= g_per_cm3_TO_kg_per_m3
+    Te *= eV_TO_K
+    charge_state = 1.0
+    atomic_mass = 1.0
+    atomic_number = 1.0
+    lfc = 0.0
+
+    models = ModelOptions(polarisation_model="NUMERICAL")
+    models2 = ModelOptions(polarisation_model="LINDHARD")
+
+    omega_array = np.linspace(-100, 100, 500) * eV_TO_J
+    state = PlasmaState(
+        electron_temperature=Te,
+        ion_temperature=Te,
+        mass_density=rho,
+        charge_state=charge_state,
+        atomic_mass=atomic_mass,
+        atomic_number=atomic_number,
+    )
+
+    fig, axes = plt.subplots(1, 1, figsize=(14, 8))
+    colors = ["magenta", "crimson", "orange", "dodgerblue", "lightgreen", "lightgray", "yellow", "cyan"]
+
+    for k, cs in zip(ks, colors):
+        dsfs = np.zeros_like(omega_array)
+        dsfs2 = np.zeros_like(omega_array)
+        q = k * BOHR_RADIUS
+
+        for i in range(0, len(omega_array)):
+            w = omega_array[i]
+            kernel = FreeFreeDSF(state=state, models=models)
+            kernel2 = FreeFreeDSF(state=state, models=models2)
+
+            dsf = kernel.get_dsf(k=k, w=w, lfc=lfc)
+            dsf2 = kernel2.get_dsf(k=k, w=w, lfc=lfc)
+
+            dsfs[i] = dsf
+            dsfs2[i] = dsf2
+
+        idx = np.argwhere(np.isnan(dsfs))
+        dsfs_new = np.delete(dsfs, idx)
+        dsfs2_new = np.delete(dsfs2, idx)
+        omega_new = np.delete(omega_array, idx)
+
+        axes.plot(omega_new * J_TO_eV, dsfs_new / J_TO_eV, label=f"q={q} 1/aB", c=cs)
+        axes.plot(omega_new * J_TO_eV, dsfs2_new / J_TO_eV, label=f"Lindhard: q={q}", c=cs, ls="-.")
+
+    axes.set_xlabel(r"$\omega$ [eV]")
+    axes.set_ylabel(r"DSF [1/eV]")
+    axes.legend()
+
+    plt.tight_layout()
+    plt.show()
+    fig.savefig("ff_dsf_test_lindhard.pdf", dpi=200)
+
+
+def test_full_spectrum():
+    import matplotlib.pyplot as plt
+    import scipy.stats as stats
+
+    Z_mean = 0.51
+
+    rs = 3
+    theta = 1
+    atomic_mass = 1.00784
+    rho, T = get_rho_T_from_rs_theta(rs=rs, theta=theta, atomic_mass=atomic_mass)
+    rho *= g_per_cm3_TO_kg_per_m3
+    T *= eV_TO_K
+
+    models = ModelOptions(polarisation_model="NUMERICAL_RPA", bf_model="SCHUMACHER")
+
+    state_bf = PlasmaState(
+        electron_temperature=T,
+        ion_temperature=T,
+        mass_density=rho,
+        charge_state=0.0,
+        atomic_mass=atomic_mass,
+        atomic_number=1,
+    )
+
+    beam_energy = 9.0e3
+    angles = np.array([13, 30, 45, 60, 80, 100, 120, 140, 160])
+    ks = calculate_q(angle=angles, energy=beam_energy) / BOHR_RADIUS
+    omega_array = np.linspace(-100, 100, 500) * eV_TO_J
+
+    binding_energies = (
+        np.array(
+            [
+                -13.6,
+            ]
+        )
+        * eV_TO_J
+    )
+
+    k = ks[0]
+
+    bf_kernel = BoundFreeDSF(state=state_bf, models=models)
+    bf_dsf = bf_kernel.get_dsf(ZA=1.0, Zb=state_bf.Zb, k=k, w=omega_array, Eb=binding_energies)
+
+    state_ff = PlasmaState(
+        electron_temperature=T,
+        ion_temperature=T,
+        mass_density=rho,
+        charge_state=1.0,
+        atomic_mass=atomic_mass,
+        atomic_number=1,
+    )
+    ff_kernel = FreeFreeDSF(state=state_ff, models=models)
+    ff_dsf = ff_kernel.get_dsf(k=k, w=omega_array, lfc=0.0)
+
+    tot_dsf = 0.5 * ff_dsf + 0.5 * bf_dsf
+
+    WR = 1.2
+
+    sif = stats.norm.pdf(omega_array, 0, 2 * eV_TO_J)
+    sif /= np.max(sif)
+    # plt.figure()
+    # plt.plot(omega_array, sif)
+    # plt.show()
+
+    # bf_sif = np.convolve(sif, bf_dsf, mode="same")
+    # spectrum = np.convolve(tot_dsf, sif, mode="same")
+    inelastic = fftconvolve(tot_dsf, sif, mode="same")  # + WR * sif
+    elastic = WR * sif * J_TO_eV
+    spectrum = inelastic + elastic
+
+    # print(bf_dsf)
+    # plt.figure()
+    fig, axes = plt.subplots(1, 2)
+    ax = axes[0]
+    ax.plot(omega_array * J_TO_eV, 0.5 * bf_dsf / J_TO_eV, label="BF", c="crimson", ls="-.")
+    ax.plot(omega_array * J_TO_eV, 0.5 * ff_dsf / J_TO_eV, label="FF", c="navy", ls="-.")
+    ax.plot(omega_array * J_TO_eV, tot_dsf / J_TO_eV, label="TOT", c="darkgreen", ls="-.")
+    # ax.plot(omega_array * J_TO_eV, sif / J_TO_eV, label="SIF", c="black", ls="-.")
+    ax.set_xlabel(r"$\omega$ [eV]")
+    ax.set_ylabel(r"DSF [1/eV]")
+    ax.legend()
+
+    ax = axes[1]
+    ax.plot(omega_array * J_TO_eV, sif / np.max(sif), label="SIF", ls="-.")
+    ax.plot(omega_array * J_TO_eV, inelastic / np.max(spectrum), label="Inelastic", ls="-.")
+    ax.plot(omega_array * J_TO_eV, elastic / np.max(spectrum), label="Elastic", ls="-.")
+    ax.plot(omega_array * J_TO_eV, spectrum / np.max(spectrum), label="Spectrum", ls="-.")
+    ax.set_xlabel(r"$\omega$ [eV]")
+    ax.set_ylabel(r"Signal [arb. units]")
+    # ax.plot(omega_array, bf_sif / np.max(bf_sif), label="BF", ls="solid")
+    ax.legend()
+    fig.suptitle(f"Hydrogen at rs={rs}, theta={theta}, Z=0.5")
+    plt.show()
+
+    # return
+
+
+def compare_hydrogen_against_pimc():
+    import scipy.stats as stats
+
+    rs = 3
+    theta = 1
+    atomic_mass = 1.00784
+    Z_mean = 0.51
+    ipd_best_fit = -3.43  # eV
+    rho, T = get_rho_T_from_rs_theta(rs=rs, theta=theta, atomic_mass=atomic_mass)
+    rho *= g_per_cm3_TO_kg_per_m3
+    T *= eV_TO_K
+
+    N = 14
+    pimc_data_dir = f"/home/bellen85/code/dev/itcf_fitting/data/N{N}_rs{rs}_theta{theta:.0f}"
+    # pimc_data_dir = "/home/bellen85/code/dev/itcf_fitting/data/N14_rs3_theta1"
+    q_value, tau_array, itcf_array, itcf_errors, S_ei, S_ii, WR = load_itcf_from_file(
+        N=N, q_index=10, data_path=pimc_data_dir
+    )
+
+    state_H0 = PlasmaState(
+        electron_temperature=T,
+        ion_temperature=T,
+        mass_density=rho,
+        charge_state=0.0,
+        atomic_mass=atomic_mass,
+        atomic_number=1,
+    )
+
+    state_H1 = PlasmaState(
+        electron_temperature=T,
+        ion_temperature=T,
+        mass_density=rho,
+        charge_state=1.0,
+        atomic_mass=atomic_mass,
+        atomic_number=1,
+    )
+
+    # beam_energy = 9.0e3  # * eV_TO_J
+    # angles = np.array([13, 30, 45, 60, 80, 100, 120, 140, 160])
+    # ks = calculate_q(angle=angles, energy=beam_energy) / BOHR_RADIUS
+    omega_array = np.linspace(-200, 200, 1000) * eV_TO_J
+
+    # WR = 1.2
+
+    models = ModelOptions(
+        polarisation_model="NUMERICAL", bf_model="SCHUMACHER", lfc_model="DORNHEIM_ESA", ipd_model="NONE"
+    )
+    x1, x2 = get_fractions_from_Z(Z=Z_mean)
+    xs = np.array([x1, x2])
+
+    print(
+        f"Running fractions: {x1} for charge {state_H0.charge_state}\n"
+        f"and {x2} for charge {state_H1.charge_state}\n"
+    )
+    xdave = xDave(
+        models=models,
+        states=np.array([state_H0, state_H1]),
+        fractions=xs,
+        binding_energies=np.array([-13.6]) * eV_TO_J,
+        rayleigh_weight=WR,
+        sif=np.zeros_like(omega_array),
+        ipd=ipd_best_fit,
+    )
+
+    q = q_value
+    k = q / BOHR_RADIUS
+
+    bf_tot, ff_tot, dsf, Wr = xdave.run(k=k, w=omega_array)
+    F_tot_inel, F_wff, F_wbf = xdave.get_itcf(
+        tau=tau_array, w=omega_array * J_TO_eV, ff=ff_tot / J_TO_eV, bf=bf_tot / J_TO_eV
+    )
+
+    fig, axes = plt.subplots(1, 3, figsize=(14, 10))
+
+    # plt.figure()
+    ax = axes[0]
+    ax.plot(omega_array * J_TO_eV, bf_tot / J_TO_eV, label="BF")
+    ax.plot(omega_array * J_TO_eV, ff_tot / J_TO_eV, label="FF")
+    ax.plot(omega_array * J_TO_eV, dsf / J_TO_eV, label="Tot")
+    ax.legend()
+    ax.set_xlabel(r"$\omega$ [eV]")
+    ax.set_ylabel(r"DSF [1/eV]")
+    # plt.show()
+
+    sif = stats.norm.pdf(omega_array, 0, 2 * eV_TO_J)
+    sif /= np.max(sif)
+    WR *= J_TO_eV
+
+    inelastic, elastic, spectrum = xdave.convolve_with_sif(sif=sif, bf=bf_tot, ff=ff_tot, WR=WR)
+
+    ax = axes[1]
+    ax.plot(omega_array * J_TO_eV, inelastic / np.max(spectrum), label="inel", ls="-.")
+    ax.plot(omega_array * J_TO_eV, elastic / np.max(spectrum), label="el", ls="-.")
+    ax.plot(omega_array * J_TO_eV, spectrum / np.max(spectrum), label="tot", ls="-.")
+    ax.legend()
+    ax.set_xlabel(r"$\omega$ [eV]")
+    ax.set_ylabel(r"Intensity []")
+
+    ax = axes[2]
+    # ax.plot(tau_array, itcf_array, label="PIMC tot", ls="solid", c="black")
+    ax.plot(tau_array, itcf_array - Wr, label="PIMC inel", ls="dashed", c="crimson")
+    ax.plot(tau_array, F_tot_inel, label="xDave inel", ls="dashed", c="magenta")
+    ax.plot(tau_array, F_wff, label="xDave ff", ls="dashed", c="navy")
+    ax.plot(tau_array, F_wbf, label="xDave bf", ls="dashed", c="orange")
+    ax.axhline(Wr, ls="solid", c="gray", label="WR")
+    ax.legend()
+    ax.set_xlabel(r"$\tau$ [1/eV]")
+    ax.set_ylabel(r"ITCF []")
+
+    plt.suptitle(f"Hydrogen at q={q:.2f} rs={rs}, theta={theta}, Z={Z_mean}, ipd={ipd_best_fit}")
+    plt.tight_layout()
+    plt.show()
+
+    fig.savefig(f"hydrogen_test_rs={rs}_theta={theta}_Z={Z_mean}_q={q:.2f}.pdf", dpi=200)
+
+
 if __name__ == "__main__":
     # test_chemical_potential()
-    test_ff_rpa()
+    # test_ff_rpa()
+    test_lindhard()
+    # compare_hydrogen_against_pimc()
