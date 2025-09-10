@@ -2,6 +2,8 @@ import numpy as np
 from constants import DIRAC_CONSTANT, SPEED_OF_LIGHT, BOHR_RADIUS, PI
 from unit_conversions import eV_TO_J
 
+from mendeleev import element
+import pandas as pd
 import os
 
 
@@ -161,3 +163,47 @@ def laplace(tau, E, wff, wbf):
 
     F_tot_inel = F_wff + F_wbf
     return F_tot_inel, F_wff, F_wbf
+
+
+def get_atomic_mass_for_element(e):
+    # y = element(int(AN))
+    # amu = y.atomic_weight
+    return element(str(e)).atomic_weight, element(str(e)).atomic_number
+
+
+def get_binding_energies_from_elements(AN):
+    dat_file = f"data/binding_energies_xrdb.csv"
+    df = pd.read_csv(dat_file)
+
+    AN_col = df.columns[0]
+    # Filter row for the given atomic number
+    row = df[df[AN_col] == AN]
+
+    if row.empty:
+        return {}
+
+    # Drop the AN column and any NaNs
+    values = row.iloc[0].drop(labels=[AN_col]).fillna(0)
+    return values.to_numpy() * (-1)
+
+
+def get_emission_lines_for_element(element):
+    df = pd.read_csv("data/emission_lines_table_1_2.csv")
+    # Filter the row for the element
+    row = df[df["Element"] == element]
+
+    if row.empty:
+        raise ValueError(f"Element '{element}' not found in the dataset.")
+
+    row = row.iloc[0]  # Extract the single row as Series
+
+    # Build dict of emission lines and energies
+    emission_dict = {}
+    for col in df.columns[1:]:  # skip "Element" column
+        val = row[col]
+        if pd.isna(val):
+            val = 0  # or you could skip instead of setting to 0
+        if pd.notna(val) and val != 0:
+            emission_dict[col] = val
+
+    return emission_dict
