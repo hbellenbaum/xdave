@@ -10,7 +10,7 @@ class ModelOptions:
         static_structure_factor_approximation="MSA",
         lfc_model="DORNHEIM_ESA",
         bf_model="SCHUMACHER",
-        # ipd_model,
+        ipd_model="CROWLEY",
         # wr_model,
     ):
         # self.ii_potential = ii_potential
@@ -21,5 +21,5 @@ class ModelOptions:
         self.static_structure_factor_approximation = static_structure_factor_approximation
         self.lfc_model = lfc_model
         self.bf_model = bf_model
-        # self.ipd_model = ipd_model
+        self.ipd_model = ipd_model
         # self.wr_model = wr_model

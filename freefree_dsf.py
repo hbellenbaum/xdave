@@ -28,11 +28,10 @@ def effective_coulomb_potential(ionisation, wave_number):
 
 class FreeFreeDSF:
 
-    def __init__(self, state: PlasmaState, models: ModelOptions) -> None:
+    def __init__(self, state: PlasmaState) -> None:
         self.state = state
-        self.polarisation_model = models.polarisation_model
 
-    def get_dsf(self, k, w, lfc):
+    def get_dsf(self, k, w, lfc, model="NUMERICAL_RPA"):
         # dielectric_func = self.dielectric_function(k=k, w=w)
         # im_dielectric = -np.imag(dielectric_func) / ((np.real(dielectric_func)) ** 2 + (np.imag(dielectric_func)) ** 2)
 
@@ -47,7 +46,7 @@ class FreeFreeDSF:
         if self.state.free_electron_number_density == 0.0:
             return 0.0
 
-        chi0 = self.susceptibility_function(k=k, w=w)
+        chi0 = self.susceptibility_function(k=k, w=w, model=model)
         Vee = 4 * np.pi * COULOMB_CONSTANT * ELEMENTARY_CHARGE**2 / k**2
         chilfc = chi0 / (1 - Vee * (1 - lfc) * chi0)
         im_suspectibility = np.imag(chilfc)
@@ -61,29 +60,30 @@ class FreeFreeDSF:
 
         return S_EG_LFC
 
-    def dielectric_function(self, k, w):
+    def dielectric_function(self, k, w, model):
         potential_func = 4 * np.pi * COULOMB_CONSTANT * ELEMENTARY_CHARGE**2 / k**2
-        if self.polarisation_model == "LINDHARD":
+        if model == "LINDHARD":
             pol_func = self.lindhard_pol_func_dc(k=k, w=w)
             dielectric_func = 1 - potential_func * pol_func
-        elif self.polarisation_model == "DANDREA_FIT":
+        elif model == "DANDREA_FIT":
             pol_func = self.dandrea_fit(k=k, omega=w)
             dielectric_func = 1 - potential_func * pol_func
-        elif self.polarisation_model == "NUMERICAL":
+        elif model == "NUMERICAL":
             dielectric_func = self.rpa_numerical_dielectric_func(k=k, w=w)  # * potential_func
             # dielectric_func = self.rpa_numerical_dielectric_func_pontus(k=k, w=w)
         else:
             dielectric_func = self.rpa_numerical_dielectric_func(k=k, w=w)
-            warnings.warn(f"Model {self.polarisation_model} not recognized. Overwriting using NUMERICAL.")
+            warnings.warn(f"Model {model} not recognized. Overwriting using NUMERICAL.")
 
         return dielectric_func
 
-    def susceptibility_function(self, k, w):
-        if self.polarisation_model == "LINDHARD":
+    def susceptibility_function(self, k, w, model):
+        if model == "LINDHARD":
+            warnings.warn(f"Lindhard model currently not working. Try something else.")
             susceptibility_func = self.lindhard_pol_func_dc(k=k, w=w)
-        elif self.polarisation_model == "DANDREA_FIT":
+        elif model == "DANDREA_FIT":
             susceptibility_func = self.dandrea_fit(k=k, omega=w)
-        elif self.polarisation_model == "NUMERICAL":
+        elif model == "NUMERICAL":
             potential_func = 4 * np.pi * COULOMB_CONSTANT * ELEMENTARY_CHARGE**2 / k**2
             dielectric_func = self.rpa_numerical_dielectric_func(k=k, w=w)  # * potential_func
             susceptibility_func = (1 - dielectric_func) / potential_func
@@ -91,7 +91,7 @@ class FreeFreeDSF:
             potential_func = 4 * np.pi * COULOMB_CONSTANT * ELEMENTARY_CHARGE**2 / k**2
             dielectric_func = self.rpa_numerical_dielectric_func(k=k, w=w)
             susceptibility_func = (1 - dielectric_func) / potential_func
-            warnings.warn(f"Model {self.polarisation_model} not recognized. Overwriting using NUMERICAL.")
+            warnings.warn(f"Model {model} not recognized. Overwriting using NUMERICAL.")
 
         return susceptibility_func
 
@@ -131,8 +131,10 @@ class FreeFreeDSF:
     def lindhard_pol_func_dc(self, k, w):
         EF = self.state.fermi_energy(self.state.free_electron_number_density, ELECTRON_MASS)
         kF = self.state.fermi_wave_number(self.state.free_electron_number_density)
-        q0 = 0.5 * k / kF
-        w0 = 0.25 * w / (EF * q0)
+        vF = DIRAC_CONSTANT * kF / ELECTRON_MASS  # m/s
+
+        q0 = k / (2 * kF)  # k / (2 * kF)0.5 * k / kF
+        w0 = w / (k * vF * DIRAC_CONSTANT)  # 0.25 * w / (EF * q0)
 
         def lindhard_func(x):
             real_part = -x - 1 / 2 * (1 - x**2) * np.log(np.abs((x + 1) / (x - 1)))
@@ -470,10 +472,9 @@ def test():
         # for i in range(0, len(omega_array)):
         w = omega_array  # [i]
         kernel = FreeFreeDSF(state=state, models=models)
-        kernel2 = FreeFreeDSF(state=state, models=models2)
         # int_term = kernel._real_dielectric_rpa(k=k, w=w)
-        dsfs = kernel.get_dsf(k=k, w=w, lfc=lfc)
-        dsfs2 = kernel2.get_dsf(k=k, w=w, lfc=lfc)
+        dsfs = kernel.get_dsf(k=k, w=w, lfc=lfc, model="NUMERICAL_RPA")
+        dsfs2 = kernel.get_dsf(k=k, w=w, lfc=lfc, model="DANDREA_FIT")
         # dielectric_func, im_part_rpa, real_part_rpa = kernel.rpa_numerical_dielectric_func(k, w)
         # real_dielectrics[i] = np.real(dielectric_func)
         # im_dielectric[i] = np.imag(dielectric_func)

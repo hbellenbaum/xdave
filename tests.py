@@ -84,8 +84,8 @@ def test_ff_rpa():
     atomic_number = 1.0
     lfc = 0.0
 
-    models = ModelOptions(polarisation_model="NUMERICAL")
-    models2 = ModelOptions(polarisation_model="DANDREA_FIT")
+    # models = ModelOptions(polarisation_model="NUMERICAL")
+    # models2 = ModelOptions(polarisation_model="DANDREA_FIT")
 
     omega_array = np.linspace(-100, 100, 500) * eV_TO_J
     state = PlasmaState(
@@ -107,11 +107,11 @@ def test_ff_rpa():
 
         for i in range(0, len(omega_array)):
             w = omega_array[i]
-            kernel = FreeFreeDSF(state=state, models=models)
-            kernel2 = FreeFreeDSF(state=state, models=models2)
+            kernel = FreeFreeDSF(state=state)
+            kernel2 = FreeFreeDSF(state=state)
 
-            dsf = kernel.get_dsf(k=k, w=w, lfc=lfc)
-            dsf2 = kernel2.get_dsf(k=k, w=w, lfc=lfc)
+            dsf = kernel.get_dsf(k=k, w=w, lfc=lfc, model="NUMERICAL_RPA")
+            dsf2 = kernel2.get_dsf(k=k, w=w, lfc=lfc, model="DANDREA_FIT")
 
             dsfs[i] = dsf
             dsfs2[i] = dsf2
@@ -270,11 +270,11 @@ def test_lindhard():
 
         for i in range(0, len(omega_array)):
             w = omega_array[i]
-            kernel = FreeFreeDSF(state=state, models=models)
-            kernel2 = FreeFreeDSF(state=state, models=models2)
+            kernel = FreeFreeDSF(state=state)
+            # kernel2 = FreeFreeDSF(state=state, models=models2)
 
-            dsf = kernel.get_dsf(k=k, w=w, lfc=lfc)
-            dsf2 = kernel2.get_dsf(k=k, w=w, lfc=lfc)
+            dsf = kernel.get_dsf(k=k, w=w, lfc=lfc, model="NUMERICAL_RPA")
+            dsf2 = kernel.get_dsf(k=k, w=w, lfc=lfc, model="LINDHARD")
 
             dsfs[i] = dsf
             dsfs2[i] = dsf2
@@ -336,8 +336,8 @@ def test_full_spectrum():
 
     k = ks[0]
 
-    bf_kernel = BoundFreeDSF(state=state_bf, models=models)
-    bf_dsf = bf_kernel.get_dsf(ZA=1.0, Zb=state_bf.Zb, k=k, w=omega_array, Eb=binding_energies)
+    bf_kernel = BoundFreeDSF(state=state_bf)
+    bf_dsf = bf_kernel.get_dsf(ZA=1.0, Zb=state_bf.Zb, k=k, w=omega_array, Eb=binding_energies, model=models.bf_model)
 
     state_ff = PlasmaState(
         electron_temperature=T,
@@ -347,8 +347,8 @@ def test_full_spectrum():
         atomic_mass=atomic_mass,
         atomic_number=1,
     )
-    ff_kernel = FreeFreeDSF(state=state_ff, models=models)
-    ff_dsf = ff_kernel.get_dsf(k=k, w=omega_array, lfc=0.0)
+    ff_kernel = FreeFreeDSF(state=state_ff)
+    ff_dsf = ff_kernel.get_dsf(k=k, w=omega_array, lfc=0.0, model=models.polarisation_model)
 
     tot_dsf = 0.5 * ff_dsf + 0.5 * bf_dsf
 

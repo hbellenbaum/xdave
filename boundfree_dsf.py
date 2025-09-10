@@ -13,13 +13,13 @@ class BoundFreeDSF:
     Currently only doing basic Impulse Approximation :)
     """
 
-    def __init__(self, state: PlasmaState, models: ModelOptions) -> None:
+    def __init__(self, state: PlasmaState) -> None:
         self.state = state
         self.ff_model = PaulingShermanIonicFormFactor()
         self.screening_constants = ScreeningConstants
-        self.bf_model = models.bf_model
+        # self.bf_model = models.bf_model
 
-    def get_dsf(self, ZA, Zb, k, w, Eb, ipd_model="NONE"):
+    def get_dsf(self, ZA, Zb, k, w, Eb, model="SCHUMACHER"):
         """
         Inputs:
             - ZA: Net charge state
@@ -31,21 +31,15 @@ class BoundFreeDSF:
             - ipd_model: str
         """
 
-        # Calculate IPD
-        ipd = 0.0
-        if ipd_model != "NONE":
-            ipd = get_ipd(state=self.state, model=ipd_model)
-        Eb_eff = Eb + ipd  # "+ ipd" if Eb < 0 and IPD > 0
-
         # Load correct bf model
-        if self.bf_model == "SCHUMACHER":
-            Sce = self.schuhmacher_ia(ZA, Zb, k, w, Eb_eff)
-        elif self.bf_model == "HR_CORRECTION":
-            Sce = self.schumacher_ia_correction(ZA, Zb, k, w, Eb_eff)
-        elif self.bf_model == "TRUNCATED_IA":
+        if model == "SCHUMACHER":
+            Sce = self.schuhmacher_ia(ZA, Zb, k, w, Eb)
+        elif model == "HR_CORRECTION":
+            Sce = self.schumacher_ia_correction(ZA, Zb, k, w, Eb)
+        elif model == "TRUNCATED_IA":
             Sce = self.truncated_IA(ZA, Zb, k, w, Eb)
         else:
-            raise NotImplementedError(f"Model {self.bf_model} not recognised. Try SCHUMACHER :)")
+            raise NotImplementedError(f"Model {model} not recognised. Try SCHUMACHER :)")
         return Sce / DIRAC_CONSTANT
 
     def _shell_amplitude(self, Znl, n, l):
@@ -435,11 +429,9 @@ def test():
         print(f"Running for k={k * BOHR_RADIUS} 1/aB and angle={angle}")
         c = colors[i]
         kernel = BoundFreeDSF(state=state, models=models)
-        dsf = kernel.get_dsf(ZA=1, Zb=1, Eb=EB, w=omega_array, k=k)
-        kernel = BoundFreeDSF(state=state, models=ModelOptions(bf_model="HR_CORRECTION"))
-        dsf_hr = kernel.get_dsf(ZA=1, Zb=1, Eb=EB, w=omega_array, k=k)
-        kernel = BoundFreeDSF(state=state, models=ModelOptions(bf_model="TRUNCATED_IA"))
-        dsf_tr = kernel.get_dsf(ZA=1, Zb=1, Eb=EB, w=omega_array, k=k)
+        dsf = kernel.get_dsf(ZA=1, Zb=1, Eb=EB, w=omega_array, k=k, model="SCHUMACHER")
+        dsf_hr = kernel.get_dsf(ZA=1, Zb=1, Eb=EB, w=omega_array, k=k, model="HR_CORRECTION")
+        dsf_tr = kernel.get_dsf(ZA=1, Zb=1, Eb=EB, w=omega_array, k=k, model="TRUNCATED_IA")
 
         En, wff, wbf, ff, bf, el = load_mcss_result(
             filename=f"mcss_tests/mcss_outputs_model=IA/mcss_bf_test_angle={angle:0.0f}.csv"

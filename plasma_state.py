@@ -81,7 +81,10 @@ class PlasmaState:
         charge_state,
         atomic_mass,
         atomic_number,
+        binding_energies,
     ) -> None:
+
+        self.initiliased = False
 
         # This should all be in SI units
         self.electron_temperature = electron_temperature
@@ -100,14 +103,24 @@ class PlasmaState:
         self.bound_electron_number_density = (atomic_number - charge_state) * self.ion_number_density
         self.total_electron_number_density = self.free_electron_number_density + self.bound_electron_number_density
 
+        self.binding_energies = binding_energies
+
         self.rs, self.theta = get_rs_theta_from_rho_T_SI(
             rho=self.mass_density, T=self.electron_temperature, atomic_mass=self.atomic_mass
         )
         self.Zb = atomic_number - charge_state
-        # self.ZA =
+        # self.initiliase()
 
-    def initiliase():
-        return
+    def initiliase(self):
+        self.kF = self.fermi_wave_number(number_density=self.total_electron_number_density)
+        self.EF = self.fermi_energy(self.total_electron_number_density, self.atomic_mass)
+        self.mue = self.chemical_potential_ichimaru(
+            temperature=self.electron_temperature,
+            number_density=self.total_electron_number_density,
+            mass=self.atomic_mass,
+        )
+        self.omegaF = self.fermi_frequency(self.total_electron_number_density, self.atomic_mass)
+        self.initiliased = True
 
     def fermi_temperature(self, mass, number_density):
         TF = DIRAC_CONSTANT**2 / (mass * BOLTZMANN_CONSTANT) * 0.5 * (3 * PI_SQR) ** (2 / 3) * number_density**1.5
@@ -212,7 +225,7 @@ class PlasmaState:
         return eta
 
     def chemical_potential_ichimaru(self, temperature, number_density, mass):
-        from scipy.special import gamma
+        # from scipy.special import gamma
 
         """
         Fit from Ichimaru (2018)
@@ -247,7 +260,7 @@ class PlasmaState:
     def alt_degeneracy_parameter(self, number_density, temperature, mass):
         return BOLTZMANN_CONSTANT * temperature / self.fermi_energy(number_density, mass)
 
-    def electron_plasma_parameter(self, number_density, temperature):
+    def electron_electron_coupling_parameter(self, number_density, temperature):
         radius = (3 / (4 * PI * number_density)) ** (1 / 3)
         Gamma_ee = ELEMENTARY_CHARGE**2 / (4 * PI * VACUUM_PERMITTIVITY * radius * BOLTZMANN_CONSTANT * temperature)
         return Gamma_ee

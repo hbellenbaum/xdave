@@ -12,13 +12,16 @@ from plasmapy.formulary.mathematics import Fermi_integral as fdi
 import numpy as np
 
 
-def get_ipd(state: PlasmaState, model):
-    Zi = state.charge_state
-    ne = state.free_electron_number_density
+def get_ipd(state: PlasmaState, model, user_defined_ipd=0.0):
+    Zi = state.atomic_number - state.charge_state
+    ne = state.total_electron_number_density
     ni = state.ion_number_density
     Te = state.electron_temperature
     Ti = state.ion_temperature
     Zn = state.atomic_number
+
+    if Zi == 0.0:
+        return 0.0
 
     if model == "STEWART_PYATT":
         return ipd_stewart_pyatt(Zi=Zi, ne=ne, ni=ni, Te=Te, Ti=Ti)
@@ -30,6 +33,10 @@ def get_ipd(state: PlasmaState, model):
         return ipd_ion_sphere(Zi=Zi, ne=ne, ni=ni)
     elif model == "CROWLEY":
         return ipd_crowley(Zi=Zi, ne=ne, ni=ni, Te=Te, Ti=Ti, ForceConst=0.9)
+    elif model == "NONE":
+        return 0.0
+    elif model == "USER_DEFINED":
+        return user_defined_ipd * eV_TO_J
     else:
         raise NotImplementedError(f"IPD model {model} is not recognised.")
 
@@ -135,7 +142,7 @@ def ipd_stewart_pyatt(Zi, ne, ni, Te, Ti):
     factor = (1 + s**3) ** (2 / 3) - s**2
     ipd_shift = 3 / 2 * (Zi + 1) * UNIT_COULOMB_POTENTIAL / r_IS * factor
 
-    return ipd_shift
+    return -ipd_shift
 
 
 def ipd_ecker_kroell(Zi, ne, ni, Te, Ti, Zn):

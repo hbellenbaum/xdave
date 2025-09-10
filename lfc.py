@@ -193,21 +193,21 @@ class LFC:
         diff2 = -numerator / denominator
         return 0.25 - PI * (4 / (9 * PI)) ** (1 / 3) / 24 * (rs**3 * diff2 - 2 * rs * diff1)
 
-    def calculate_lfc(self, k, w, model="DORNHEIM_ESA"):
-        if self.state.charge_state == 0:
-            return 0.0
-        if model == "DORNHEIM_ESA":
-            return self._dornheim_esa(k, w)
-        elif model == "PADE_INTERP":
-            return self._pade_interp_static(k, w)
-        elif model == "UI":
-            return self._utsumi_ichimaru_static(k, w)
-        elif model == "GV":
-            return self._geldart_vosko(k, w)
-        elif model == "FARID":
-            return self._farid_static(k, w)
-        else:
-            raise NotImplementedError(f"Model {model} not a recognized option.")
+    # def calculate_lfc(self, k, w, model="DORNHEIM_ESA"):
+    #     if self.state.charge_state == 0:
+    #         return 0.0
+    #     if model == "DORNHEIM_ESA":
+    #         return self._dornheim_esa(k, w)
+    #     elif model == "PADE_INTERP":
+    #         return self._pade_interp_static(k, w)
+    #     elif model == "UI":
+    #         return self._utsumi_ichimaru_static(k, w)
+    #     elif model == "GV":
+    #         return self._geldart_vosko(k, w)
+    #     elif model == "FARID":
+    #         return self._farid_static(k, w)
+    #     else:
+    #         raise NotImplementedError(f"Model {model} not a recognized option.")
 
     def _f_extended(self, t, a, b, c):
         return a + b * t + c * t**1.5
@@ -889,8 +889,8 @@ def test_gv():
 if __name__ == "__main__":
     # test()
     test_gv()
-    # test_gregori_2007()
-    # test_fortmann_2010()
-    # test_dornheim_2021()
-    # test_farid()
-    # test_ui()
+    test_gregori_2007()
+    test_fortmann_2010()
+    test_dornheim_2021()
+    test_farid()
+    test_ui()
