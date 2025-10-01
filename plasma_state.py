@@ -24,10 +24,30 @@ def get_frac(Z, Z_min, Z_max):
     return frac_min, frac_max
 
 
+def get_frac_partial(Z, Z_min, Z_max, xlim):
+    frac_min = 0
+    frac_max = 0
+    tot = 1.0 - xlim
+
+    if Z_min != Z_max:
+        frac_max = tot * (Z - Z_min) / (Z_max - Z_min)
+        frac_min = tot - frac_max
+    else:
+        frac_max = tot
+        frac_min = 0.0
+    return frac_min, frac_max
+
+
 def get_fractions_from_Z(Z):
     Z_min, Z_max = get_Z(Z)
     frac_min, frac_max = get_frac(Z=Z, Z_min=Z_min, Z_max=Z_max)
-    return frac_min, frac_max
+    return Z_min, Z_max, frac_min, frac_max
+
+
+def get_fractions_from_Z_partial(Z, x0=0):
+    Z_min, Z_max = get_Z(Z)
+    frac_min, frac_max = get_frac_partial(Z=Z, Z_min=Z_min, Z_max=Z_max, xlim=x0)
+    return Z_min, Z_max, frac_min, frac_max
 
 
 def get_rho_T_from_rs_theta(rs, theta, atomic_mass=1.00784):
@@ -51,6 +71,16 @@ def get_rho_T_from_rs_theta(rs, theta, atomic_mass=1.00784):
     return rho, T
 
 
+def get_rho_T_from_rs_theta_SI(rs, theta, atomic_mass):
+    fermi_energy = DIRAC_CONSTANT**2 / (2 * ELECTRON_MASS) * (9 * np.pi / (4 * (rs * BOHR_RADIUS) ** 3)) ** (2 / 3)
+    Te = fermi_energy * theta / BOLTZMANN_CONSTANT
+    T = Te  # * K_TO_eV
+
+    m_atm = atomic_mass  #  * 1.6605e-27
+    rho = 3 / (4 * np.pi * (rs * BOHR_RADIUS) ** 3) * m_atm
+    return rho, T
+
+
 def get_rs_theta_from_rho_T(rho, T, atomic_mass=1.00784):
     m_atm = atomic_mass * 1.6605e-27
     rs = (m_atm / 1000 * 3 / (4 * np.pi * rho)) ** (1 / 3) * 1 / BOHR_RADIUS
@@ -61,7 +91,7 @@ def get_rs_theta_from_rho_T(rho, T, atomic_mass=1.00784):
     return rs, theta
 
 
-def get_rs_theta_from_rho_T_SI(rho, T, atomic_mass=1.00784):
+def get_rs_theta_from_rho_T_SI(rho, T, atomic_mass):
     m_atm = atomic_mass  # * 1.6605e-27
     rs = (m_atm * 3 / (4 * np.pi * rho)) ** (1 / 3) * 1 / BOHR_RADIUS
 

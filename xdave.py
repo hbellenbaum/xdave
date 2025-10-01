@@ -1,4 +1,4 @@
-from plasma_state import PlasmaState, get_rho_T_from_rs_theta, get_fractions_from_Z
+from plasma_state import PlasmaState, get_rho_T_from_rs_theta, get_fractions_from_Z, get_fractions_from_Z_partial
 from models import ModelOptions
 from freefree_dsf import FreeFreeDSF
 from boundfree_dsf import BoundFreeDSF
@@ -11,6 +11,9 @@ from utils import (
     get_atomic_mass_for_element,
     get_binding_energies_from_elements,
     get_emission_lines_for_element,
+    calculate_angle,
+    get_mcss_wr_from_status_file,
+    load_mcss_result,
 )
 from unit_conversions import *
 from constants import *
@@ -63,7 +66,7 @@ class Setup:
             amu, AN = get_atomic_mass_for_element(element)
             x = self.partial_densities[i]
             Z = self.charge_states[i]
-            assert Z <= AN, f"Ionization degree for state {i} is larger than the atomic number{AN}. Check your setup."
+            assert Z <= AN, f"Ionization degree for state {i} is larger than the atomic number {AN}. Check your setup."
             binding_energies = get_binding_energies_from_elements(AN)
             state = PlasmaState(
                 electron_temperature=self.electron_temperature,
@@ -80,9 +83,9 @@ class Setup:
             amu_mean += x * amu
 
         overlord_state = PlasmaState(
-            electron_temperature=state.electron_temperature,
-            ion_temperature=state.ion_temperature,
-            mass_density=state.mass_density,
+            electron_temperature=self.electron_temperature,
+            ion_temperature=self.ion_temperature,
+            mass_density=self.mass_density,
             charge_state=Z_mean,
             atomic_mass=amu_mean,
             atomic_number=AN_mean,
@@ -99,7 +102,6 @@ class xDave:
         overlord_state: PlasmaState,
         states: np.array,
         fractions: np.array,
-        # binding_energies: np.array,
         rayleigh_weight: float,
         sif: np.array,
         ipd: float = None,
@@ -107,7 +109,6 @@ class xDave:
         self.models = models
         self.states = states
         self.fractions = fractions
-        # self.binding_energies = binding_energies
         self.rayleigh_weight = rayleigh_weight
         self.sif = sif
         self.ipd_eV = ipd
@@ -118,10 +119,7 @@ class xDave:
 
         self._print_logo()
 
-        ff_tot = np.zeros_like(w)
-        bf_tot = np.zeros_like(w)
-
-        lfc_kernel = LFC(models=self.models, state=self.overlord_state)
+        lfc_kernel = LFC(state=self.overlord_state)
         lfc = lfc_kernel.calculate_lfc(k=k, w=w, model=self.models.lfc_model)
         print(f"Calculated LFC={lfc}")
 
@@ -132,8 +130,16 @@ class xDave:
             ipd = get_ipd(state=self.overlord_state, model=self.models.ipd_model, user_defined_ipd=self.ipd_eV)
             print(f"Calculated IPD={ipd * J_TO_eV} eV")
 
+        ff = FreeFreeDSF(state=self.overlord_state)
+        ff_dsf = ff.get_dsf(k=k, w=w, lfc=lfc, model=self.models.polarisation_model)
+        # the factor of Z/AN is needed to match MCSS results, I will need to figure out where it comes from
+        ff_tot = ff_dsf * self.overlord_state.charge_state / self.overlord_state.atomic_number
+
+        bf_tot = np.zeros_like(w)
         ff_i = np.zeros((len(self.states), len(w)))
         bf_i = np.zeros((len(self.states), len(w)))
+
+        print(f"Mean charge state = {self.overlord_state.charge_state}.")
 
         for i in range(0, len(self.states)):
             state = self.states[i]
@@ -141,9 +147,6 @@ class xDave:
             print(f"\nRunning state {i} with Z={state.charge_state} and x={x}\n")
             binding_energies = state.binding_energies * eV_TO_J
 
-            ff = FreeFreeDSF(state=state)
-            ff_dsf = ff.get_dsf(k=k, w=w, lfc=lfc, model=self.models.polarisation_model)
-            ff_tot += x * ff_dsf
             ff_i[i] = x * ff_dsf
 
             Eb = binding_energies - ipd
@@ -155,12 +158,14 @@ class xDave:
 
             bf = BoundFreeDSF(state=state)
             bf_dsf = bf.get_dsf(ZA=state.atomic_number, Zb=state.Zb, k=k, w=w, Eb=Eb, model=self.models.bf_model)
-            bf_tot += x * bf_dsf
-            bf_i[i] = x * bf_dsf
+            bf_tot += x * bf_dsf  # * state.charge_state  # / state.atomic_number
+            bf_i[i] = x * bf_dsf  # * state.charge_state  # / state.atomic_number
 
             # This is where the HNC stuff will have to go eventually
             WR = self.rayleigh_weight
 
+        # Divide by the atomic number to be consistent with the ff component
+        bf_tot /= self.overlord_state.atomic_number
         dsf = ff_tot + bf_tot
         return bf_tot, ff_tot, dsf, WR, ff_i, bf_i
 
@@ -175,17 +180,19 @@ class xDave:
         return laplace(tau=tau, E=w, wff=ff, wbf=bf)
 
     def _print_logo(self):
-        # ' .----------------.  .----------------.  .----------------.  .----------------. '
-        # '| .--------------. || .--------------. || .--------------. || .--------------. |'
-        # '| |  ____  ____  | || |  _______     | || |  _________   | || |    _______   | |  '
-        # '| | |_  _||_  _| | || | |_   __ \    | || | |  _   _  |  | || |   /  ___  |  | |  '
-        # '| |   \ \  / /   | || |   | |__) |   | || | |_/ | | \_|  | || |  |  (__ \_|  | |  '
-        # '| |    > `' <    | || |   |  __ /    | || |     | |      | || |   '.___`-.   | |  '
-        # '| |  _/ /'`\ \_  | || |  _| |  \ \_  | || |    _| |_     | || |  |`\____) |  | |  '
-        # '| | |____||____| | || | |____| |___| | || |   |_____|    | || |  |_______.'  | |  '
-        # '| |              | || |              | || |              | || |              | |  '
-        # '| '--------------' || '--------------' || '--------------' || '--------------' |  '
-        # '' '----------------'  '----------------'  '----------------'  '----------------'  '
+        # print(
+        #     ".----------------.  .----------------.  .----------------.  .----------------.\n"
+        #     "| .--------------. || .--------------. || .--------------. || .--------------. |\n"
+        #     "| |  ____  ____  | || |  _______     | || |  _________   | || |    _______   | |  \n"
+        #     "| | |_  _||_  _| | || | |_   __ \    | || | |  _   _  |  | || |   /  ___  |  | |  \n"
+        #     "| |   \ \  / /   | || |   | |__) |   | || | |_/ | | \_|  | || |  |  (__ \_|  | |  \n"
+        #     "| |    > `' <    | || |   |  __ /    | || |     | |      | || |   '.___`-.   | |  \n"
+        #     "| |  _/ /'`\ \_  | || |  _| |  \ \_  | || |    _| |_     | || |  |`\____) |  | |  \n"
+        #     "| | |____||____| | || | |____| |___| | || |   |_____|    | || |  |_______.'  | |  \n"
+        #     "| |              | || |              | || |              | || |              | |  \n"
+        #     "| '--------------' || '--------------' || '--------------' || '--------------' |  \n"
+        #     "' '----------------'  '----------------'  '----------------'  '----------------'  \n"
+        # )
         print("\n -------------------------------- \n xDAVE C\n --------------------------------\n")
 
 
@@ -194,16 +201,14 @@ def test_setup():
     rho = 1 * g_per_cm3_TO_kg_per_m3
     T = 70 * eV_TO_K
 
-    partial_densities = np.array([0.0, 0.3, 0.34, 0.36])
+    partial_densities = np.array([0.15, 0.15, 0.34, 0.36])
     charge_states = np.array([0.0, 1.0, 3, 4])
     user_defined_inputs = None
 
-    models = ModelOptions(
-        polarisation_model="NUMERICAL", bf_model="SCHUMACHER", lfc_model="DORNHEIM_ESA", ipd_model="STEWART_PYATT"
-    )
+    models = ModelOptions(polarisation_model="NUMERICAL", bf_model="SCHUMACHER", lfc_model="NONE", ipd_model="NONE")
     # binding_energies = np.array([-13.6, -130]) * eV_TO_J
 
-    c_emission_lines = get_emission_lines_for_element(element="C")
+    # c_emission_lines = get_emission_lines_for_element(element="C")
 
     setup = Setup(
         mass_density=rho,
@@ -216,10 +221,19 @@ def test_setup():
         user_defined_inputs=user_defined_inputs,
     )
     states = setup.states
-    # print(states)
-    rayleigh_weight = 0.3
     omega_array = np.linspace(-1000, 1500, 1000) * eV_TO_J
 
+    k = 8 / ang_TO_m
+    q = k * BOHR_RADIUS
+    beam_energy = 9.0e3
+    angle = calculate_angle(q=q, energy=beam_energy)
+    print(f"Running at q={q}, E={beam_energy} -> angle={angle}")
+
+    # Load values from MCSS output files
+    mcss_fn = f"mcss_tests/mixed_species_tests/mcss_mixed_species_test_ch_angle={angle:.2f}"
+    rayleigh_weight = get_mcss_wr_from_status_file(mcss_fn + "_status.txt")
+    mcss_En, mcss_wff, mcss_wbf, mcss_ff, mcss_bf, mcss_el = load_mcss_result(mcss_fn + ".csv")
+    mcss_ipd = -3.3087805e001  # eV
     sif = np.zeros_like(omega_array)
 
     kernel = xDave(
@@ -228,44 +242,44 @@ def test_setup():
         fractions=partial_densities,
         rayleigh_weight=rayleigh_weight,
         overlord_state=setup.overlord_state,
-        ipd=None,
+        ipd=0.0,
         sif=sif,
     )
 
-    k = 8 / ang_TO_m
-    q = k * BOHR_RADIUS
-
     bf_tot, ff_tot, dsf, WR, ff_i, bf_i = kernel.run(k=k, w=omega_array)
-    fig, axes = plt.subplots(1, 4, figsize=(14, 10))
+    fig, axes = plt.subplots(2, 2, figsize=(14, 10))
 
-    ax = axes[0]
+    mcss_norm = 0.3 * 1 + (1 - 0.3) * 6
+
+    ax = axes[0, 0]
     ax.set_title("Total DSF")
-    for key, value in c_emission_lines.items():
-        print(key, value)
-        # if value > 0.0:
-        ax.axvline(x=-value, label=f"{key}", ls=":")
-        # print("{} is of the type {} and is located at {}".format(key, value["type"], value["locatie"]))
     ax.plot(omega_array * J_TO_eV, bf_tot / J_TO_eV, label="BF")
     ax.plot(omega_array * J_TO_eV, ff_tot / J_TO_eV, label="FF")
     ax.plot(omega_array * J_TO_eV, dsf / J_TO_eV, label="Tot")
+    ax.plot(mcss_En, (mcss_wbf + mcss_wff) / mcss_norm, lw=2, c="black", label="MCSS / AN")
+    ax.plot(mcss_En, (mcss_wbf + mcss_wff), lw=2, c="black", ls="dashed", label="MCSS")
     ax.legend()
 
-    ax = axes[1]
+    ax = axes[1, 0]
     ax.set_title("FF contributions")
     ax.plot(omega_array * J_TO_eV, ff_i[0] / J_TO_eV, label="H0: FF")
     ax.plot(omega_array * J_TO_eV, ff_i[1] / J_TO_eV, label="H1: FF")
     ax.plot(omega_array * J_TO_eV, ff_i[2] / J_TO_eV, label="C3: FF")
     ax.plot(omega_array * J_TO_eV, ff_i[3] / J_TO_eV, label="C4: FF")
     ax.plot(omega_array * J_TO_eV, ff_tot / J_TO_eV, label="Tot FF")
+    ax.plot(mcss_En, mcss_wff / mcss_norm, lw=2, c="black", ls="dashed", label="MCSS / AN")
+    ax.plot(mcss_En, mcss_wff, lw=2, c="black", ls="solid", label="MCSS")
     ax.legend()
 
-    ax = axes[2]
+    ax = axes[1, 1]
     ax.set_title("BF contributions")
     ax.plot(omega_array * J_TO_eV, bf_i[0] / J_TO_eV, label="H0: BF")
     ax.plot(omega_array * J_TO_eV, bf_i[1] / J_TO_eV, label="H1: BF")
     ax.plot(omega_array * J_TO_eV, bf_i[2] / J_TO_eV, label="C3: BF")
     ax.plot(omega_array * J_TO_eV, bf_i[3] / J_TO_eV, label="C4: BF")
     ax.plot(omega_array * J_TO_eV, bf_tot / J_TO_eV, label="Tot BF")
+    ax.plot(mcss_En, mcss_wbf / mcss_norm, lw=2, c="black", ls="dashed", label="MCSS")
+    ax.plot(mcss_En, mcss_wbf, lw=2, c="black", ls="solid", label="MCSS")
     ax.legend()
 
     sif = stats.norm.pdf(omega_array, 0, 2 * eV_TO_J)
@@ -274,7 +288,7 @@ def test_setup():
 
     inelastic, elastic, spectrum = kernel.convolve_with_sif(sif=sif, bf=bf_tot, ff=ff_tot, WR=WR)
 
-    ax = axes[3]
+    ax = axes[0, 1]
     ax.set_title("Spectrum")
     ax.plot(omega_array * J_TO_eV, inelastic / np.max(spectrum), label="inel", ls="-.")
     ax.plot(omega_array * J_TO_eV, elastic / np.max(spectrum), label="el", ls="-.")
@@ -317,14 +331,6 @@ def test_be():
         atomic_mass=atomic_mass,
         atomic_number=4,
     )
-    ##TODO(Hannah):
-    ## check that the mass density and number of electrons is being handled correctly across all states
-    ## compare against MCSS and PIMC for this set of conditions
-    ## Add IPD model
-    ## Clean up bf call (arguments are a bit messy)
-    ## Start calculating things like kF, EF, omega_p, etc. for the plasma state upon initialisation to avoid extra computation
-    ## Start timing and looking at how much this scales with number of points
-    ## I should move away from defining states by their mass density (problematic when you have mixed species) and just look at electron number density... probably a lot easier to split up
 
     beam_energy = 9.0e3  # * eV_TO_J
     angles = np.array([13, 30, 45, 60, 80, 100, 120, 140, 160])
@@ -396,6 +402,14 @@ def test_be():
     fig.savefig(f"beryllium_test_rs={rs}_theta={theta}_Z={Z_mean}_q={q:.2f}.pdf", dpi=200)
 
 
-if __name__ == "__main__":
+# if __name__ == "__main__":
 
-    test_setup()
+#     ##TODO(Hannah):
+#     ## check that the mass density and number of electrons is being handled correctly across all states
+#     ## compare against MCSS and PIMC for this set of conditions
+#     ## Add IPD model: DONE
+#     ## Clean up bf call (arguments are a bit messy): DONE
+#     ## Start calculating things like kF, EF, omega_p, etc. for the plasma state upon initialisation to avoid extra computation
+#     ## Start timing and looking at how much this scales with number of points
+#     ## I should move away from defining states by their mass density (problematic when you have mixed species) and just look at electron number density... probably a lot easier to split up: STILL THINKING ABOUT THIS
+#     test_setup()

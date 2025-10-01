@@ -4,6 +4,7 @@ from plasma_state import PlasmaState
 from models import ModelOptions
 from unit_conversions import *
 from constants import *
+from utils import read_mcss_output
 from scipy.special import gamma
 import numpy as np
 
@@ -69,6 +70,7 @@ class BoundFreeDSF:
         """
 
         Sce = 0.0
+        J = np.zeros_like(w)
 
         if Zb > 0:
             c1s = 0
@@ -103,9 +105,8 @@ class BoundFreeDSF:
             # dimensionless scattering wave number
             q = (w_freq - wC) / (SPEED_OF_LIGHT * k)
 
-            J = 0.0
-
             if c1s > 0:
+
                 n = 1
                 l = 0
 
@@ -113,11 +114,12 @@ class BoundFreeDSF:
                 xnl = 1.0 / (1.0 + (n * q / (Znl * FINE_STRUCTURE_CONSTANT)) ** 2.0)  # [xnl] =
 
                 Jnl = self._shell_amplitude(Znl, n, l) * xnl**3 / 3
-
+                # Jnl10 = Jnl
                 for i in range(c1s):
-                    if Eb[i] >= 0:
+                    if Eb[i] > 0:
                         continue
-                    J = J + Jnl * np.heaviside(E + Eb[i], 1)  # np.heaviside(E, Eb[i])
+                    J += Jnl * np.heaviside(E + Eb[i], 1)  # np.heaviside(E, Eb[i])
+                    # Jnl10 *= np.heaviside(E + Eb[i], 1)
 
             if c2s > 0:
 
@@ -127,18 +129,13 @@ class BoundFreeDSF:
                 Znl = self.ff_model.calculate_effective_charge_state(ZA, Zb, n, l)
                 xnl = 1.0 / (1.0 + (n * q / (Znl * FINE_STRUCTURE_CONSTANT)) ** 2.0)
 
-                Jnl = (
-                    self._shell_amplitude(Znl, n, l)
-                    * 4.0
-                    * (xnl**3.0 / 3.0 - xnl**4.0 + 4.0 * xnl**5.0 / 5.0)
-                    * 1.0e-6
-                )
-
+                Jnl = self._shell_amplitude(Znl, n, l) * 4.0 * (xnl**3.0 / 3.0 - xnl**4.0 + 4.0 * xnl**5.0 / 5.0)
+                # Jnl20 = Jnl
                 for i in range(c2s):
-                    if Eb[i + 2] >= 0:
+                    if Eb[i + 2] > 0:
                         continue
-                    # J = J + Jnl * np.heaviside(E, Eb[i + 2 - 1])
-                    J = J + Jnl * np.heaviside(E + Eb[i + 2], 1)
+                    J += Jnl * np.heaviside(E + Eb[i + 2], 1)
+                    # Jnl20 *= np.heaviside(E + Eb[i + 2], 1)
 
             if c2p > 0:
 
@@ -149,12 +146,12 @@ class BoundFreeDSF:
                 xnl = 1.0 / (1.0 + (n * q / (Znl * FINE_STRUCTURE_CONSTANT)) ** 2.0)
 
                 Jnl = self._shell_amplitude(Znl, n, l) * (xnl**4.0 / 4.0 - xnl**5.0 / 5.0)
-
+                # Jnl21 = Jnl
                 for i in range(c2p):
-                    if Eb[i + 4] >= 0:
+                    if Eb[i + 4] > 0:
                         continue
-                    # J = J + Jnl * np.heaviside(E, Eb[i + 4 - 1])
-                    J = J + Jnl * np.heaviside(E + Eb[i + 4], 1)
+                    J += Jnl * np.heaviside(E + Eb[i + 4], 1)
+                    # Jnl21 *= np.heaviside(E + Eb[i + 4], 1)
 
             if c3s > 0:
 
@@ -174,8 +171,7 @@ class BoundFreeDSF:
                 for i in range(c3s):
                     if Eb[i + 10] >= 0:
                         continue
-                    # J = J + Jnl * np.heaviside(E, Eb[i + 10 - 1])
-                    J = J + Jnl * np.heaviside(E + Eb[i + 10], 1)
+                    J += Jnl * np.heaviside(E + Eb[i + 10], 1)
 
             if c3p > 0:
 
@@ -193,8 +189,7 @@ class BoundFreeDSF:
                 for i in range(c3p):
                     if Eb[i + 12] >= 0:
                         continue
-                    # J = J + Jnl * np.heaviside(E, Eb[i + 12 - 1])
-                    J = J + Jnl * np.heaviside(E + Eb[i + 12], 1)
+                    J += Jnl * np.heaviside(E + Eb[i + 12], 1)
 
             if c4s > 0:
                 n = 4
@@ -219,8 +214,7 @@ class BoundFreeDSF:
                 for i in range(c4s):
                     if Eb[i + 18] >= 0:
                         continue
-                    # J = J + Jnl * np.heaviside(E, Eb[i + 18 - 1])
-                    J = J + Jnl * np.heaviside(E + Eb[i + 18], 1)
+                    J += Jnl * np.heaviside(E + Eb[i + 18], 1)
 
             if c3d > 0:
 
@@ -234,9 +228,9 @@ class BoundFreeDSF:
                 for i in range(c3d):
                     if Eb[i + 20] >= 0:
                         continue
-                    # J = J + Jnl * np.heaviside(E, Eb[i + 20 - 1])
-                    J = J + Jnl * np.heaviside(E + Eb[i + 20], 1)
+                    J += Jnl * np.heaviside(E + Eb[i + 20], 1)
 
+            # Sce = (c1s * Jnl10 + c2s * Jnl20 + c2p * Jnl21) / (SPEED_OF_LIGHT * k)
             Sce = J / (SPEED_OF_LIGHT * k)
 
             # Detailed balanced
