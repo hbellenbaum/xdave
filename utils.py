@@ -3,8 +3,48 @@ from constants import DIRAC_CONSTANT, SPEED_OF_LIGHT, BOHR_RADIUS, PI
 from unit_conversions import eV_TO_J
 
 from mendeleev import element
+from scipy.fft import dst, idst, dstn, idstn
 import pandas as pd
 import os
+
+from collections import defaultdict
+
+
+def read_mcss_output(filepath, start_line=0, end_line=96022):
+    grouped_data = defaultdict(lambda: {"xnl": [], "Jnl": []})
+    current_zb = None
+
+    with open(filepath, "r") as f:
+        lines = f.readlines()
+        if end_line is not None:
+            lines = lines[start_line:end_line]
+        else:
+            lines = lines[start_line:]
+
+    for line in lines:
+        parts = line.strip().split()
+        if len(parts) == 2:
+            key, val = parts
+            try:
+                if key == "Zb":
+                    current_zb = int(val)
+                else:
+                    val = float(val)
+                    if key == "xnl" and current_zb is not None:
+                        grouped_data[current_zb]["xnl"].append(val)
+                    elif key == "Jnl" and current_zb is not None:
+                        grouped_data[current_zb]["Jnl"].append(val)
+            except ValueError:
+                continue
+
+    # build arrays for each Zb group
+    results = {}
+    for zb, values in grouped_data.items():
+        pairs = list(zip(values["xnl"], values["Jnl"]))
+        # pairs.sort(key=lambda x: x[0])
+        results[zb] = np.array(pairs)
+
+    return results
 
 
 def calculate_q(angle, energy):
@@ -172,7 +212,8 @@ def get_atomic_mass_for_element(e):
 
 
 def get_binding_energies_from_elements(AN):
-    dat_file = f"data/binding_energies_xrdb.csv"
+    # TODO(Hannah): this is a temporary fix until I get the file structure sorted out
+    dat_file = os.path.dirname(__file__) + f"/data/binding_energies_xrdb.csv"
     df = pd.read_csv(dat_file)
 
     AN_col = df.columns[0]
@@ -207,3 +248,42 @@ def get_emission_lines_for_element(element):
             emission_dict[col] = val
 
     return emission_dict
+
+
+# Fourier transform stuff
+
+
+def forward_transform_fft(yr, r, k, dr, dk):
+    """
+    Fourier transform using the scipy.fft functions
+    """
+    n = len(r)
+
+    weighted_yr = r[1:] * yr[1:]
+    sum_vals = dst(weighted_yr, type=1)
+
+    # Noramlize
+    yk = np.zeros(n)
+    yk[1:] = (2 * np.pi * dr / k[1:]) * sum_vals
+
+    return yk
+
+
+def inverse_transform_fft(yk, r, k, dr, dk):
+    """
+    Inverse fourier transform using the scipy.fft functions
+    """
+    n = len(r)
+
+    weighted_yk = k[1:] * yk[1:]
+    sum_vals = dst(weighted_yk, type=1)
+
+    # Normalize
+    yr = np.zeros(n)
+    yr[1:] = (dk / (2 * np.pi) ** 2) * sum_vals / r[1:]
+
+    # Extrapolate first point
+    # Is this still necessary since I'm now doing this for the structure factor as well?
+    yr[0] = 2 * yr[1] - yr[2]
+
+    return yr

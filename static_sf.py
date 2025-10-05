@@ -2,7 +2,10 @@
 from models import ModelOptions
 from plasma_state import PlasmaState
 
+from bridge_functions import *
+from utils import forward_transform_fft, inverse_transform_fft
 from constants import BOHR_RADIUS, ELEMENTARY_CHARGE, PI, BOLTZMANN_CONSTANT, VACUUM_PERMITTIVITY
+from hnc_potentials import *
 import numpy as np
 
 
@@ -99,6 +102,10 @@ class StaticStructureFactor:
     def get_ii_static_structure_factor_ocp(self, k):
         if self.ss_model == "MSA":
             return self.mean_spherical_approximation_ocp_ii(k)
+        elif self.ss_model == "HNC":
+            return self.hnc_ocp_ii(k)
+        elif self.ss_model == "EXTENDED_HNC":
+            return self.xhnc_ocp_ii(k)
         else:
             raise NotImplementedError(
                 f"Model {self.ss_model} for the static structure factor not yet implemented. Try MSA :)"
@@ -107,6 +114,8 @@ class StaticStructureFactor:
     def get_ii_static_structure_factor(self, k):
         if self.ss_model == "MSA":
             return self.mean_spherical_approximation_ss(k)
+        elif self.ss_model == "HNC":
+            return self.hnc_ss(k)
         else:
             raise NotImplementedError(
                 f"Model {self.ss_model} for the static structure factor not yet implemented. Try MSA :)"
@@ -208,6 +217,207 @@ class StaticStructureFactor:
         )
         S_ii = S_ii_OCP / (1 + screening_correction * S_ii_OCP)
         return S_ii, screening_correction, q_sc, S_ee0
+
+    def hnc_ocp_ii(self, k, max_iterations=1000, mix_fraction=0.2, delta=1.0e-12):
+        Ti = self.state.ion_temperature
+        Zi = self.state.charge_state
+        ni = self.state.ion_number_density
+        Rii = self.state.mean_sphere_radius(number_density=ni)
+        beta = 1 / (BOLTZMANN_CONSTANT * Ti)  # [1/J]
+        n = 8192  # per themis [#]
+
+        # Rii = mean_sphere_radius(ni)  # [m]
+        alpha = 2 / Rii  # [1/m]
+
+        r0 = 1.0e-2 * Rii  # [m]
+        rf = 1.0e2 * Rii  # [m]
+        dr = (rf - r0) / n
+        k0 = 1.0e-4 / BOHR_RADIUS  # * aB
+        dk = np.pi / (n * dr)  # [1/m] as it should be [1/m],
+        kf = k0 + n * dk
+        rs = np.linspace(r0, rf, n)  # [m]
+        ks = np.linspace(k0, kf, n)  # [1/m]
+
+        Qa = Qb = Zi * ELEMENTARY_CHARGE  # [C]
+
+        # use thermodynamically normalized potential
+        # imo, this should be dimensionless (as it is)
+        Us_rs = beta * springer_short_range_rs(Qa, Qb, rs, alpha)  # [ ]
+        Ul_ks = beta * springer_long_range_ks(Qa, Qb, ks, alpha)  # [m^3] ???
+
+        cs0_rs = -Us_rs  # [ ]
+        Ns0_rs = np.zeros_like(cs0_rs)  # should be [ ]
+
+        converged = False
+        i = 0
+
+        i = 0
+        while i < max_iterations:
+
+            if i == 0:
+                Ns_rs = Ns0_rs.copy()
+                Ns_rs_prev = Ns0_rs.copy()
+                g_rs_prev = np.exp(Ns_rs_prev - Us_rs)
+                cs_rs = cs0_rs.copy()
+
+            # total correlation function
+            h_rs = g_rs_prev - 1
+
+            # direct correlation function in k-space
+            cs_ks = forward_transform_fft(yr=cs_rs, dr=dr, dk=dk, r=rs, k=ks)
+            c_ks = cs_ks - Ul_ks
+            # this will need to be replaced by a matrix inversion
+            h_ks = c_ks / (1 - ni * c_ks)
+
+            # indirect correlation function
+            Ns_ks = h_ks - cs_ks
+            Ns_rs_new = inverse_transform_fft(yk=Ns_ks, dr=dr, dk=dk, r=rs, k=ks)
+
+            # mixing
+            Ns_rs[:] = (1 - mix_fraction) * Ns_rs_new + mix_fraction * Ns_rs_prev
+
+            # calculate new g(r)
+            g_rs_new = np.exp(Ns_rs - Us_rs)
+
+            if np.any(g_rs_new) == np.nan:
+                print(f"Careful, we have naan")
+
+            # check convergence
+            converged = np.sum((g_rs_prev - g_rs_new) ** 2) < delta
+            if converged:
+                print(f"Converged after {i} iterations.")
+                break
+
+            # save variables for next iteration
+            Ns_rs_prev[:] = Ns_rs
+            g_rs_prev[:] = g_rs_new
+            cs_rs[:] = h_rs - Ns_rs
+
+            i += 1
+        else:
+            print(f"Exited after {max_iterations} iterations without convergence.")
+
+        giir = g_rs_new
+
+        hiir = giir - 1.0
+        Siik = 1 + ni * forward_transform_fft(yr=hiir, dr=dr, dk=dk, r=rs, k=ks)  # [#]
+
+        # extrapolation in log10 space (for stability) -> inspired by THEMIS
+        Siik[1 - 1] = 1.0 / 10 ** (
+            np.log10(1.0 / Siik[4 - 1])
+            + (np.log10(1.0 / Siik[6 - 1]) - np.log10(1.0 / Siik[4 - 1]))
+            * (np.log10(ks[1 - 1]) - np.log10(ks[4 - 1]))
+            / (np.log10(ks[6 - 1]) - np.log10(ks[4 - 1]))
+        )
+        Siik[2 - 1] = 1.0 / 10 ** (
+            np.log10(1.0 / Siik[4 - 1])
+            + (np.log10(1.0 / Siik[6 - 1]) - np.log10(1.0 / Siik[4 - 1]))
+            * (np.log10(ks[2 - 1]) - np.log10(ks[4 - 1]))
+            / (np.log10(ks[6 - 1]) - np.log10(ks[4 - 1]))
+        )
+        return ks, rs, giir, hiir, Siik
+
+    def xhnc_ocp_ii(self, k, max_iterations=1000, mix_fraction=0.2, delta=1.0e-12):
+        Ti = self.state.ion_temperature
+        Zi = self.state.charge_state
+        ni = self.state.ion_number_density
+        Rii = self.state.mean_sphere_radius(number_density=ni)
+        beta = 1 / (BOLTZMANN_CONSTANT * Ti)  # [1/J]
+        n = 8192  # per themis [#]
+
+        # Rii = mean_sphere_radius(ni)  # [m]
+        alpha = 2 / Rii  # [1/m]
+
+        r0 = 1.0e-2 * Rii  # [m]
+        rf = 1.0e2 * Rii  # [m]
+        dr = (rf - r0) / n
+        k0 = 1.0e-4 / BOHR_RADIUS  # * aB
+        dk = np.pi / (n * dr)  # [1/m] as it should be [1/m],
+        kf = k0 + n * dk
+        rs = np.linspace(r0, rf, n)  # [m]
+        ks = np.linspace(k0, kf, n)  # [1/m]
+
+        Qa = Qb = Zi * ELEMENTARY_CHARGE  # [C]
+
+        # use thermodynamically normalized potential
+        # imo, this should be dimensionless (as it is)
+        Us_rs = beta * springer_short_range_rs(Qa, Qb, rs, alpha)  # [ ]
+        Ul_ks = beta * springer_long_range_ks(Qa, Qb, ks, alpha)  # [m^3] ???
+
+        cs0_rs = -Us_rs  # [ ]
+        Ns0_rs = np.zeros_like(cs0_rs)  # should be [ ]
+
+        converged = False
+        i = 0
+        Gamma = self.state.coupling_parameter(Za=Zi, beta=beta, da=Rii)
+        xs, Biir = iyetomi_bridge_function(rs=rs, Rii=Rii, Gamma=Gamma)
+        while i < max_iterations:
+
+            if i == 0:
+                Ns_rs = Ns0_rs.copy()
+                Ns_rs_prev = Ns0_rs.copy()
+                g_rs_prev = np.exp(Ns_rs_prev - Us_rs + Biir)
+                cs_rs = cs0_rs.copy()
+
+            # total correlation function
+            h_rs = g_rs_prev - 1
+
+            # direct correlation function in k-space
+            cs_ks = forward_transform_fft(yr=cs_rs, dr=dr, dk=dk, r=rs, k=ks)
+            c_ks = cs_ks - Ul_ks
+            # this will need to be replaced by a matrix inversion
+            h_ks = c_ks / (1 - ni * c_ks)
+
+            # indirect correlation function
+            Ns_ks = h_ks - cs_ks
+            Ns_rs_new = inverse_transform_fft(yk=Ns_ks, dr=dr, dk=dk, r=rs, k=ks)
+
+            # mixing
+            Ns_rs[:] = (1 - mix_fraction) * Ns_rs_new + mix_fraction * Ns_rs_prev
+
+            # calculate new g(r)
+            g_rs_new = np.exp(Ns_rs - Us_rs + Biir)
+
+            if np.any(g_rs_new) == np.nan:
+                print(f"Careful, we have naan")
+
+            # check convergence
+            converged = np.sum((g_rs_prev - g_rs_new) ** 2) < delta
+            if converged:
+                print(f"Converged after {i} iterations.")
+                break
+
+            # save variables for next iteration
+            Ns_rs_prev[:] = Ns_rs
+            g_rs_prev[:] = g_rs_new
+            cs_rs[:] = h_rs - Ns_rs
+
+            i += 1
+        else:
+            print(f"Exited after {max_iterations} iterations without convergence.")
+
+        giir = g_rs_new
+
+        hiir = giir - 1.0
+        Siik = 1 + ni * forward_transform_fft(yr=hiir, dr=dr, dk=dk, r=rs, k=ks)  # [#]
+
+        # extrapolation in log10 space (for stability) -> inspired by THEMIS
+        Siik[1 - 1] = 1.0 / 10 ** (
+            np.log10(1.0 / Siik[4 - 1])
+            + (np.log10(1.0 / Siik[6 - 1]) - np.log10(1.0 / Siik[4 - 1]))
+            * (np.log10(ks[1 - 1]) - np.log10(ks[4 - 1]))
+            / (np.log10(ks[6 - 1]) - np.log10(ks[4 - 1]))
+        )
+        Siik[2 - 1] = 1.0 / 10 ** (
+            np.log10(1.0 / Siik[4 - 1])
+            + (np.log10(1.0 / Siik[6 - 1]) - np.log10(1.0 / Siik[4 - 1]))
+            * (np.log10(ks[2 - 1]) - np.log10(ks[4 - 1]))
+            / (np.log10(ks[6 - 1]) - np.log10(ks[4 - 1]))
+        )
+        return ks, rs, giir, hiir, Siik
+
+    def hnc_ss(self, k):
+        return
 
 
 def test():
