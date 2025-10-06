@@ -125,6 +125,7 @@ class PlasmaState:
         self.mass_density = mass_density
         self.atomic_mass = atomic_mass * ATOMIC_MASS_UNIT
         self.charge_state = charge_state
+        self.ion_charge = atomic_number - charge_state
         mi = self.atomic_mass
         self.ion_number_density = mass_density / mi
         self.electron_number_density = charge_state * self.ion_number_density
@@ -294,3 +295,6 @@ class PlasmaState:
         radius = (3 / (4 * PI * number_density)) ** (1 / 3)
         Gamma_ee = ELEMENTARY_CHARGE**2 / (4 * PI * VACUUM_PERMITTIVITY * radius * BOLTZMANN_CONSTANT * temperature)
         return Gamma_ee
+
+    def coupling_parameter(self, Za, beta, da):
+        return Za**2 * ELEMENTARY_CHARGE**2 * beta / (4 * PI * VACUUM_PERMITTIVITY * da)

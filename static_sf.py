@@ -6,90 +6,44 @@ from bridge_functions import *
 from utils import forward_transform_fft, inverse_transform_fft
 from constants import BOHR_RADIUS, ELEMENTARY_CHARGE, PI, BOLTZMANN_CONSTANT, VACUUM_PERMITTIVITY
 from hnc_potentials import *
+
+from scipy.optimize import minimize
+import matplotlib.pyplot as plt
 import numpy as np
 
 
-def eta_func(sigmac, ni):
-    return PI / 6 * ni * sigmac**3
+def h0(eta, chi):
+    return (1 + 2 * eta) / (1 - eta) * (1 - (1 + 2 * (1 - eta) ** 3 * chi / (1 + 2 * eta) ** 2) ** (1 / 2))
 
 
-def gamma_func(Z, sigmac, Ti):
-    gamma = (Z**2 * ELEMENTARY_CHARGE**2) / (4 * PI * VACUUM_PERMITTIVITY * sigmac * BOLTZMANN_CONSTANT * Ti)
-    return gamma
+def h1(eta, chi):
+    """
+    Enforce h1=0 to get a value for eta
+    """
+    return h0(eta, chi) ** 2 / (24 * eta) - (1 + eta / 2) / (1 - eta) ** 2
 
 
-def xi_func(eta, gamma):
-    return np.sqrt(24 * eta * gamma)
+def h2(eta, chi):
+    return -(1 + eta - eta**2 / 5) / (12 * eta) - (1 - eta) * h0(eta, chi) / (12 * eta * chi)
 
 
-def h0_func(eta, xi, gamma):
-    h0 = (1 + 2 * eta) / (1 - eta) * (1 - np.sqrt(1 + (2 * (1 - eta) ** 3 * xi) / (1 + 2 * eta) ** 2))
-    return h0
+def get_sigmac(ni, Zi, Ti):
 
+    def h1_long(sigma_c):
+        """
+        Enforce h1=0 to get a value for eta
+        """
+        eta = PI / 6 * ni * sigma_c**3  # [ ]
+        gamma = (
+            Zi**2 * ELEMENTARY_CHARGE**2 / (4 * PI * VACUUM_PERMITTIVITY * sigma_c * BOLTZMANN_CONSTANT * Ti)
+        )  # 1 / (kg^-1 m^-3 s^2  m  J ) = kg m^2 s^{-2} / J = J / J = [ ]
+        chi = np.sqrt(24 * eta * gamma)  # [ ]
+        h0_val = (1 + 2 * eta) / (1 - eta) * (1 - (1 + 2 * (1 - eta) ** 3 * chi / (1 + 2 * eta) ** 2) ** (1 / 2))
+        return h0_val / (24 * eta) - (1 + eta / 2) / (1 - eta) ** 2
 
-def h1_func(eta, xi, gamma):
-    h0 = h0_func(eta, xi, gamma)
-    h1 = h0**2 / (24 * eta) - (1 + eta / 2) / (1 - eta) ** 2
-    return h1
-
-
-def h2_func(eta, xi, gamma):
-    h0 = h0_func(eta, xi, gamma)
-    h2 = -(1 + eta - eta**2 / 5) / (12 * eta) - (1 - eta) * h0 / (12 * eta * xi)
-    return h2
-
-
-def y0_func(eta, gamma, xi):
-    h0 = h0_func(eta, gamma, xi)
-    y = (
-        -((1 + 2 * eta) ** 2) / (1 - eta) ** 4
-        + h0**2 / (4 * (1 - eta) ** 2)
-        - (1 + eta) * h0 * xi / (12 * eta)
-        - (5 + eta**2) / xi**2 / (60 * eta)
-    )
-    return y
-
-
-def y1_func(eta, gamma, xi):
-    h1 = h1_func(eta, gamma, xi)
-    return 6 * eta * h1**2
-
-
-def y2_func(eta, gamma, xi):
-    return xi**2 / 6
-
-
-def y3_func(eta, gamma, xi):
-    y0 = y0_func(eta, gamma, xi)
-    h2 = h2_func(eta, gamma, xi)
-    return eta / 2 * (y0 + xi**2 * h2)
-
-
-def y4_func(eta, gamma, xi):
-    return eta * xi**2 / 60
-
-
-def find_sigma_c(ni, Z, Ti):
-    from scipy import optimize
-
-    def func(x):
-        # b = h0_sqr(x)
-        eta = eta_func(x, ni)
-        gamma = gamma_func(Z, x, Ti)
-        xi = xi_func(eta, gamma)
-        # sqrt_term = 1 + 2 * (1 - eta) ** 3 * xi / (1 + 2 * eta) ** 2
-        # h0 = (1 + 2 * eta) / (1 - eta) * (1 - np.sqrt(sqrt_term))
-        # h1 = h0**2 / (24 * eta) - (1 + eta / 2) / (1 - eta) ** 2
-        # return np.abs(h0**2 / (24 * x) - (1 + x / 2) / (1 - x) ** 2)
-        h1 = h1_func(eta, gamma, xi)
-        return np.abs(h1)
-
-    res = optimize.minimize(func, x0=BOHR_RADIUS, method="Nelder-Mead", tol=1.0e-25)
-
-    print(func(res.x[0]))
-    # print(res)
-
-    return res.x[0]
+    sol = minimize(h1_long, x0=1.0e-12)
+    print(sol)
+    return sol.x
 
 
 class StaticStructureFactor:
@@ -122,70 +76,52 @@ class StaticStructureFactor:
             )
 
     def mean_spherical_approximation_ocp_ii(self, k):
-        # This should really be a user-defined input
-        ion_particle_diameter = self.ion_particle_diameter
+        ni = self.state.ion_number_density
+        Zi = self.state.ion_charge
+        Ti = self.state.ion_temperature
+        if sigma_c is None:
+            sigma_c = get_sigmac(ni=ni, Zi=Zi, Ti=Ti)
+        eta = PI / 6 * ni * sigma_c**3
+        gamma = Zi**2 * ELEMENTARY_CHARGE**2 / (4 * PI * VACUUM_PERMITTIVITY * sigma_c * BOLTZMANN_CONSTANT * Ti)
+        chi = np.sqrt(24 * eta * gamma)
 
-        q = k * ion_particle_diameter
-
-        # eta = PI / 6 * self.state.ion_number_density * ion_particle_diameter**3
-        # gamma = (
-        #     self.state.charge_state**2
-        #     * ELEMENTARY_CHARGE
-        #     / (4 * PI * VACUUM_PERMITTIVITY * ion_particle_diameter * BOLTZMANN_CONSTANT * self.state.ion_temperature)
-        # )
-        # xi = np.sqrt(24 * eta * gamma)
-
+        q = sigma_c * k
         sinq = np.sin(q)
-        qsinq = q * sinq
-        cosq = np.cos(k)
+        cosq = np.cos(q)
         qcosq = q * cosq
-        qsqr = q * q
-        qcub = qsqr * q
-        qquad = qsqr * qsqr
-        # Zstar = self.state.atomic_number - self.state.charge_state
+        qsinq = q * sinq
 
-        # sqrt_term = 1 + 2 * (1 - eta) ** 3 * xi / (1 + 2 * eta) ** 2
-        # h0 = (1 + 2 * eta) / (1 - eta) * (1 - np.sqrt(sqrt_term))
-        # h1 = h0**2 / (24 * eta) - (1 + eta / 2) / (1 - eta) ** 2
-        # h2 = -(1 + eta - eta**2 / 5) / (12 * eta) - (1 - eta) * h0 / (12 * eta * xi)
-        eta = eta_func(sigmac=ion_particle_diameter, ni=self.state.ion_number_density)
-        gamma = gamma_func(Z=self.state.charge_state, sigmac=ion_particle_diameter, Ti=self.state.ion_temperature)
-        xi = xi_func(eta=eta, gamma=gamma)
-        h0 = h0_func(eta, gamma, xi)
-        h1 = h1_func(eta, gamma, xi)
-        h2 = h2_func(eta, gamma, xi)
-        y0 = y0_func(eta, gamma, xi)
-        y1 = y1_func(eta, gamma, xi)
-        y2 = y2_func(eta, gamma, xi)
-        y3 = y3_func(eta, gamma, xi)
-        y4 = y4_func(eta, gamma, xi)
-
-        # y0 = (
-        #     -((1 + 2 * eta) ** 2) / (1 - eta) ** 4
-        #     + h0**2 / (4 * (1 - eta) ** 2)
-        #     - (1 + eta) * h0 * xi / (12 * eta)
-        #     - (5 + eta**2) * xi**2 / (60 * eta)
-        # )
-        # y1 = 6 * eta * h1**2
-        # y2 = xi**2 / 6
-        # y3 = eta / 2 * (y0 + xi**2 * h2)
-        # y4 = eta * xi**2 / 60
-
-        c0 = y0 * qcub * (sinq - qcosq)
-        c1 = y1 * qsqr * (2 * qsinq - (q**2 - 2) * cosq - 2)
-        c2 = y2 * q * ((3 * qsqr - 6) * sinq - (qsqr - 6) * qcosq)
-        c3 = y3 * ((4 * qsqr - 24) * qsinq - (qquad - 12 * qsqr + 24) * cosq + 24)
-        c4 = y4 * (6 * (qquad - 20 * qsqr + 120) * qsinq - (q**6 - 30 * qquad + 360 * qsqr - 720) * cosq - 720) / qsqr
-        c5 = -gamma * qquad * cosq
-
-        c_ii = 24 * eta / k**6 * (c0 + c1 + c2 + c3 + c4 + c5)
-        S_ii_OCP = 1 / (1 - c_ii)
-        return S_ii_OCP
+        y0 = (
+            -((1 + 2 * eta) ** 2) / (1 - eta) ** 4
+            + h0(eta, chi) ** 2 / (4 * (1 - eta) ** 2)
+            - (1 + eta) * h0(eta, chi) * chi / (12 * eta)
+            - (5 + eta**2) * chi**2 / (60 * eta)
+        )
+        y1 = 6 * eta * h1(eta, chi) ** 2
+        y2 = chi**2 / 6
+        y3 = eta / 2 * (y0 + chi**2 * h2(eta, chi))
+        y4 = eta * chi**2 / 60
+        Cii = (
+            24
+            * eta
+            / q**6
+            * (
+                y0 * q**3 * (sinq - qcosq)
+                + y1 * q**2 * (2 * qsinq - (q**2 - 2) * cosq - 2)
+                + y2 * q * ((3 * q**3 - 6) * sinq - (q**2 - 6) * qcosq)
+                + y3 * ((4 * q**2 - 24) * qsinq - (q**4 - 12 * q**2 + 24) * cosq + 24)
+                + y4
+                * (6 * (q**4 - 20 * q**2 + 120) * qsinq - (q**6 - 30 * q**4 + 360 * q**2 - 720) * cosq - 720)
+                / q**2
+                - gamma * q**4 * cosq
+            )
+        )
+        S_ii_ocp = 1 / (1 - Cii)
+        return S_ii_ocp
 
     def mean_spherical_approximation_ss(self, k):
         ion_particle_diameter = self.ion_particle_diameter
         S_ii_OCP = self.get_ii_static_structure_factor_ocp(k)
-        # S_ee =
 
         kappa_i = np.sqrt(
             self.state.charge_state
@@ -220,7 +156,7 @@ class StaticStructureFactor:
 
     def hnc_ocp_ii(self, k, max_iterations=1000, mix_fraction=0.2, delta=1.0e-12):
         Ti = self.state.ion_temperature
-        Zi = self.state.charge_state
+        Zi = self.state.ion_charge
         ni = self.state.ion_number_density
         Rii = self.state.mean_sphere_radius(number_density=ni)
         beta = 1 / (BOLTZMANN_CONSTANT * Ti)  # [1/J]
@@ -319,7 +255,7 @@ class StaticStructureFactor:
 
     def xhnc_ocp_ii(self, k, max_iterations=1000, mix_fraction=0.2, delta=1.0e-12):
         Ti = self.state.ion_temperature
-        Zi = self.state.charge_state
+        Zi = self.state.ion_charge
         ni = self.state.ion_number_density
         Rii = self.state.mean_sphere_radius(number_density=ni)
         beta = 1 / (BOLTZMANN_CONSTANT * Ti)  # [1/J]
@@ -446,7 +382,7 @@ def test():
 
     kF = state.fermi_wave_number(state.electron_number_density)
 
-    optimal_diameter = find_sigma_c(ni=state.ion_number_density, Z=state.charge_state, Ti=state.ion_temperature)
+    optimal_diameter = get_sigmac(ni=state.ion_number_density, Z=state.charge_state, Ti=state.ion_temperature)
     print(f"Calculated diameter: {optimal_diameter / BOHR_RADIUS} a_B")
 
     ks = 2 * E0 / (DIRAC_CONSTANT * SPEED_OF_LIGHT) * np.sin(angles_rad / 2) / kF * 1.0e3
@@ -481,6 +417,10 @@ def test():
     plt.plot(ks, sfs_ocp, ls="dashed", c="crimson", label="OCP")
     plt.legend()
     plt.show()
+
+
+def wuensch_fig45_test():
+    T = 4  # eV
 
 
 if __name__ == "__main__":

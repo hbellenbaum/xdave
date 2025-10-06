@@ -1,20 +1,8 @@
 from ii_ff import PaulingShermanIonicFormFactor
-
-
-class ScreeningCloud:
-
-    def __init__(self) -> None:
-        pass
-
-
-class StaticStructureFactor:
-
-    def __init__(self) -> None:
-        pass
+from static_sf import StaticStructureFactor
 
 
 class RayleighWeight:
 
-    def __init__(self) -> None:
+    def __init__(self, state) -> None:
         pass
-
