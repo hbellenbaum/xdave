@@ -1,0 +1,59 @@
+from constants import VACUUM_PERMITTIVITY, PI, ELEMENTARY_CHARGE, COULOMB_CONSTANT
+from utils import forward_transform_fft
+
+import numpy as np
+
+
+## Ion potentials for the ion-ion HNC solver
+
+
+# Screened Coulomb potential - Yukawa potential
+def springer_short_range_rs(Qa, Qb, r, alpha):
+    return Qa * Qb / (4 * PI * VACUUM_PERMITTIVITY) * np.exp(-alpha * r) / r
+
+
+def springer_long_range_rs(Qa, Qb, r, alpha):
+    return Qa * Qb / (4 * PI * VACUUM_PERMITTIVITY) * (1 - np.exp(-alpha * r)) / r
+
+
+def springer_long_range_ks(Qa, Qb, k, alpha):
+    return Qa * Qb / VACUUM_PERMITTIVITY * alpha**2 / (k**2 * (alpha**2 + k**2))
+
+
+# 'normal' Coulomb potential
+def coulomb(Qa, Qb, r):
+    return Qa * Qb * ELEMENTARY_CHARGE**2 / (4 * PI * VACUUM_PERMITTIVITY * r)
+
+
+def coulomb_k(Qa, Qb, k):
+    """
+    Coulomb potential in k-space, note that the inputs Qa and Qb here are given in units of C.
+    """
+    return Qa * Qb * ELEMENTARY_CHARGE**2 / (VACUUM_PERMITTIVITY * k**2)
+
+
+## Electron-ion potentials for the screening cloud
+def ei_coulomb(Qa, r):
+    return coulomb(Qa=Qa, Qb=1, r=r)
+
+
+def ei_coulomb_k(Qa, k):
+    return coulomb_k(Qa=Qa, Qb=1, k=k)
+
+
+def effective_ei_coulomb(Qa, r):
+    return -Qa * ELEMENTARY_CHARGE**2 * COULOMB_CONSTANT / r
+
+
+def effective_ei_coulomb_k(Qa, k):
+    return -4 * PI * Qa * ELEMENTARY_CHARGE**2 * COULOMB_CONSTANT / k**2
+
+
+def HEC_ei_k(Qa, k, rcore):
+    return effective_ei_coulomb_k(Qa=Qa, k=k) * np.cos(k * rcore)
+
+
+def SEC_ei_k(Qa, k, r, rcore, n):
+    U_eff_k = effective_ei_coulomb_k(Qa=Qa, k=k)
+    U_eff_r = effective_ei_coulomb(Qa=Qa, r=r)
+    return U_eff_k - forward_transform_fft(U_eff_r * np.exp(-((r / rcore) ** n)))

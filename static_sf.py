@@ -5,7 +5,7 @@ from plasma_state import PlasmaState
 from bridge_functions import *
 from utils import forward_transform_fft, inverse_transform_fft
 from constants import BOHR_RADIUS, ELEMENTARY_CHARGE, PI, BOLTZMANN_CONSTANT, VACUUM_PERMITTIVITY
-from hnc_potentials import *
+from potentials import *
 
 from scipy.optimize import minimize
 import matplotlib.pyplot as plt

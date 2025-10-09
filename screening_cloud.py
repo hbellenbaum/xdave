@@ -1,7 +1,7 @@
 from models import ModelOptions
 from plasma_state import PlasmaState
 from constants import ELEMENTARY_CHARGE
-from hnc_potentials import coulomb_k
+from potentials import coulomb_k
 from freefree_dsf import FreeFreeDSF
 
 
