@@ -1,8 +1,13 @@
 import numpy as np
+import warnings
 
 
 def iyetomi_bridge_function(rs, Rii, Gamma):
     ## Iyetomi, Phys. Rev. A 46 (1992) bridge function
+    if Gamma < 5:
+        warnings.warn(
+            f"Iyetomi bridge function is not valid for weakly coupled plasmas. In this regime, the extended HNC solver should not be applied."
+        )
     xs = rs / Rii
     lnGamma = np.log(Gamma)
     b0 = 0.258 - 0.0612 * lnGamma + 0.0123 * lnGamma**2 - 1 / Gamma
