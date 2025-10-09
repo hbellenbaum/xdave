@@ -1,0 +1,61 @@
+$SETUP
+	mode_of_operation = "XRTS_ANGULAR"
+	number_of_ions = 2
+	perform_error_checks = .TRUE.
+	run_code_silently = .TRUE.
+!	wk_relation = "exact"
+	output_wr_parts = .TRUE.
+$END
+$FILE
+	output_file_name = "{output_file_name}"
+	status_file_name = "{status_file_name}"
+$END
+$PLASMA
+    !use_mean_charge_states = .FALSE.
+    atomic_number = {AN1:d}, {AN2:d}
+    ionization_state = {Z_min:0.0f}, {Z_max:0.0f}
+    density_fraction = {frac_min:0.5f}, {frac_max:0.5f}
+    mass_density = {rho:0.5f}
+    temperature = {T:0.5f}
+	bulk_flow_along_k = 0.
+$END
+$PROBE
+	probe_energy = {probe_energy:0.0f}
+	use_source_func_data = {use_source_func_data}
+	source_func_shape = "{source_func_shape}"
+	use_source_func_data = {use_source_func_data}
+	source_func_fwhm_ev = {source_func_fwhm_ev:0.2f}
+    source_func_file_name = "{source_func_file_name}"
+$END
+$DETECTOR
+    number_of_points = {n_points:d}
+    min_wave_number = {k_min:0.4f}
+    max_wave_number = {k_max:0.4f}
+$END
+$MODELS
+	ee_pol_func_model = "{ee_pol_func_model}"
+	ee_lfc_model = "{ee_lfc_model}"
+	ii_potential_model = "{ii_potential_model}"
+	screen_cloud_model = "{screen_cloud_model}"
+	ei_potential_model = "{ei_potential_model}"
+	bf_dsf_model = "{bf_dsf_model}"
+	sec_core_power = {sec_core_power:0.0f}
+	ion_core_radius = 40
+	use_ideal_wr = .FALSE.
+	ipd_model = "{ipd_model}"
+	calculate_rk_factor = .FALSE.
+	user_defined_ipd = {user_defined_ipd:0.5f}
+	! ee_pol_func_model = "BORN_MERMIN"
+	! ee_lfc_model = "STATIC_UTSUMI_ICHIMARU"
+	! ii_potential_model = "DEBYE_HUCKEL"
+	! screen_cloud_model = "FINITE_WAVELENGTH"
+	! ei_potential_model = "EFFECTIVE_COULOMB"
+	! bf_dsf_model = "IMPULSE_SCHUMACHER"
+	! sec_core_power = 6
+	! ion_core_radius = 40
+	! use_ideal_wr = .FALSE.
+	! ideal_peak_ratio = 2.8
+	! ipd_model = "STEWART_PYATT"
+	! calibration_energy = 5780
+	! calculate_rk_factor = .FALSE.
+$END

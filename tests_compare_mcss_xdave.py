@@ -1,0 +1,397 @@
+from xdave import *
+from mcss_tests.run_mcss_sim import run_be_sr_mode, run_ch_sr_mode, run_c_sr_mode
+
+import numpy as np
+import matplotlib.pyplot as plt
+import os
+
+
+THIS_DIR = os.path.dirname(__file__)
+
+mcss_dir = "~/code/mcss/mcss_ndtt/pro/mcss"
+mcss_executable = "mcss_60"  # "mcss_ndtt"  'mcss_51'
+
+
+def compare_mcss_xdave_be():
+    T = 155.5
+    rho = 30.0
+    Z = 3.5
+    # q = 4.0
+    angle = 75
+    beam_energy = 20.0e3
+    q = calculate_q(angle=angle, energy=beam_energy)
+    print(f"Running at q={q:.3f}")
+
+    try:
+        fname = "mcss_tests/be_runs_T=155.50_rho=30.00/mcss_run_be_T=155.50_rho=30.00_Z=3.0_angle=75.csv"
+        En_mcss, wff_mcss, wbf_mcss, ff_mcss, bf_mcss, el_mcss = load_mcss_result(filename=fname)
+        WR_mcss = get_mcss_wr_from_status_file(
+            status_file="mcss_tests/be_runs_T=155.50_rho=30.00/mcss_run_be_T=155.50_rho=30.00_Z=3.0_angle=75_status.txt"
+        )
+    except FileNotFoundError:
+        En_mcss, wff_mcss, wbf_mcss, ff_mcss, bf_mcss, el_mcss, WR_mcss = run_be_sr_mode(
+            T=T, rho=rho, Z=Z, angle=angle, user_defined_ipd=0.0, user_defined_lfc=0.0, plot=False
+        )
+
+    mcss_norm = 4
+
+    elements = np.array(["Be", "Be"])
+    rho *= g_per_cm3_TO_kg_per_m3
+    T *= eV_TO_K
+
+    partial_densities = np.array([0.5, 0.5])
+    charge_states = np.array([3, 4])
+    user_defined_inputs = dict()
+
+    models = ModelOptions(polarisation_model="NUMERICAL", bf_model="SCHUMACHER", lfc_model="NONE", ipd_model="NONE")
+    setup = Setup(
+        mass_density=rho,
+        electron_temperature=T,
+        ion_temperature=T,
+        elements=elements,
+        partial_densities=partial_densities,
+        charge_states=charge_states,
+        user_defined_inputs=user_defined_inputs,
+    )
+
+    states = setup.states
+    k = q / BOHR_RADIUS
+
+    omega_array = np.arange(-4000, 4000, 0.5) * eV_TO_J
+
+    # angle = calculate_angle(q=q, energy=beam_energy)
+    rayleigh_weight = WR_mcss / mcss_norm
+    sif = np.zeros_like(omega_array)
+
+    kernel = xDave(
+        models=models,
+        states=states,
+        fractions=partial_densities,
+        rayleigh_weight=rayleigh_weight,
+        overlord_state=setup.overlord_state,
+        ipd=0.0,
+        sif=sif,
+    )
+
+    bf_tot, ff_tot, dsf, WR, ff_i, bf_i = kernel.run(k=k, w=omega_array)
+    ff_tot[np.isnan(ff_tot)] = 0.0
+
+    # plot results
+    fig, axes = plt.subplots(2, 3, figsize=(14, 10))
+
+    ax = axes[0, 0]
+    ax.set_title("Total DSF")
+    ax.plot(omega_array * J_TO_eV, dsf / J_TO_eV, label="Inel", ls="-.", c="magenta")
+    ax.plot(En_mcss, (wbf_mcss + wff_mcss) / mcss_norm, ls=":", c="purple", label="MCSS / AN")
+    ax.legend()
+
+    ax = axes[0, 1]
+    ax.set_title("FF DSF")
+    ax.plot(omega_array * J_TO_eV, ff_tot / J_TO_eV, label="FF", ls="--", c="orange")
+    ax.plot(En_mcss, wff_mcss / mcss_norm, c="navy", ls=":", label="MCSS: ff")
+    ax.legend()
+
+    ax = axes[0, 2]
+    ax.set_title("BF DSF")
+    ax.plot(omega_array * J_TO_eV, bf_tot / J_TO_eV, label="BF", ls="solid", c="dodgerblue")
+    ax.plot(En_mcss, wbf_mcss / mcss_norm, c="brown", ls=":", label="MCSS: bf")
+    ax.legend()
+
+    tau_array = np.linspace(0, 1 / (T * K_TO_eV), 2000)
+
+    F_tot_inel, F_wff, F_wbf = kernel.get_itcf(
+        tau=tau_array, w=omega_array * J_TO_eV, ff=ff_tot / J_TO_eV, bf=bf_tot / J_TO_eV
+    )
+    F_tot_inel_mcss, F_wff_mcss, F_wbf_mcss = kernel.get_itcf(tau=tau_array, w=En_mcss, ff=wff_mcss, bf=wbf_mcss)
+
+    ax = axes[1, 0]
+    ax.set_title("ITCF")
+    ax.plot(tau_array, F_tot_inel, label="xDave inel", ls="dashed", c="magenta")
+    ax.plot(tau_array, F_tot_inel_mcss / mcss_norm, label="MCSS inel", ls="dotted", c="purple")
+    ax.legend()
+
+    ax = axes[1, 1]
+    ax.set_title("FF ITCF")
+    ax.plot(tau_array, F_wff, label="xDave ff", ls="dashed", c="dodgerblue")
+    ax.plot(tau_array, F_wff_mcss / mcss_norm, label="MCSS ff", ls="dotted", c="navy")
+    ax.legend()
+
+    ax = axes[1, 2]
+    ax.set_title("BF ITCF")
+    ax.plot(tau_array, F_wbf, label="xDave bf", ls="dashed", c="orange")
+    ax.plot(tau_array, F_wbf_mcss / mcss_norm, label="MCSS bf", ls="dotted", c="brown")
+    ax.legend()
+    plt.show()
+    fig.savefig(f"2025-09-30_be_test_T={T*K_TO_eV:.1f}_rho={rho*kg_per_m3_TO_g_per_cm3:.1f}_Z={Z}_q={q:.2f}_wrong.pdf")
+
+
+def compare_mcss_xdave_c():
+    T = 80.0
+    rho = 4.0
+    Z = 0.5
+    # q = 4.0
+    angle = 90
+    beam_energy = 20.0e3
+    q = calculate_q(angle=angle, energy=beam_energy)
+    print(f"Running at q={q:.3f}")
+
+    # try:
+    # fname = (
+    #     f"mcss_tests/c_runs_T={T:.2f}_rho={rho:.2f}/mcss_run_c_T={T:.2f}_rho={rho:.2f}_Z={Z:.1f}_angle={angle:.0f}.csv"
+    # )
+    # print(f"Reading mcss output from file: {fname}")
+    # En_mcss, wff_mcss, wbf_mcss, ff_mcss, bf_mcss, el_mcss = load_mcss_result(filename=fname)
+    # WR_mcss = get_mcss_wr_from_status_file(
+    #     status_file=f"mcss_tests/c_runs_T={T:.2f}_rho={rho:.2f}/mcss_run_c_T={T:.2f}_rho={rho:.2f}_Z={Z:.1f}_angle={angle:.0f}_status.txt"
+    # )
+    # except FileNotFoundError:
+    #     print(f"Cannot find file")
+    En_mcss, wff_mcss, wbf_mcss, ff_mcss, bf_mcss, el_mcss, WR_mcss = run_c_sr_mode(
+        T=T, rho=rho, Z=Z, angle=angle, user_defined_ipd=0.0, user_defined_lfc=0.0, plot=False
+    )
+
+    Z_min, Z_max, x1, x2 = get_fractions_from_Z(Z)
+
+    elements = np.array(["C", "C"])
+    rho *= g_per_cm3_TO_kg_per_m3
+    T *= eV_TO_K
+
+    partial_densities = np.array([x1, x2])
+    charge_states = np.array([Z_min, Z_max])
+    user_defined_inputs = dict()
+
+    models = ModelOptions(polarisation_model="NUMERICAL", bf_model="SCHUMACHER", lfc_model="NONE", ipd_model="NONE")
+    setup = Setup(
+        mass_density=rho,
+        electron_temperature=T,
+        ion_temperature=T,
+        elements=elements,
+        partial_densities=partial_densities,
+        charge_states=charge_states,
+        user_defined_inputs=user_defined_inputs,
+    )
+
+    states = setup.states
+    k = q / BOHR_RADIUS
+
+    omega_array = np.arange(-4000, 4000, 0.5) * eV_TO_J
+
+    mcss_norm = setup.overlord_state.atomic_number
+
+    # angle = calculate_angle(q=q, energy=beam_energy)
+    rayleigh_weight = WR_mcss / mcss_norm
+    sif = np.zeros_like(omega_array)
+
+    kernel = xDave(
+        models=models,
+        states=states,
+        fractions=partial_densities,
+        rayleigh_weight=rayleigh_weight,
+        overlord_state=setup.overlord_state,
+        ipd=0.0,
+        sif=sif,
+    )
+
+    bf_tot, ff_tot, dsf, WR, ff_i, bf_i = kernel.run(k=k, w=omega_array)
+    ff_tot[np.isnan(ff_tot)] = 0.0
+
+    # plot results
+    fig, axes = plt.subplots(2, 3, figsize=(14, 10))
+
+    ax = axes[0, 0]
+    ax.set_title("Total DSF")
+    ax.plot(omega_array * J_TO_eV, dsf / J_TO_eV, label="Inel", ls="-.", c="magenta")
+    ax.plot(En_mcss, (wbf_mcss + wff_mcss) / mcss_norm, ls=":", c="purple", label="MCSS / AN")
+    ax.legend()
+
+    ax = axes[0, 1]
+    ax.set_title("FF DSF")
+    ax.plot(omega_array * J_TO_eV, ff_tot / J_TO_eV, label="FF", ls="--", c="orange")
+    ax.plot(En_mcss, wff_mcss / mcss_norm, c="brown", ls=":", label="MCSS: ff")
+    ax.legend()
+
+    ax = axes[0, 2]
+    ax.set_title("BF DSF")
+    ax.plot(
+        omega_array * J_TO_eV, bf_tot / J_TO_eV, label="BF", ls="solid", c="dodgerblue"
+    )  # / np.max(bf_tot / J_TO_eV)
+    ax.plot(En_mcss, wbf_mcss / mcss_norm, c="navy", ls=":", label="MCSS: bf")  # / np.max(wbf_mcss / mcss_norm)
+    ax.legend()
+
+    tau_array = np.linspace(0, 1 / (T * K_TO_eV), 2000)
+
+    F_tot_inel, F_wff, F_wbf = kernel.get_itcf(
+        tau=tau_array, w=omega_array * J_TO_eV, ff=ff_tot / J_TO_eV, bf=bf_tot / J_TO_eV
+    )
+    F_tot_inel_mcss, F_wff_mcss, F_wbf_mcss = kernel.get_itcf(tau=tau_array, w=En_mcss, ff=wff_mcss, bf=wbf_mcss)
+
+    ax = axes[1, 0]
+    ax.set_title("ITCF")
+    ax.plot(tau_array, F_tot_inel, label="xDave inel", ls="dashed", c="magenta")
+    ax.plot(tau_array, F_tot_inel_mcss / mcss_norm, label="MCSS inel", ls="dotted", c="purple")
+    ax.legend()
+
+    ax = axes[1, 1]
+    ax.set_title("FF ITCF")
+    ax.plot(tau_array, F_wff, label="xDave ff", ls="dashed", c="dodgerblue")
+    ax.plot(tau_array, F_wff_mcss / mcss_norm, label="MCSS ff", ls="dotted", c="navy")
+    ax.legend()
+
+    ax = axes[1, 2]
+    ax.set_title("BF ITCF")
+    ax.plot(tau_array, F_wbf, label="xDave bf", ls="dashed", c="orange")
+    ax.plot(tau_array, F_wbf_mcss / mcss_norm, label="MCSS bf", ls="dotted", c="brown")
+    ax.legend()
+    plt.show()
+    # fig.savefig(f"c_test_T={T*K_TO_eV:.1f}_rho={rho*kg_per_m3_TO_g_per_cm3:.1f}_Z={Z}_q={q:.2f}.pdf")
+
+
+def compare_mcss_xdave_ch():
+    T = 80.0
+    rho = 3.5
+    ZC = 2.5
+    ZH = 1.0
+    xH = 0.2
+    # q = 4.0
+    angle = 75
+    beam_energy = 20.0e3
+    q = calculate_q(angle=angle, energy=beam_energy)
+    print(f"Running at q={q:.3f}")
+
+    En_mcss, wff_mcss, wbf_mcss, ff_mcss, bf_mcss, el_mcss, WR_mcss = run_ch_sr_mode(
+        T=T, rho=rho, xH=xH, ZH=ZH, ZC=ZC, angle=angle, user_defined_ipd=0.0, user_defined_lfc=0.0, plot=False
+    )
+    # fname = "mcss_tests/be_runs_T=155.50_rho=30.00/mcss_run_be_T=155.50_rho=30.00_Z=3.0_angle=75.csv"
+    # En_mcss, wff_mcss, wbf_mcss, ff_mcss, bf_mcss, el_mcss = load_mcss_result(filename=fname)
+    # WR_mcss = get_mcss_wr_from_status_file(
+    #     status_file="mcss_tests/be_runs_T=155.50_rho=30.00/mcss_run_be_T=155.50_rho=30.00_Z=3.0_angle=75_status.txt"
+    # )
+
+    elements = np.array(["H", "C", "C"])
+    rho *= g_per_cm3_TO_kg_per_m3
+    T *= eV_TO_K
+
+    Zmin, Zmax, xmin, xmax = get_fractions_from_Z_partial(ZC, x0=xH)
+    partial_densities = np.array([xH, xmin, xmax])
+    charge_states = np.array([1.0, Zmin, Zmax])
+    user_defined_inputs = dict()
+
+    models = ModelOptions(polarisation_model="NUMERICAL", bf_model="SCHUMACHER", lfc_model="NONE", ipd_model="NONE")
+    setup = Setup(
+        mass_density=rho,
+        electron_temperature=T,
+        ion_temperature=T,
+        elements=elements,
+        partial_densities=partial_densities,
+        charge_states=charge_states,
+        user_defined_inputs=user_defined_inputs,
+    )
+
+    states = setup.states
+    k = q / BOHR_RADIUS
+
+    omega_array = np.arange(-4000, 4000, 0.5) * eV_TO_J
+
+    mcss_norm = setup.overlord_state.atomic_number
+
+    # angle = calculate_angle(q=q, energy=beam_energy)
+    rayleigh_weight = WR_mcss / mcss_norm
+    sif = np.zeros_like(omega_array)
+
+    kernel = xDave(
+        models=models,
+        states=states,
+        fractions=partial_densities,
+        rayleigh_weight=rayleigh_weight,
+        overlord_state=setup.overlord_state,
+        ipd=0.0,
+        sif=sif,
+    )
+
+    bf_tot, ff_tot, dsf, WR, ff_i, bf_i = kernel.run(k=k, w=omega_array)
+    ff_tot[np.isnan(ff_tot)] = 0.0
+
+    # plot results
+    fig, axes = plt.subplots(2, 3, figsize=(14, 10))
+
+    ax = axes[0, 0]
+    ax.set_title("Total DSF")
+    ax.set_yscale("log")
+    ax.plot(omega_array * J_TO_eV, dsf / J_TO_eV, label="Inel", ls="-.", c="magenta")
+    ax.plot(En_mcss, (wbf_mcss + wff_mcss) / mcss_norm, ls=":", c="purple", label="MCSS / AN")
+    ax.legend()
+    ax.set_xlabel(r"$\omega$ [eV]")
+    ax.set_ylabel(r"DSF [1/eV]")
+
+    ax = axes[0, 1]
+    ax.set_yscale("log")
+    ax.set_title("FF DSF")
+    ax.plot(omega_array * J_TO_eV, ff_tot / J_TO_eV, label="FF", ls="--", c="orange")
+    ax.plot(En_mcss, wff_mcss / mcss_norm, c="brown", ls=":", label="MCSS: ff")
+    ax.legend()
+    ax.set_xlabel(r"$\omega$ [eV]")
+    ax.set_ylabel(r"DSF [1/eV]")
+
+    ax = axes[0, 2]
+    ax.set_title("BF DSF")
+    ax.set_yscale("log")
+    # ax.plot(
+    #     omega_array * J_TO_eV, bf_tot / np.nanmax(bf_tot / J_TO_eV) / J_TO_eV, label="BF", ls="solid", c="dodgerblue"
+    # )
+    ax.plot(omega_array * J_TO_eV, bf_tot / J_TO_eV, label="BF", ls="solid", c="dodgerblue")
+    # ax.plot(omega_array * J_TO_eV, bf_i[0, :] / J_TO_eV, label="BF: H", ls="-.", c="dodgerblue")
+    # ax.plot(omega_array * J_TO_eV, bf_i[1, :] / J_TO_eV, label="BF: C4", ls=":", c="dodgerblue")
+    # ax.plot(omega_array * J_TO_eV, bf_i[2, :] / J_TO_eV, label="BF: C5", ls="--", c="dodgerblue")
+    # ax.plot(
+    #     omega_array * J_TO_eV,
+    #     (bf_i[0, :] + bf_i[1, :] + bf_i[2, :]) / setup.overlord_state.charge_state / J_TO_eV,
+    #     label="Sum",
+    #     ls="solid",
+    #     c="gray",
+    # )
+    # ax.plot(omega_array * J_TO_eV, bf_tot / factor / J_TO_eV, label="Attempt", ls="solid", c="navy")
+    # ax.plot(En_mcss, wbf_mcss / np.max(wbf_mcss / mcss_norm) / mcss_norm, c="navy", ls=":", label="MCSS: bf")
+    ax.plot(En_mcss, wbf_mcss / mcss_norm, c="navy", ls=":", label="MCSS: bf")
+    ax.legend()
+    ax.set_xlabel(r"$\omega$ [eV]")
+    ax.set_ylabel(r"DSF [1/eV]")
+
+    tau_array = np.linspace(0, 1 / (T * K_TO_eV), 2000)
+
+    F_tot_inel, F_wff, F_wbf = kernel.get_itcf(
+        tau=tau_array, w=omega_array * J_TO_eV, ff=ff_tot / J_TO_eV, bf=bf_tot / J_TO_eV
+    )
+    F_tot_inel_mcss, F_wff_mcss, F_wbf_mcss = kernel.get_itcf(tau=tau_array, w=En_mcss, ff=wff_mcss, bf=wbf_mcss)
+
+    ax = axes[1, 0]
+    ax.set_title("ITCF")
+    ax.plot(tau_array, F_tot_inel, label="xDave inel", ls="dashed", c="magenta")
+    ax.plot(tau_array, F_tot_inel_mcss / mcss_norm, label="MCSS inel", ls="dotted", c="purple")
+    ax.legend()
+    ax.set_xlabel(r"$\tau$ [1/eV]")
+    ax.set_ylabel(r"ITCF")
+
+    ax = axes[1, 1]
+    ax.set_title("FF ITCF")
+    ax.plot(tau_array, F_wff, label="xDave ff", ls="dashed", c="dodgerblue")
+    ax.plot(tau_array, F_wff_mcss / mcss_norm, label="MCSS ff", ls="dotted", c="navy")
+    ax.legend()
+    ax.set_xlabel(r"$\tau$ [1/eV]")
+    ax.set_ylabel(r"ITCF")
+
+    ax = axes[1, 2]
+    ax.set_title("BF ITCF")
+    ax.plot(tau_array, F_wbf, label="xDave bf", ls="dashed", c="orange")
+    ax.plot(tau_array, F_wbf_mcss / mcss_norm, label="MCSS bf", ls="dotted", c="brown")
+    ax.legend()
+    ax.set_xlabel(r"$\tau$ [1/eV]")
+    ax.set_ylabel(r"ITCF")
+    plt.tight_layout()
+    plt.show()
+    fig.savefig(f"ch_test_T={T*K_TO_eV:.1f}_rho={rho*kg_per_m3_TO_g_per_cm3:.1f}_ZC={ZC}_q={q:.2f}.pdf")
+
+
+if __name__ == "__main__":
+    # compare_mcss_xdave_be()
+    compare_mcss_xdave_ch()
+    # compare_mcss_xdave_c()
