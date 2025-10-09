@@ -7,21 +7,8 @@ import numpy as np
 ## Ion potentials for the ion-ion HNC solver
 
 
-# Screened Coulomb potential - Yukawa potential
-def springer_short_range_rs(Qa, Qb, r, alpha):
-    return Qa * Qb / (4 * PI * VACUUM_PERMITTIVITY) * np.exp(-alpha * r) / r
-
-
-def springer_long_range_rs(Qa, Qb, r, alpha):
-    return Qa * Qb / (4 * PI * VACUUM_PERMITTIVITY) * (1 - np.exp(-alpha * r)) / r
-
-
-def springer_long_range_ks(Qa, Qb, k, alpha):
-    return Qa * Qb / VACUUM_PERMITTIVITY * alpha**2 / (k**2 * (alpha**2 + k**2))
-
-
 # 'normal' Coulomb potential
-def coulomb(Qa, Qb, r):
+def coulomb_r(Qa, Qb, r):
     return Qa * Qb * ELEMENTARY_CHARGE**2 / (4 * PI * VACUUM_PERMITTIVITY * r)
 
 
@@ -32,9 +19,18 @@ def coulomb_k(Qa, Qb, k):
     return Qa * Qb * ELEMENTARY_CHARGE**2 / (VACUUM_PERMITTIVITY * k**2)
 
 
+# Screened Coulomb potential - Yukawa potential
+def yukawa_r(Qa, Qb, r, alpha):
+    return Qa * Qb * ELEMENTARY_CHARGE**2 / (4 * PI * VACUUM_PERMITTIVITY) * np.exp(-alpha * r) / r
+
+
+def yukawa_k(Qa, Qb, k, alpha):
+    return Qa * Qb * ELEMENTARY_CHARGE**2 / VACUUM_PERMITTIVITY * alpha**2 / (k**2 * (alpha**2 + k**2))
+
+
 ## Electron-ion potentials for the screening cloud
 def ei_coulomb(Qa, r):
-    return coulomb(Qa=Qa, Qb=1, r=r)
+    return coulomb_r(Qa=Qa, Qb=1, r=r)
 
 
 def ei_coulomb_k(Qa, k):

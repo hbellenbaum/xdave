@@ -287,3 +287,32 @@ def inverse_transform_fft(yk, r, k, dr, dk):
     yr[0] = 2 * yr[1] - yr[2]
 
     return yr
+
+
+def forward_transform_fftn(yr, r, norm):
+    """
+    Fourier transform using the scipy.fft functions for matrixes
+    """
+
+    yk = np.zeros_like(yr)
+    weighted_yr = yr[..., 1:].copy()
+    weighted_yr *= r[1:]
+    sum_vals = dst(weighted_yr, type=1, axis=-1)
+    yk[..., 1:] = norm * sum_vals
+
+    return yk
+
+
+def inverse_transform_fftn(yk, k, norm):
+    """
+    Inverse fourier transform using the scipy.fft functions for matrixes
+    I've tried to speed this up as much as I could, it is still slow af.
+    """
+
+    yr = np.zeros_like(yk)
+    weighted_yk = yk[..., 1:].copy()
+    weighted_yk *= k[1:]
+    sum_vals = dst(weighted_yk, type=1, axis=-1)
+    yr[..., 1:] = norm * sum_vals
+
+    return yr

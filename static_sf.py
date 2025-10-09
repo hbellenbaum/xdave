@@ -3,7 +3,7 @@ from models import ModelOptions
 from plasma_state import PlasmaState
 
 from bridge_functions import *
-from utils import forward_transform_fft, inverse_transform_fft
+from utils import forward_transform_fft, inverse_transform_fft, forward_transform_fftn, inverse_transform_fftn
 from constants import BOHR_RADIUS, ELEMENTARY_CHARGE, PI, BOLTZMANN_CONSTANT, VACUUM_PERMITTIVITY
 from potentials import *
 
@@ -46,34 +46,59 @@ def get_sigmac(ni, Zi, Ti):
     return sol.x
 
 
-class StaticStructureFactor:
+class OCPStaticStructureFactor:
 
-    def __init__(self, state: PlasmaState, models: ModelOptions, sigma=float()):
+    def __init__(
+        self,
+        state: PlasmaState,
+        sigma=float(),
+        max_iterations=5000,
+        mix_fraction=0.8,
+        delta=1.0e-8,
+        n=8192,
+    ):
         self.state = state
-        self.ss_model = models.static_structure_factor_approximation
+        # self.ss_model = models.static_structure_factor_approximation
         self.ion_particle_diameter = sigma  # 1 * BOHR_RADIUS  ## this needs to be moved to the plasma state
+        self.beta = 1 / (BOLTZMANN_CONSTANT * state.ion_temperature)  # [1/J]
+        self.n = 8192  # per themis [#]
 
-    def get_ii_static_structure_factor_ocp(self, k):
-        if self.ss_model == "MSA":
+        self.Rii = self.state.mean_sphere_radius(number_density=self.state.ion_number_density)  # [m]
+        self.alpha = 2 / self.Rii  # [1/m]
+        self.max_iterations = max_iterations
+        self.mix_fraction = mix_fraction
+        self.delta = delta
+        self.n = n
+
+    def get_ii_static_structure_factor_ocp(
+        self, k, sf_model="HNC", pseudo_potential="YUKAWA", bridge_function="IYETOMI"
+    ):
+        if sf_model == "MSA":
             return self.mean_spherical_approximation_ocp_ii(k)
-        elif self.ss_model == "HNC":
-            return self.hnc_ocp_ii(k)
-        elif self.ss_model == "EXTENDED_HNC":
-            return self.xhnc_ocp_ii(k)
+        elif sf_model == "HNC":
+            return self.hnc_ocp_ii(k, pseudo_potential)
+        elif sf_model == "EXTENDED_HNC":
+            return self.xhnc_ocp_ii(k, pseudo_potential, bridge_function)
         else:
             raise NotImplementedError(
-                f"Model {self.ss_model} for the static structure factor not yet implemented. Try MSA :)"
+                f"Model {sf_model} for the static structure factor not yet implemented. Try MSA :)"
             )
 
-    def get_ii_static_structure_factor(self, k):
-        if self.ss_model == "MSA":
-            return self.mean_spherical_approximation_ss(k)
-        elif self.ss_model == "HNC":
-            return self.hnc_ss(k)
+    def _hnc_ii_pseudopotential(self, k, r, Q, alpha, model="YUKAWA"):
+        if model == " YUKAWA":
+            return yukawa_r(Q, Q, r, alpha), yukawa_k(Q, Q, k, alpha)
         else:
-            raise NotImplementedError(
-                f"Model {self.ss_model} for the static structure factor not yet implemented. Try MSA :)"
-            )
+            raise NotImplementedError(f"Pseudo-potential model {model} not recognized.")
+
+    # def get_ii_static_structure_factor(self, k, sf_model="HNC", pseudo_potential="YUKAWA"):
+    #     if sf_model == "MSA":
+    #         return self.mean_spherical_approximation_ss(k)
+    #     elif sf_model == "HNC":
+    #         return self.hnc_ss(k)
+    #     else:
+    #         raise NotImplementedError(
+    #             f"Model {sf_model} for the static structure factor not yet implemented. Try MSA :)"
+    #         )
 
     def mean_spherical_approximation_ocp_ii(self, k):
         ni = self.state.ion_number_density
@@ -119,51 +144,52 @@ class StaticStructureFactor:
         S_ii_ocp = 1 / (1 - Cii)
         return S_ii_ocp
 
-    def mean_spherical_approximation_ss(self, k):
-        ion_particle_diameter = self.ion_particle_diameter
-        S_ii_OCP = self.get_ii_static_structure_factor_ocp(k)
+    # TODO(Hannah): figure out where this is meant to go
+    # def mean_spherical_approximation_ss(self, k):
+    #     ion_particle_diameter = self.ion_particle_diameter
+    #     S_ii_OCP = self.get_ii_static_structure_factor_ocp(k)
 
-        kappa_i = np.sqrt(
-            self.state.charge_state
-            * self.state.electron_number_density
-            * ELEMENTARY_CHARGE**2
-            / (VACUUM_PERMITTIVITY * BOLTZMANN_CONSTANT * self.state.ion_temperature)
-        )
-        kappa_e = np.sqrt(
-            self.state.electron_number_density
-            * ELEMENTARY_CHARGE**2
-            / (VACUUM_PERMITTIVITY * BOLTZMANN_CONSTANT * self.state.electron_temperature)
-        )
-        # screening_charge = self.state.charge_state * kappa_e**2 / k**2 * S_ee
-        # screening_correction = (
-        #     kappa_i**2
-        #     / k**2
-        #     * (np.cos(k * ion_particle_diameter / 2)) ** 2
-        #     * screening_charge
-        #     / self.state.charge_state
-        # )
-        # static dielectric function in the weakly coupled limit, should be replaced by RPA or something more sophisticated
-        lfc = 0.0
-        dielectric = 1 + kappa_e**2 / k**2
-        S_ee0 = k**2 / (k**2 - kappa_e**2 * (1 - lfc))
-        q_sc = self.state.charge_state * kappa_e**2 / k**2 * S_ee0
-        # screening_correction = kappa_i**2 / k**2 * (np.cos(k * ion_particle_diameter / 2)) ** 2 * (1 / dielectric - 1)
-        screening_correction = (
-            -(kappa_i**2) / k**2 * (np.cos(k * ion_particle_diameter / 2)) ** 2 * kappa_e**2 / k**2 * S_ee0
-        )
-        S_ii = S_ii_OCP / (1 + screening_correction * S_ii_OCP)
-        return S_ii, screening_correction, q_sc, S_ee0
+    #     kappa_i = np.sqrt(
+    #         self.state.charge_state
+    #         * self.state.electron_number_density
+    #         * ELEMENTARY_CHARGE**2
+    #         / (VACUUM_PERMITTIVITY * BOLTZMANN_CONSTANT * self.state.ion_temperature)
+    #     )
+    #     kappa_e = np.sqrt(
+    #         self.state.electron_number_density
+    #         * ELEMENTARY_CHARGE**2
+    #         / (VACUUM_PERMITTIVITY * BOLTZMANN_CONSTANT * self.state.electron_temperature)
+    #     )
+    #     # screening_charge = self.state.charge_state * kappa_e**2 / k**2 * S_ee
+    #     # screening_correction = (
+    #     #     kappa_i**2
+    #     #     / k**2
+    #     #     * (np.cos(k * ion_particle_diameter / 2)) ** 2
+    #     #     * screening_charge
+    #     #     / self.state.charge_state
+    #     # )
+    #     # static dielectric function in the weakly coupled limit, should be replaced by RPA or something more sophisticated
+    #     lfc = 0.0
+    #     dielectric = 1 + kappa_e**2 / k**2
+    #     S_ee0 = k**2 / (k**2 - kappa_e**2 * (1 - lfc))
+    #     q_sc = self.state.charge_state * kappa_e**2 / k**2 * S_ee0
+    #     # screening_correction = kappa_i**2 / k**2 * (np.cos(k * ion_particle_diameter / 2)) ** 2 * (1 / dielectric - 1)
+    #     screening_correction = (
+    #         -(kappa_i**2) / k**2 * (np.cos(k * ion_particle_diameter / 2)) ** 2 * kappa_e**2 / k**2 * S_ee0
+    #     )
+    #     S_ii = S_ii_OCP / (1 + screening_correction * S_ii_OCP)
+    #     return S_ii, screening_correction, q_sc, S_ee0
 
-    def hnc_ocp_ii(self, k, max_iterations=1000, mix_fraction=0.2, delta=1.0e-12):
+    def hnc_ocp_ii(self, k, pseudo_potential):
         Ti = self.state.ion_temperature
         Zi = self.state.ion_charge
         ni = self.state.ion_number_density
-        Rii = self.state.mean_sphere_radius(number_density=ni)
+        Rii = self.Rii  # self.state.mean_sphere_radius(number_density=ni)
         beta = 1 / (BOLTZMANN_CONSTANT * Ti)  # [1/J]
-        n = 8192  # per themis [#]
+        n = self.n  # per themis [#]
 
         # Rii = mean_sphere_radius(ni)  # [m]
-        alpha = 2 / Rii  # [1/m]
+        alpha = self.alpha  # 2 / Rii  # [1/m]
 
         r0 = 1.0e-2 * Rii  # [m]
         rf = 1.0e2 * Rii  # [m]
@@ -174,15 +200,24 @@ class StaticStructureFactor:
         rs = np.linspace(r0, rf, n)  # [m]
         ks = np.linspace(k0, kf, n)  # [1/m]
 
-        Qa = Qb = Zi * ELEMENTARY_CHARGE  # [C]
+        Q = Zi  # [C]
 
         # use thermodynamically normalized potential
         # imo, this should be dimensionless (as it is)
-        Us_rs = beta * springer_short_range_rs(Qa, Qb, rs, alpha)  # [ ]
-        Ul_ks = beta * springer_long_range_ks(Qa, Qb, ks, alpha)  # [m^3] ???
+        # Us_rs = beta * yukawa_r(Qa, Qb, rs, alpha)  # [ ]
+        # Ul_ks = beta * yukawa_k(Qa, Qb, ks, alpha)  # [m^3] ???
+        Us_rs = beta * self._hnc_ii_pseudopotential(Q=Q, r=rs, alpha=alpha, k=ks, model=pseudo_potential)[0]  # [ ]
+        Ul_ks = (
+            beta * self._hnc_ii_pseudopotential(Q=Q, r=rs, alpha=alpha, k=ks, model=pseudo_potential)[1]
+        )  # [m^3] ???
 
         cs0_rs = -Us_rs  # [ ]
         Ns0_rs = np.zeros_like(cs0_rs)  # should be [ ]
+
+        # Set up variables for HNC solver
+        max_iterations = self.max_iterations
+        mix_fraction = self.mix_fraction
+        delta = self.delta
 
         converged = False
         i = 0
@@ -253,16 +288,16 @@ class StaticStructureFactor:
         )
         return ks, rs, giir, hiir, Siik
 
-    def xhnc_ocp_ii(self, k, max_iterations=1000, mix_fraction=0.2, delta=1.0e-12):
-        Ti = self.state.ion_temperature
+    def xhnc_ocp_ii(self, k, pseudo_potential, bridge_function):
+        # Ti = self.overlord_state.ion_temperature
         Zi = self.state.ion_charge
         ni = self.state.ion_number_density
-        Rii = self.state.mean_sphere_radius(number_density=ni)
-        beta = 1 / (BOLTZMANN_CONSTANT * Ti)  # [1/J]
-        n = 8192  # per themis [#]
+        Rii = self.Rii  # self.overlord_state.mean_sphere_radius(number_density=ni)
+        beta = self.beta  # 1 / (BOLTZMANN_CONSTANT * Ti)  # [1/J]
+        n = self.n  # 8192  # per themis [#]
 
         # Rii = mean_sphere_radius(ni)  # [m]
-        alpha = 2 / Rii  # [1/m]
+        alpha = self.alpha  # 2 / Rii  # [1/m]
 
         r0 = 1.0e-2 * Rii  # [m]
         rf = 1.0e2 * Rii  # [m]
@@ -273,20 +308,29 @@ class StaticStructureFactor:
         rs = np.linspace(r0, rf, n)  # [m]
         ks = np.linspace(k0, kf, n)  # [1/m]
 
-        Qa = Qb = Zi * ELEMENTARY_CHARGE  # [C]
+        Q = Zi  # [C]
 
-        # use thermodynamically normalized potential
-        # imo, this should be dimensionless (as it is)
-        Us_rs = beta * springer_short_range_rs(Qa, Qb, rs, alpha)  # [ ]
-        Ul_ks = beta * springer_long_range_ks(Qa, Qb, ks, alpha)  # [m^3] ???
+        # # use thermodynamically normalized potential
+        # Us_rs = beta * yukawa_r(Qa, Qb, rs, alpha)  # [ ]
+        # Ul_ks = beta * yukawa_k(Qa, Qb, ks, alpha)  # [m^3] ???
+        Us_rs = beta * self._hnc_ii_pseudopotential(Q=Q, r=rs, alpha=alpha, k=ks, model=pseudo_potential)[0]  # [ ]
+        Ul_ks = (
+            beta * self._hnc_ii_pseudopotential(Q=Q, r=rs, alpha=alpha, k=ks, model=pseudo_potential)[1]
+        )  # [m^3] ???
 
         cs0_rs = -Us_rs  # [ ]
         Ns0_rs = np.zeros_like(cs0_rs)  # should be [ ]
+
+        # Set up variables for HNC solver
+        max_iterations = self.max_iterations
+        mix_fraction = self.mix_fraction
+        delta = self.delta
 
         converged = False
         i = 0
         Gamma = self.state.coupling_parameter(Za=Zi, beta=beta, da=Rii)
         xs, Biir = iyetomi_bridge_function(rs=rs, Rii=Rii, Gamma=Gamma)
+
         while i < max_iterations:
 
             if i == 0:
@@ -315,7 +359,7 @@ class StaticStructureFactor:
             g_rs_new = np.exp(Ns_rs - Us_rs + Biir)
 
             if np.any(g_rs_new) == np.nan:
-                print(f"Careful, we have naan")
+                print(f"Careful, we have naan.")
 
             # check convergence
             converged = np.sum((g_rs_prev - g_rs_new) ** 2) < delta
@@ -352,71 +396,199 @@ class StaticStructureFactor:
         )
         return ks, rs, giir, hiir, Siik
 
-    def hnc_ss(self, k):
-        return
+
+## Multi-component implementation
+
+
+class MCPStaticStructureFactor:
+
+    def __init__(
+        self,
+        overlord_state: PlasmaState,
+        states: np.array,
+        sigma=float(),
+        max_iterations=5000,
+        mix_fraction=0.8,
+        delta=1.0e-8,
+        n=8192,
+    ):
+        self.overlord_state = overlord_state
+        self.ion_particle_diameter = sigma  # 1 * BOHR_RADIUS  ## this needs to be moved to the plasma state
+        self.beta = 1 / (BOLTZMANN_CONSTANT * overlord_state.ion_temperature)  # [1/J]
+        self.n = n  # per themis [#]
+
+        self.Rii = self.overlord_state.mean_sphere_radius(number_density=self.overlord_state.ion_number_density)  # [m]
+        self.alpha = 2 / self.Rii  # [1/m]
+        self.nspecies = len(states)
+
+        self.a = self.b = len(states)
+        self.nis = []
+        self.Qs = []
+        for i in len(states):
+            self.nis.append(states[i].ion_number_density)
+            self.Qs.append(states[i].ion_charge)
+
+        self.max_iterations = max_iterations
+        self.mix_fraction = mix_fraction
+        self.delta = delta
+
+    def get_ab_static_structure_factor(self, k, sf_model="HNC", pseudo_potential="YUKAWA"):
+        if sf_model == "MSA":
+            raise NotImplementedError("The MSA has not been implemented for multi-component systems")
+        elif sf_model == "HNC":
+            return self.hnc_ab_ss(k, pseudo_potential)
+        else:
+            raise NotImplementedError(f"Model {sf_model} not recognized. Try HNC.")
+
+    def _hnc_pseudopotential(self, k, r, Qa, Qb, alpha, model="YUKAWA"):
+        if model == " YUKAWA":
+            return yukawa_r(Qa, Qb, r, alpha), yukawa_k(Qa, Qb, k, alpha)
+        else:
+            raise NotImplementedError(f"Pseudo-potential model {model} not recognized.")
+
+    def hnc_ab_ss(self, k, pseudo_potential):
+        beta = self.beta  # [1/J]
+        n = self.n  # 8192  # per themis [#]
+
+        alpha = self.alpha  # 2 / Rii  # [1/m]
+
+        a = b = self.nspecies
+        Qs = np.asarray(self.Qs, dtype=float)  # [C]
+
+        # Set up grid
+        r0 = 1.0e-3 * BOHR_RADIUS  # [m]
+        rf = 1.0e2 * BOHR_RADIUS  # [m]
+        dr = (rf - r0) / n
+        dk = np.pi / (n * dr)  # [1/m] as it should be [1/m],
+        kf = r0 + n * dk
+        rs = np.linspace(r0, rf, n)  # [m]
+        ks = np.linspace(r0, kf, n)  # [1/m]
+
+        # Set up initial matrices
+        D = np.zeros((a, b))  # density matrix
+        nis = self.nis
+        I = np.eye(a)
+
+        Us_rs = np.zeros((b, a, n))
+        Ul_ks = np.zeros((b, a, n))
+
+        # populate potentials: dimensionless
+        for n1 in (0, b - 1):
+            for n2 in (0, a - 1):
+                # Us_rs[n1, n2, :] = beta * yukawa_r(Qa=Qs[n2], Qb=Qs[n1], r=rs, alpha=alpha)  # [ ]
+                # Ul_ks[n1, n2, :] = beta * yukawa_k(Qa=Qs[n2], Qb=Qs[n1], k=ks, alpha=alpha)  # [ ]
+                Us_rs[n1, n2, :] = (
+                    beta
+                    * self._hnc_pseudopotential(Qa=Qs[n2], Qb=Qs[n1], r=rs, alpha=alpha, model=pseudo_potential)[0]
+                )
+                Ul_ks[n1, n2, :] = (
+                    beta
+                    * self._hnc_pseudopotential(Qa=Qs[n2], Qb=Qs[n1], r=rs, alpha=alpha, model=pseudo_potential)[1]
+                )
+                if n1 == n2:
+                    # Populate density matrix
+                    D[n1, n2] = nis[n1]  # [m^{-3}]
+
+        converged = False
+        i = 0
+
+        Ns0_rs = np.zeros_like(Us_rs)  # [ ]
+        cs0_rs = Us_rs  # [ ]
+
+        prefactor_forward = 2 * np.pi * dr / ks[1:]
+        prefactor_inverse = (dk / (2 * np.pi) ** 2) / rs[1:]
+
+        max_iterations = self.max_iterations
+        mix_fraction = self.mix_fraction
+        delta = self.delta
+
+        # epsilon = 1.0e-14
+        while i < max_iterations:
+
+            if i == 0:
+                Ns_rs = Ns0_rs.copy()  # [ ]
+                Ns_rs_prev = Ns0_rs.copy()  # [ ]
+                g_rs_prev = np.exp(Ns_rs_prev - Us_rs)  # [ ]
+                cs_rs = cs0_rs.copy()  # [ ]
+
+            # total correlation function
+            h_rs = g_rs_prev - 1  # [ ]
+
+            cs_ks = forward_transform_fftn(yr=cs_rs, r=rs, norm=prefactor_forward)  #  [ ]
+            c_ks = cs_ks - Ul_ks  # [ ]
+
+            # Matrix inversion
+            Dc = D @ c_ks
+            M = I[..., None] - Dc
+            M = np.moveaxis(M, -1, 0)
+
+            # try to filter out indices where the matrix is singular
+            conds = np.linalg.cond(M)
+
+            good_idx = np.where(conds < 1.0e12)[0]
+            bad_idx = np.where(conds >= 1.0e12)[0]
+            h_ks = np.empty_like(c_ks)
+            if len(good_idx) > 0:
+                M_good = M[good_idx]
+                c_good = c_ks[..., good_idx].transpose(2, 0, 1)
+                h_good = np.linalg.solve(M_good.transpose(0, 2, 1), c_good.transpose(0, 2, 1)).transpose(0, 2, 1)
+                h_ks[..., good_idx] = h_good.transpose(1, 2, 0)
+            for ik in bad_idx:
+                h_ks[..., ik] = c_ks[..., ik] @ np.linalg.pinv(M[ik])
+
+            # indirect correlation function
+            Ns_ks = h_ks - cs_ks
+            Ns_rs_new = inverse_transform_fftn(yk=Ns_ks, k=ks, norm=prefactor_inverse)
+
+            # Update new indirect correlation function for next iteration using the mix fraction
+            Ns_rs = (1 - mix_fraction) * Ns_rs_new + mix_fraction * Ns_rs_prev
+
+            g_rs_new = np.exp(Ns_rs - Us_rs)
+
+            if np.any(np.isnan(g_rs_new)) or np.any(np.isnan(c_ks)) or np.any(np.isnan(cs_rs)):
+                print(f"\nCareful, we have naan at i={i}! Exciting.\n")
+                break
+
+            converged = np.sum((g_rs_prev - g_rs_new) ** 2) < delta
+            if converged:
+                print(f"Converged after {i} iterations.")
+                break
+
+            # save variables for next iteration
+            Ns_rs_prev[:] = Ns_rs
+            g_rs_prev[:] = g_rs_new
+            cs_rs[:] = h_rs - Ns_rs
+
+            i += 1
+        else:
+            print(f"Exited after {max_iterations} iterations without convergence.")
+
+        giir = g_rs_new
+
+        hiir = giir - 1.0
+
+        Sabs = np.zeros((a, b, n))
+        # This is only done once, so it could probably be sped up by generalizing the Fourier Transform for matrices, but it's not a priority right now
+        for n1 in (0, a - 1):
+            for n2 in (0, b - 1):
+                if n1 == n2:
+                    Sabs[n1, n2, :] = 1 + np.sqrt(nis[n1] * nis[n2]) * forward_transform_fft(
+                        yr=hiir[n1, n2, :], r=rs, k=ks, dk=dk, dr=dr
+                    )
+                else:
+                    Sabs[n1, n2, :] = np.sqrt(nis[n1] * nis[n2]) * forward_transform_fft(
+                        yr=hiir[n1, n2, :], r=rs, k=ks, dk=dk, dr=dr
+                    )
+
+                # extrapolate first few points in k-space -> inspired by THEMIS
+                Sabs[n1, n2, 0] = Sabs[n1, n2, 2] + (Sabs[n1, n2, 3] - Sabs[n1, n2, 2]) * (ks[0] - ks[1]) / (
+                    ks[2] - ks[1]
+                )
+        return ks, rs, giir, hiir, Sabs
 
 
 def test():
-    from unit_conversions import eV_TO_J, g_per_cm3_TO_kg_per_m3, eV_TO_K, per_cm3_TO_per_m3
-    from constants import DIRAC_CONSTANT, SPEED_OF_LIGHT
-    import matplotlib.pyplot as plt
-
-    Te = 20 * eV_TO_K
-    rho = 2 * g_per_cm3_TO_kg_per_m3
-    charge_state = 2.0
-    atomic_number = 6
-    atomic_mass = 6.0
-    E0 = 8.0e3 * eV_TO_J
-
-    # angles_rad = np.array([10, 30, 60, 120]) * np.pi / 180  # , 20, 30, 45, 60, 80, 100, 120, 140
-    angles_rad = np.linspace(10, 120, 5000) * np.pi / 180
-
-    state = PlasmaState(
-        electron_temperature=Te,
-        ion_temperature=Te,
-        mass_density=rho,
-        charge_state=charge_state,
-        atomic_mass=atomic_mass,
-        atomic_number=atomic_number,
-    )
-
-    kF = state.fermi_wave_number(state.electron_number_density)
-
-    optimal_diameter = get_sigmac(ni=state.ion_number_density, Z=state.charge_state, Ti=state.ion_temperature)
-    print(f"Calculated diameter: {optimal_diameter / BOHR_RADIUS} a_B")
-
-    ks = 2 * E0 / (DIRAC_CONSTANT * SPEED_OF_LIGHT) * np.sin(angles_rad / 2) / kF * 1.0e3
-    # ks = np.linspace(0.01, 4, 500) / BOHR_RADIUS  # * kF
-    # ks = np.linspace(0, 6, 1000) * kF
-
-    models = ModelOptions()
-
-    kernel = StaticStructureFactor(state=state, models=models, sigma=optimal_diameter)
-
-    sfs_screened = []
-    sfs_ocp = []
-    fs_k = []
-    qs_sc = []
-    S_ees = []
-    for k in ks:
-        sf_screened, f_k, q_sc, S_ee = kernel.get_ii_static_structure_factor(k)
-        sf_ocp = kernel.get_ii_static_structure_factor_ocp(k)
-        sfs_screened.append(sf_screened)
-        sfs_ocp.append(sf_ocp)
-        fs_k.append(f_k)
-        qs_sc.append(q_sc)
-        S_ees.append(S_ee)
-
-    # print(sfs_ocp)
-    plt.figure()
-    plt.axhline(1.0, c="gray", ls="dashed")
-    # plt.plot(ks, sfs_screened, ls="dashed", c="navy", label="Screened")
-    # plt.plot(ks / kF, fs_k, ls="dashed", c="crimson", label="Screening correction")
-    # plt.plot(ks / kF, qs_sc, ls="dashed", c="orange", label="Screening")
-    # plt.plot(ks / kF, S_ees, ls="dashed", c="navy", label="S_ee0")
-    plt.plot(ks, sfs_ocp, ls="dashed", c="crimson", label="OCP")
-    plt.legend()
-    plt.show()
+    return
 
 
 def wuensch_fig45_test():
