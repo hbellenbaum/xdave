@@ -47,11 +47,11 @@ def effective_ei_coulomb_k(Qa, k):
     return -4 * PI * Qa * ELEMENTARY_CHARGE**2 * COULOMB_CONSTANT / k**2
 
 
-def HEC_ei_k_r(Qa, k, rcore):
-    return effective_ei_coulomb_k(Qa=Qa, k=k) * np.cos(k * rcore)
-
-
-def SEC_ei_k(Qa, k, r, rcore, n):
+def soft_core_k(Qa, k, r, rcore, n):
     U_eff_k = effective_ei_coulomb_k(Qa=Qa, k=k)
     U_eff_r = effective_ei_coulomb_r(Qa=Qa, r=r)
     return U_eff_k - forward_transform_fft(U_eff_r * np.exp(-((r / rcore) ** n)))
+
+
+def hard_core_k(Qa, Qb, k, sigma_c):
+    return coulomb_k(Qa, Qb, k) * np.cos(k * sigma_c / 2)

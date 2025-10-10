@@ -2,6 +2,7 @@ from plasma_state import PlasmaState, get_rho_T_from_rs_theta, get_fractions_fro
 from models import ModelOptions
 from freefree_dsf import FreeFreeDSF
 from boundfree_dsf import BoundFreeDSF
+from rayleigh_weight import OCPRayleighWeight, MCPRayleighWeight
 from lfc import LFC
 from ipd import get_ipd
 
@@ -40,6 +41,7 @@ class Setup:
         charge_states: np.array,
         user_defined_inputs: dict,
     ):
+        # TODO(Hannah): do these really need to be separate classes? -> the fact that they are is proving a bit difficult right now...
         assert np.sum(partial_densities) == 1.0, f"Fractional densities do not add up 1. Try again sucker."
         self.number_of_states = len(partial_densities)
         self.mass_density = mass_density
@@ -60,10 +62,12 @@ class Setup:
         states = []
         Z_mean = 0.0
         AN_mean = 0.0
+        ANs = []
         amu_mean = 0.0
         for i in range(0, self.number_of_states):
             element = self.elements[i]
             amu, AN = get_atomic_mass_for_element(element)
+            ANs.append(AN)
             x = self.partial_densities[i]
             Z = self.charge_states[i]
             assert Z <= AN, f"Ionization degree for state {i} is larger than the atomic number {AN}. Check your setup."
@@ -91,6 +95,7 @@ class Setup:
             atomic_number=AN_mean,
             binding_energies=np.array([]),
         )
+        self.ocp_flag = (len(np.unique(ANs)) < len(states)) and len(states) <= 2
         return np.array(states), overlord_state
 
 
@@ -103,8 +108,9 @@ class xDave:
         states: np.array,
         fractions: np.array,
         rayleigh_weight: float,
-        sif: np.array,
+        sif: None,
         ipd: float = None,
+        ocp_flag: bool = False,
     ):
         self.models = models
         self.states = states
@@ -114,6 +120,7 @@ class xDave:
         self.ipd_eV = ipd
 
         self.overlord_state = overlord_state
+        self.ocp_flag = ocp_flag  # (len(np.unique(overlord_state.elements)) < len(states)) and len(states) <= 2
 
     def run(self, k, w):
 
@@ -168,6 +175,36 @@ class xDave:
         bf_tot /= self.overlord_state.atomic_number
         dsf = ff_tot + bf_tot
         return bf_tot, ff_tot, dsf, WR, ff_i, bf_i
+
+    def run_static_mode(self, k):
+        lfc_kernel = LFC(state=self.overlord_state)
+        lfc = lfc_kernel.calculate_lfc(k=k, w=0, model=self.models.lfc_model)
+        print(f"Calculated LFC={lfc}")
+
+        if self.ocp_flag:
+            wr_kernel = OCPRayleighWeight(state=self.overlord_state, ion_core_radius=1.0 * BOHR_RADIUS)
+            return wr_kernel.get_rayleigh_weight(
+                k=k,
+                sf_model=self.models.static_structure_factor_approximation,
+                ii_potential=self.models.ii_potential,
+                bridge_function=self.models.bridge_function,
+                screening="HARD_CORE",
+            )
+
+        wr_kernel = MCPRayleighWeight(
+            overlord_state=self.overlord_state, states=self.states, ion_core_radius=1.0 * BOHR_RADIUS
+        )
+        k, Sab, rayleigh_weight, qs, fs = wr_kernel.get_rayleigh_weight(
+            k=k,
+            lfc=lfc,
+            sf_model=self.models.static_structure_factor_approximation,
+            ii_potential=self.models.ii_potential,
+            ee_potential=self.models.ee_potential,
+            ei_potential=self.models.ei_potential,
+            screening_model=self.models.screening_model,
+            return_full=True,
+        )
+        return k, Sab, rayleigh_weight, qs, fs
 
     def convolve_with_sif(self, sif, bf, ff, WR):
         tot_dsf = bf + ff

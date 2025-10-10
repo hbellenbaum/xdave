@@ -125,7 +125,7 @@ class PlasmaState:
         self.mass_density = mass_density
         self.atomic_mass = atomic_mass * ATOMIC_MASS_UNIT
         self.charge_state = charge_state
-        self.ion_charge = atomic_number - charge_state
+        self.ion_charge = charge_state
         mi = self.atomic_mass
         self.ion_number_density = mass_density / mi
         self.electron_number_density = charge_state * self.ion_number_density
@@ -184,9 +184,12 @@ class PlasmaState:
         return mass * SPEED_OF_LIGHT_SQR / DIRAC_CONSTANT
 
     def debye_screening_length(self, charge, number_density, temperature):
-        return np.sqrt(ELECTRIC_CONSTANT * BOLTZMANN_CONSTANT * temperature / number_density) / abs(
-            charge * ELEMENTARY_CHARGE
+        return np.sqrt(
+            number_density * charge * ELEMENTARY_CHARGE**2 / (VACUUM_PERMITTIVITY * BOLTZMANN_CONSTANT * temperature)
         )
+        # return np.sqrt(ELECTRIC_CONSTANT * BOLTZMANN_CONSTANT * temperature / number_density) / abs(
+        #     charge * ELEMENTARY_CHARGE
+        # )
 
     def thomas_fermi_screening_length(self, charge, number_density, mass):
         return np.sqrt(ELECTRIC_CONSTANT * self.fermi_energy(number_density) / (1.5 * number_density)) / abs(

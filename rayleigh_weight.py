@@ -1,8 +1,99 @@
 from ii_ff import PaulingShermanIonicFormFactor
-from static_sf import StaticStructureFactor
+from screening_cloud import ScreeningCloud
+from static_sf import OCPStaticStructureFactor, MCPStaticStructureFactor
+
+import numpy as np
 
 
-class RayleighWeight:
+class OCPRayleighWeight:
+    def __init__(self, state, ion_core_radius):
+        self.state = state
+        self.ion_core_radius = ion_core_radius
 
-    def __init__(self, state) -> None:
-        pass
+    def get_rayleigh_weight(self, k, sf_model, ii_potential, bridge_function, screening="NONE"):
+        sf = OCPStaticStructureFactor(state=self.state, ion_core_radius=self.ion_core_radius)
+
+        if screening == "NONE":
+            Siik = sf.get_ii_static_structure_factor(
+                k=k,
+                sf_model=sf_model,
+                pseudo_potential=ii_potential,
+                bridge_function=bridge_function,
+                return_full=False,
+            )
+        else:
+            Siik = sf.get_screened_ii_static_structure_factor(
+                k=k,
+                sf_model=sf_model,
+                pseudo_potential=ii_potential,
+                bridge_function=bridge_function,
+                return_full=False,
+            )
+
+        return Siik
+
+
+class MCPRayleighWeight:
+
+    def __init__(self, overlord_state, states, ion_core_radius) -> None:
+        self.overlord_state = overlord_state
+        self.states = states
+        self.nspecies = len(states)
+        self.ion_core_radius = ion_core_radius
+
+    def get_rayleigh_weight(
+        self, k, lfc, sf_model, ii_potential, ee_potential, ei_potential, screening_model, return_full=False
+    ):
+
+        nspecies = self.nspecies
+        states = self.states
+
+        qs = np.zeros((nspecies, len(k)))
+        fs = np.zeros((nspecies, len(k)))
+
+        for i in (0, nspecies - 1):
+            qs[i, :] = ScreeningCloud(state=states[i]).get_screening_cloud(
+                k=k,
+                ion_core_radius=self.ion_core_radius,
+                lfc=lfc,
+                screening_model=screening_model,
+                ee_potential=ee_potential,
+                ei_potential=ei_potential,
+            )
+            fs[i, :] = PaulingShermanIonicFormFactor().calculate_form_factor(
+                Z=states[i].atomic_number, Z_b=states[i].Zb, k=k
+            )
+
+        sf = MCPStaticStructureFactor(
+            overlord_state=self.overlord_state,
+            states=states,
+            ion_core_radius=self.ion_core_radius,
+            mix_fraction=0.9,
+            delta=1.0e-8,
+        )
+        Sab = sf.get_ab_static_structure_factor(
+            k=k,
+            sf_model=sf_model,
+            pseudo_potential=ii_potential,
+            return_full=False,
+        )
+
+        # nis = sf.nis
+        xs = sf.xs
+
+        rayleigh_weight = np.zeros_like(k)
+        for n1 in (0, nspecies - 1):
+            for n2 in (0, nspecies - 1):
+                rayleigh_weight += np.sqrt(xs[n1] * xs[n2]) * (fs[n1] + qs[n1]) * (fs[n2] + qs[n2]) * Sab[n1, n2, :]
+
+        if return_full:
+            return k, Sab, rayleigh_weight, qs, fs
+        return rayleigh_weight
+
+
+def test_mcp():
+    return
+
+
+if __name__ == "__main__":
+    test_mcp()

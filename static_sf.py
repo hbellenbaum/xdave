@@ -13,6 +13,7 @@ from unit_conversions import *
 from scipy.optimize import minimize
 import matplotlib.pyplot as plt
 import numpy as np
+import os
 
 
 def h0(eta, chi):
@@ -59,7 +60,7 @@ class OCPStaticStructureFactor:
     def __init__(
         self,
         state: PlasmaState,
-        ion_particle_diameter=None,
+        ion_core_radius=None,
         max_iterations=5000,
         mix_fraction=0.8,
         delta=1.0e-8,
@@ -75,12 +76,12 @@ class OCPStaticStructureFactor:
         self.mix_fraction = mix_fraction
         self.delta = delta
 
-        if ion_particle_diameter is None:
-            self.ion_particle_diameter = get_sigmac(
+        if ion_core_radius is None:
+            self.ion_core_radius = get_sigmac(
                 ni=state.ion_number_density, Zi=state.ion_charge, Ti=state.ion_temperature
             )
         else:
-            self.ion_particle_diameter = ion_particle_diameter
+            self.ion_core_radius = ion_core_radius
 
     def get_ii_static_structure_factor(
         self, k, sf_model="HNC", pseudo_potential="YUKAWA", bridge_function="IYETOMI", return_full=False
@@ -113,7 +114,14 @@ class OCPStaticStructureFactor:
             return Siik_new
 
     def get_screened_ii_static_structure_factor(
-        self, k, sf_model="HNC", pseudo_potential="YUKAWA", bridge_function="IYETOMI", return_full=False
+        self,
+        k,
+        lfc=0.0,
+        sf_model="HNC",
+        pseudo_potential="YUKAWA",
+        bridge_function="IYETOMI",
+        screening_model="HARD_CORE",
+        return_full=False,
     ):
         """
         Following Gregori et al., HEDP 3 (2007): Eq. (32 - 34)
@@ -125,8 +133,7 @@ class OCPStaticStructureFactor:
             bridge_function=bridge_function,
             return_full=False,
         )
-        lfc = 0.0  # for now
-        ion_particle_diameter = self.ion_particle_diameter
+        ion_core_radius = self.ion_core_radius
         kappa_i = np.sqrt(
             self.state.charge_state
             * self.state.electron_number_density
@@ -140,10 +147,13 @@ class OCPStaticStructureFactor:
         )
         S_ee0 = k**2 / (k**2 - kappa_e**2 * (1 - lfc))
         screening_correction = (
-            -(kappa_i**2) / k**2 * (np.cos(k * ion_particle_diameter / 2)) ** 2 * kappa_e**2 / k**2 * S_ee0
+            -(kappa_i**2) / k**2 * (np.cos(k * ion_core_radius / 2)) ** 2 * kappa_e**2 / k**2 * S_ee0
         )
         Sii_screened = Sii / (1 + screening_correction * Sii)
         return Sii_screened
+
+    def _screening_correction(self, k, r):
+        return
 
     def _hnc_ii_pseudopotential(self, k, r, Q, alpha, model="YUKAWA"):
         if model == "YUKAWA":
@@ -167,11 +177,7 @@ class OCPStaticStructureFactor:
         Zi = self.state.ion_charge
         Ti = self.state.ion_temperature
         # TODO(Hannah): move the ion diameter to the plasma state
-        # if self.ion_particle_diameter is None:
-        #     sigma_c = get_sigmac(ni=ni, Zi=Zi, Ti=Ti)
-        #     # print(f"Calculated ion core radius = {sigma_c / BOHR_RADIUS} aB")
-        # else:
-        sigma_c = self.ion_particle_diameter
+        sigma_c = self.ion_core_radius
 
         eta = PI / 6 * ni * sigma_c**3
         gamma = Zi**2 * ELEMENTARY_CHARGE**2 / (4 * PI * VACUUM_PERMITTIVITY * sigma_c * BOLTZMANN_CONSTANT * Ti)
@@ -184,7 +190,7 @@ class OCPStaticStructureFactor:
         qsinq = q * sinq
 
         y0 = (
-            -((1 + 2 * eta) ** 2) / (1 - eta) ** 4
+            -(((1 + 2 * eta) ** 2) / (1 - eta) ** 4)
             + h0(eta, chi) ** 2 / (4 * (1 - eta) ** 2)
             - (1 + eta) * h0(eta, chi) * chi / (12 * eta)
             - (5 + eta**2) * chi**2 / (60 * eta)
@@ -200,7 +206,7 @@ class OCPStaticStructureFactor:
             * (
                 y0 * q**3 * (sinq - qcosq)
                 + y1 * q**2 * (2 * qsinq - (q**2 - 2) * cosq - 2)
-                + y2 * q * ((3 * q**3 - 6) * sinq - (q**2 - 6) * qcosq)
+                + y2 * q * ((3 * q**2 - 6) * sinq - (q**2 - 6) * qcosq)
                 + y3 * ((4 * q**2 - 24) * qsinq - (q**4 - 12 * q**2 + 24) * cosq + 24)
                 + y4
                 * (6 * (q**4 - 20 * q**2 + 120) * qsinq - (q**6 - 30 * q**4 + 360 * q**2 - 720) * cosq - 720)
@@ -433,16 +439,14 @@ class MCPStaticStructureFactor:
         self,
         overlord_state: PlasmaState,
         states: np.array,
-        ion_particle_diameter=None,
+        ion_core_radius=None,
         max_iterations=5000,
         mix_fraction=0.8,
         delta=1.0e-8,
         n=8192,
     ):
         self.overlord_state = overlord_state
-        self.ion_particle_diameter = (
-            ion_particle_diameter  # 1 * BOHR_RADIUS  ## this needs to be moved to the plasma state
-        )
+        self.ion_core_radius = ion_core_radius  # 1 * BOHR_RADIUS  ## this needs to be moved to the plasma state
         self.beta = 1 / (BOLTZMANN_CONSTANT * overlord_state.ion_temperature)  # [1/J]
         self.n = n  # per themis [#]
 
@@ -452,10 +456,12 @@ class MCPStaticStructureFactor:
 
         self.a = self.b = len(states)
         self.nis = []
+        self.xs = []
         self.Qs = []
-        for i in len(states):
+        for i in (0, len(states) - 1):
             self.nis.append(states[i].ion_number_density)
             self.Qs.append(states[i].ion_charge)
+            self.xs.append(states[i].mass_density / overlord_state.mass_density)
 
         self.max_iterations = max_iterations
         self.mix_fraction = mix_fraction
@@ -469,6 +475,7 @@ class MCPStaticStructureFactor:
         else:
             raise NotImplementedError(f"Model {sf_model} not recognized. Try HNC.")
 
+        # consider switching out the interpolation with something like np.interpolate which is meant to be faster
         interp_sf = interp1d(ks, Sabs)
         Sabs_new = interp_sf(k)
         if return_full:
@@ -482,7 +489,7 @@ class MCPStaticStructureFactor:
             return Sabs_new
 
     def _hnc_pseudopotential(self, k, r, Qa, Qb, alpha, model="YUKAWA"):
-        if model == " YUKAWA":
+        if model == "YUKAWA":
             return yukawa_r(Qa, Qb, r, alpha), yukawa_k(Qa, Qb, k, alpha)
         else:
             raise NotImplementedError(f"Pseudo-potential model {model} not recognized.")
@@ -516,14 +523,9 @@ class MCPStaticStructureFactor:
         # populate potentials: dimensionless
         for n1 in (0, b - 1):
             for n2 in (0, a - 1):
-                Us_rs[n1, n2, :] = (
-                    beta
-                    * self._hnc_pseudopotential(Qa=Qs[n2], Qb=Qs[n1], r=rs, alpha=alpha, model=pseudo_potential)[0]
-                )
-                Ul_ks[n1, n2, :] = (
-                    beta
-                    * self._hnc_pseudopotential(Qa=Qs[n2], Qb=Qs[n1], r=rs, alpha=alpha, model=pseudo_potential)[1]
-                )
+                Uab = self._hnc_pseudopotential(k=ks, Qa=Qs[n2], Qb=Qs[n1], r=rs, alpha=alpha, model=pseudo_potential)
+                Us_rs[n1, n2, :] = beta * Uab[0]
+                Ul_ks[n1, n2, :] = beta * Uab[1]
                 if n1 == n2:
                     # Populate density matrix
                     D[n1, n2] = nis[n1]  # [m^{-3}]
@@ -630,6 +632,7 @@ def test_ocp():
     r"""
     Comparison against K W\"unsch PhD Thesis (2011), Fig. 4.5
     """
+    plt.style.use("~/Desktop/resources/plotting/poster.mplstyle")
 
     # Case 1: Gamma_ii = 12.3, Ti = 4 eV
     T = 4 * eV_TO_K
@@ -646,15 +649,23 @@ def test_ocp():
     )
     ni = rho / (2 * amu_TO_kg)
     Rii = (3 / (4 * np.pi * ni)) ** (1 / 3)
+    Rii1 = Rii
     beta = 1 / (BOLTZMANN_CONSTANT * T)
     Gamma = Zi**2 * ELEMENTARY_CHARGE**2 * beta / (4 * np.pi * VACUUM_PERMITTIVITY * Rii)
     print(f"Gamma1 = {Gamma}")
 
+    sigma_c = 2.15 * BOHR_RADIUS
+
     k = np.linspace(1.0e-1 / BOHR_RADIUS, 10 / BOHR_RADIUS, 200)
-    kernel = OCPStaticStructureFactor(state=state, ion_particle_diameter=None, max_iterations=1000)
+    kernel = OCPStaticStructureFactor(state=state, ion_core_radius=sigma_c, max_iterations=1000)
     Sii_HNC = kernel.get_ii_static_structure_factor(k=k, sf_model="HNC")
     Sii_xHNC = kernel.get_ii_static_structure_factor(k=k, sf_model="EXTENDED_HNC")
     Sii_MSA = kernel.get_ii_static_structure_factor(k=k, sf_model="MSA")
+
+    fn = "validation/static_sf/verification/Wuensch_Thesis_Fig4-5/T_4eV_Gamma_12.3_HNC-OCP.csv"  # os.path.join(DATA_DIR, f"T_{T*K_TO_eV:.0f}eV_Gamma_{Gamma:.1f}_HNC-OCP.csv")
+    dat1 = np.genfromtxt(fn, delimiter=",")
+    fn = "validation/static_sf/verification/Wuensch_Thesis_Fig4-5/T_4eV_Gamma_12.3_MSA-OCP.csv"  # os.path.join(DATA_DIR, f"T_{T*K_TO_eV:.0f}eV_Gamma_{Gamma:.1f}_HNC-OCP.csv")
+    dat11 = np.genfromtxt(fn, delimiter=",")
 
     T = 20 * eV_TO_K
     Zi = 2
@@ -670,29 +681,177 @@ def test_ocp():
     )
     ni = rho / (2 * amu_TO_kg)
     Rii = (3 / (4 * np.pi * ni)) ** (1 / 3)
+    Rii2 = Rii
     beta = 1 / (BOLTZMANN_CONSTANT * T)
     Gamma2 = Zi**2 * ELEMENTARY_CHARGE**2 * beta / (4 * np.pi * VACUUM_PERMITTIVITY * Rii)
     print(f"Gamma2 = {Gamma2}")
+    fn = "validation/static_sf/verification/Wuensch_Thesis_Fig4-5/T_20eV_Gamma_2.7_HNC-OCP.csv"
+    dat2 = np.genfromtxt(fn, delimiter=",")
+    fn = "validation/static_sf/verification/Wuensch_Thesis_Fig4-5/T_20eV_Gamma_2.7_MSA-OCP.csv"
+    dat22 = np.genfromtxt(fn, delimiter=",")
 
-    kernel = OCPStaticStructureFactor(state=state, ion_particle_diameter=None, max_iterations=5000, mix_fraction=0.9)
+    sigma_c = 1.5 * BOHR_RADIUS
+
+    kernel = OCPStaticStructureFactor(state=state, ion_core_radius=sigma_c, max_iterations=5000, mix_fraction=0.9)
     Sii_HNC2 = kernel.get_ii_static_structure_factor(k=k, sf_model="HNC")
     # Sii_xHNC2 = kernel.get_ii_static_structure_factor(k=k, sf_model="EXTENDED_HNC")
     Sii_MSA2 = kernel.get_ii_static_structure_factor(k=k, sf_model="MSA")
 
-    plt.figure()
-    plt.plot(k * BOHR_RADIUS, Sii_MSA, label=f"MSA, Gamma={Gamma}", c="orange", ls="--")
-    plt.plot(k * BOHR_RADIUS, Sii_HNC, label=f"HNC, Gamma={Gamma}", c="crimson", ls="-.")
-    plt.plot(k * BOHR_RADIUS, Sii_xHNC, label=f"xHNC, Gamma={Gamma}", c="crimson", ls=":")
-    plt.plot(k * BOHR_RADIUS, Sii_HNC2, label=f"HNC, Gamma={Gamma2}", c="navy", ls="-.")
+    fig, ax = plt.subplots(1, 1, figsize=(12, 8))
+    ax.plot(k * BOHR_RADIUS, Sii_MSA, label=f"MSA, Gamma={Gamma:.1f}", c="orange", ls="--")
+    ax.plot(k * BOHR_RADIUS, Sii_HNC, label=f"HNC, Gamma={Gamma:.1f}", c="crimson", ls="-.")
+    ax.plot(k * BOHR_RADIUS, Sii_xHNC, label=f"xHNC, Gamma={Gamma:.1f}", c="crimson", ls=":")
+    ax.scatter(
+        dat1[:, 0] * BOHR_RADIUS / Rii1, dat1[:, 1], label=f"HNC - Wuensch, Gamma={Gamma:.1f}", c="brown", marker="x"
+    )
+    ax.scatter(
+        dat11[:, 0] * BOHR_RADIUS / Rii1,
+        dat11[:, 1],
+        label=f"MSA - Wuensch, Gamma={Gamma:.1f}",
+        c="orange",
+        marker="o",
+    )
+    ax.plot(k * BOHR_RADIUS, Sii_HNC2, label=f"HNC, Gamma={Gamma2:.1f}", c="navy", ls="-.")
     # plt.plot(k * BOHR_RADIUS, Sii_xHNC2, label="xHNC", c="navy", ls=":")
-    plt.plot(k * BOHR_RADIUS, Sii_MSA2, label=f"MSA, Gamma={Gamma2}", c="dodgerblue", ls="--")
-    plt.legend()
+    ax.plot(k * BOHR_RADIUS, Sii_MSA2, label=f"MSA, Gamma={Gamma2:.1f}", c="dodgerblue", ls="--")
+    ax.scatter(
+        dat2[:, 0] * BOHR_RADIUS / Rii2, dat2[:, 1], label=f"HNC - Wuensch, Gamma={Gamma2:.1f}", c="black", marker="x"
+    )
+    ax.scatter(
+        dat22[:, 0] * BOHR_RADIUS / Rii2,
+        dat22[:, 1],
+        label=f"MSA - Wuensch, Gamma={Gamma2:.1f}",
+        c="dodgerblue",
+        marker="o",
+    )
+    ax.legend()
+    ax.axhline(1.0, lw=1, ls=":", c="gray")
+    ax.set_xlim(-0.1, 6.0)
+    ax.set_xlabel(r"$k$ [$a_B^{-1}$]")
+    ax.set_ylabel(r"$S_{ii}(k)$")
     plt.show()
+    fig.savefig(f"static_ii_sf_comparison.pdf", dpi=200)
+
+
+def test_screened_ocp():
+    r"""
+    Comparison against K W\"unsch PhD Thesis (2011), Fig. 4.5
+    """
+    # plt.style.use("~/Desktop/resources/plotting/poster.mplstyle")
+
+    # Case 1: Gamma_ii = 12.3, Ti = 4 eV
+    T = 4 * eV_TO_K
+    Zi = 2
+    rho = 498.16  # kg/m^3
+    state = PlasmaState(
+        electron_temperature=T,
+        ion_temperature=T,
+        mass_density=rho,
+        charge_state=Zi,
+        atomic_mass=2,
+        atomic_number=2,
+        binding_energies=None,
+    )
+    ni = rho / (2 * amu_TO_kg)
+    Rii = (3 / (4 * np.pi * ni)) ** (1 / 3)
+    Rii1 = Rii
+    beta = 1 / (BOLTZMANN_CONSTANT * T)
+    Gamma = Zi**2 * ELEMENTARY_CHARGE**2 * beta / (4 * np.pi * VACUUM_PERMITTIVITY * Rii)
+    print(f"Gamma1 = {Gamma}")
+
+    sigma_c = 2.15 * BOHR_RADIUS
+
+    k = np.linspace(1.0e-1 / BOHR_RADIUS, 10 / BOHR_RADIUS, 200)
+    kernel = OCPStaticStructureFactor(state=state, ion_core_radius=sigma_c, max_iterations=1000)
+    Sii_HNC = kernel.get_screened_ii_static_structure_factor(k=k, sf_model="HNC")
+    Sii_xHNC = kernel.get_screened_ii_static_structure_factor(k=k, sf_model="EXTENDED_HNC")
+    Sii_MSA = kernel.get_screened_ii_static_structure_factor(k=k, sf_model="MSA")
+
+    fn = "validation/static_sf/verification/Wuensch_Thesis_Fig4-5/T_4eV_Gamma_12.3_HNC-OCP.csv"  # os.path.join(DATA_DIR, f"T_{T*K_TO_eV:.0f}eV_Gamma_{Gamma:.1f}_HNC-OCP.csv")
+    dat1 = np.genfromtxt(fn, delimiter=",")
+    fn = "validation/static_sf/verification/Wuensch_Thesis_Fig4-5/T_4eV_Gamma_12.3_MSA-OCP.csv"  # os.path.join(DATA_DIR, f"T_{T*K_TO_eV:.0f}eV_Gamma_{Gamma:.1f}_HNC-OCP.csv")
+    dat11 = np.genfromtxt(fn, delimiter=",")
+
+    T = 20 * eV_TO_K
+    Zi = 2
+    rho = 498.16  # kg/m^3
+    state = PlasmaState(
+        electron_temperature=T,
+        ion_temperature=T,
+        mass_density=rho,
+        charge_state=Zi,
+        atomic_mass=2,
+        atomic_number=2,
+        binding_energies=None,
+    )
+    ni = rho / (2 * amu_TO_kg)
+    Rii = (3 / (4 * np.pi * ni)) ** (1 / 3)
+    Rii2 = Rii
+    beta = 1 / (BOLTZMANN_CONSTANT * T)
+    Gamma2 = Zi**2 * ELEMENTARY_CHARGE**2 * beta / (4 * np.pi * VACUUM_PERMITTIVITY * Rii)
+    print(f"Gamma2 = {Gamma2}")
+    fn = "validation/static_sf/verification/Wuensch_Thesis_Fig4-5/T_20eV_Gamma_2.7_HNC-OCP.csv"
+    dat2 = np.genfromtxt(fn, delimiter=",")
+    fn = "validation/static_sf/verification/Wuensch_Thesis_Fig4-5/T_20eV_Gamma_2.7_MSA-OCP.csv"
+    dat22 = np.genfromtxt(fn, delimiter=",")
+
+    sigma_c = 1.5 * BOHR_RADIUS
+
+    kernel = OCPStaticStructureFactor(state=state, ion_core_radius=sigma_c, max_iterations=5000, mix_fraction=0.9)
+    Sii_HNC2 = kernel.get_screened_ii_static_structure_factor(k=k, sf_model="HNC")
+    # Sii_xHNC2 = kernel.get_ii_static_structure_factor(k=k, sf_model="EXTENDED_HNC")
+    Sii_MSA2 = kernel.get_screened_ii_static_structure_factor(k=k, sf_model="MSA")
+
+    fig, ax = plt.subplots(1, 1, figsize=(12, 8))
+    ax.plot(k * BOHR_RADIUS, Sii_MSA, label=f"MSA, Gamma={Gamma:.1f}", c="orange", ls="--")
+    ax.plot(k * BOHR_RADIUS, Sii_HNC, label=f"HNC, Gamma={Gamma:.1f}", c="crimson", ls="-.")
+    ax.plot(k * BOHR_RADIUS, Sii_xHNC, label=f"xHNC, Gamma={Gamma:.1f}", c="crimson", ls=":")
+    # ax.scatter(
+    #     dat1[:, 0] * BOHR_RADIUS / Rii1, dat1[:, 1], label=f"HNC - Wuensch, Gamma={Gamma:.1f}", c="brown", marker="x"
+    # )
+    # ax.scatter(
+    #     dat11[:, 0] * BOHR_RADIUS / Rii1,
+    #     dat11[:, 1],
+    #     label=f"MSA - Wuensch, Gamma={Gamma:.1f}",
+    #     c="orange",
+    #     marker="o",
+    # )
+    ax.plot(k * BOHR_RADIUS, Sii_HNC2, label=f"HNC, Gamma={Gamma2:.1f}", c="navy", ls="-.")
+    # plt.plot(k * BOHR_RADIUS, Sii_xHNC2, label="xHNC", c="navy", ls=":")
+    ax.plot(k * BOHR_RADIUS, Sii_MSA2, label=f"MSA, Gamma={Gamma2:.1f}", c="dodgerblue", ls="--")
+    # ax.scatter(
+    #     dat2[:, 0] * BOHR_RADIUS / Rii2, dat2[:, 1], label=f"HNC - Wuensch, Gamma={Gamma2:.1f}", c="black", marker="x"
+    # )
+    # ax.scatter(
+    #     dat22[:, 0] * BOHR_RADIUS / Rii2,
+    #     dat22[:, 1],
+    #     label=f"MSA - Wuensch, Gamma={Gamma2:.1f}",
+    #     c="dodgerblue",
+    #     marker="o",
+    # )
+    ax.legend()
+    ax.axhline(1.0, lw=1, ls=":", c="gray")
+    ax.set_xlim(-0.1, 6.0)
+    # ax.set_ylim(-0.1, 1.1)
+    ax.set_xlabel(r"$k$ [$a_B^{-1}$]")
+    ax.set_ylabel(r"$S_{ii}(k)$")
+    plt.show()
+    fig.savefig(f"static_ii_sf_comparison.pdf", dpi=200)
 
 
 def test_mcp():
-    return
+
+    Ti_eV = 10  # 8 * eV_TO_K  # eV
+    Ti = Ti_eV * eV_TO_K
+    T = Ti
+    rho_cgs = 1.5
+    rho = rho_cgs * 1000
+    ZH = 1
+    ZC = 4
+    xH = 0.5
+    xC = 0.5
 
 
 if __name__ == "__main__":
-    test_ocp()
+    # test_ocp()
+    test_screened_ocp()

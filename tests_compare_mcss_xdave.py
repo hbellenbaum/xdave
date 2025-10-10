@@ -1,5 +1,5 @@
 from xdave import *
-from mcss_tests.run_mcss_sim import run_be_sr_mode, run_ch_sr_mode, run_c_sr_mode
+from mcss_tests.run_mcss_sim import run_be_sr_mode, run_ch_sr_mode, run_c_sr_mode, run_ch_ar_mode
 
 import numpy as np
 import matplotlib.pyplot as plt
@@ -391,7 +391,117 @@ def compare_mcss_xdave_ch():
     fig.savefig(f"ch_test_T={T*K_TO_eV:.1f}_rho={rho*kg_per_m3_TO_g_per_cm3:.1f}_ZC={ZC}_q={q:.2f}.pdf")
 
 
+def compare_mcss_xdave_ch_static():
+    T = 100.0
+    rho = 0.8
+    ZC = 2
+    ZH = 1.0
+    xH = 0.5
+    xC = 1 - xH
+    # q = 4.0
+    angle = 75
+    beam_energy = 20.0e3
+    q = calculate_q(angle=angle, energy=beam_energy)
+    print(f"Running at q={q:.3f}")
+
+    k_mcss, WR_mcss, f1_mcss, f2_mcss, q1_mcss, q2_mcss, S11_mcss, S12_mcss, S22_mcss = run_ch_ar_mode(
+        T=T, rho=rho, xH=xH, ZH=ZH, ZC=ZC, angle=angle, user_defined_ipd=0.0, user_defined_lfc=0.0, plot=False
+    )
+
+    elements = np.array(["H", "C"])
+    rho *= g_per_cm3_TO_kg_per_m3
+    T *= eV_TO_K
+
+    # Zmin, Zmax, xmin, xmax = get_fractions_from_Z_partial(ZC, x0=xH)
+    partial_densities = np.array([xH, xC])
+    charge_states = np.array([ZH, ZC])
+    user_defined_inputs = dict()
+
+    models = ModelOptions(polarisation_model="NUMERICAL", bf_model="SCHUMACHER", lfc_model="NONE", ipd_model="NONE")
+    setup = Setup(
+        mass_density=rho,
+        electron_temperature=T,
+        ion_temperature=T,
+        elements=elements,
+        partial_densities=partial_densities,
+        charge_states=charge_states,
+        user_defined_inputs=user_defined_inputs,
+    )
+
+    states = setup.states
+    k = q / BOHR_RADIUS
+
+    # omega_array = np.arange(-4000, 4000, 0.5) * eV_TO_J
+
+    mcss_norm = setup.overlord_state.atomic_number
+
+    # angle = calculate_angle(q=q, energy=beam_energy)
+    rayleigh_weight = WR_mcss / mcss_norm
+    # sif = np.zeros_like(omega_array)
+
+    kernel = xDave(
+        models=models,
+        states=states,
+        fractions=partial_densities,
+        rayleigh_weight=rayleigh_weight,
+        overlord_state=setup.overlord_state,
+        ipd=0.0,
+        sif=None,
+        ocp_flag=setup.ocp_flag,
+    )
+    k = np.linspace(0.5 / BOHR_RADIUS, 15 / BOHR_RADIUS, 200)
+    k, Sab, WR, qs, fs = kernel.run_static_mode(k=k)
+
+    WR_test = (
+        (qs[0] + fs[0]) ** 2 * Sab[0, 0, :]
+        + (qs[1] + fs[1]) ** 2 * Sab[1, 1, :]
+        + 2 * (qs[0] + fs[0]) * (qs[1] + fs[1]) * Sab[0, 1, :]
+    )
+
+    # k_mcss, WR_mcss, f1_mcss, f2_mcss, q1_mcss, q2_mcss, S11_mcss, S12_mcss, S22_mcss
+    fig, axes = plt.subplots(2, 2, figsize=(14, 14))
+    ax = axes[0, 0]
+    ax.plot(k * BOHR_RADIUS, Sab[0, 0, :], label="HH", c="crimson", ls="-.")
+    ax.plot(k * BOHR_RADIUS, Sab[0, 1, :], label="CH", c="navy", ls="-.")
+    ax.plot(k * BOHR_RADIUS, Sab[1, 1, :], label="HH", c="purple", ls="-.")
+    ax.plot(k_mcss, S11_mcss, label="MCSS: HH", c="crimson", ls=":")
+    ax.plot(k_mcss, S12_mcss, label="MCSS: CH", c="navy", ls=":")
+    ax.plot(k_mcss, S22_mcss, label="MCSS: HH", c="purple", ls=":")
+    ax.legend()
+    ax.set_xlabel(r"$k$ [$a_B^{-1}$]")
+    ax.set_ylabel(r"$S_{ab}$ [ ]")
+
+    ax = axes[0, 1]
+    ax.plot(k * BOHR_RADIUS, qs[0], label="H", c="crimson", ls="-.")
+    ax.plot(k * BOHR_RADIUS, qs[1], label="C", c="purple", ls="-.")
+    ax.plot(k_mcss, q1_mcss, label="MCSS: H", c="crimson", ls=":")
+    ax.plot(k_mcss, q2_mcss, label="MCSS: C", c="purple", ls=":")
+    ax.set_xlabel(r"$k$ [$a_B^{-1}$]")
+    ax.set_ylabel(r"$q_{a}$ [ ]")
+    ax.legend()
+
+    ax = axes[1, 0]
+    ax.plot(k * BOHR_RADIUS, fs[0], label="H", c="crimson", ls="-.")
+    ax.plot(k * BOHR_RADIUS, fs[1], label="C", c="purple", ls="-.")
+    ax.plot(k_mcss, f1_mcss, label="MCSS: H", c="crimson", ls=":")
+    ax.plot(k_mcss, f2_mcss, label="MCSS: C", c="purple", ls=":")
+    ax.set_xlabel(r"$k$ [$a_B^{-1}$]")
+    ax.set_ylabel(r"$f_{a}$ [ ]")
+    ax.legend()
+
+    ax = axes[1, 1]
+    ax.plot(k * BOHR_RADIUS, WR, label=r"$W_R$", c="darkgreen", ls="-.")
+    ax.plot(k_mcss, WR_mcss / setup.overlord_state.atomic_number, label=r"MCSS: $W_R$/AN", c="limegreen", ls=":")
+    ax.set_xlabel(r"$k$ [$a_B^{-1}$]")
+    ax.set_ylabel(r"$W_R$ [ ]")
+    ax.legend()
+
+    plt.tight_layout()
+    plt.show()
+
+
 if __name__ == "__main__":
     # compare_mcss_xdave_be()
-    compare_mcss_xdave_ch()
+    # compare_mcss_xdave_ch()
     # compare_mcss_xdave_c()
+    compare_mcss_xdave_ch_static()

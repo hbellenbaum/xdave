@@ -675,7 +675,7 @@ def run_mcss(deck_data, params: MCSSParameters):
             warnings.warn(print(f"Cannot load MCSS output file: {e}"))
             exit()
 
-        return k, WR, lfc
+        return k, WR, f1, f2, q1, q2, S11, S12, S22
 
 
 # if __name__ == "__main__":
