@@ -202,7 +202,7 @@ def laplace(tau, E, wff, wbf):
         F_wbf[i] = np.trapz(kernel_wbf, E)  # * omega_new[i]
 
     F_tot_inel = F_wff + F_wbf
-    return F_tot_inel, F_wff, F_wbf
+    return tau, F_tot_inel, F_wff, F_wbf
 
 
 def get_atomic_mass_for_element(e):

@@ -461,7 +461,7 @@ def compare_hydrogen_against_pimc():
     k = q / BOHR_RADIUS
 
     bf_tot, ff_tot, dsf, Wr = xdave.run(k=k, w=omega_array)
-    F_tot_inel, F_wff, F_wbf = xdave.get_itcf(
+    tau_array, F_tot_inel, F_wff, F_wbf = xdave.get_itcf(
         tau=tau_array, w=omega_array * J_TO_eV, ff=ff_tot / J_TO_eV, bf=bf_tot / J_TO_eV
     )
 
@@ -567,7 +567,6 @@ def compare_hydrogen_against_pimc_and_mcss():
         partial_densities=partial_densities,
         rayleigh_weight=WR,
         ipd=ipd_best_fit,
-        sif=sif,
         user_defined_inputs=user_defined_inputs,
     )
 
@@ -575,11 +574,13 @@ def compare_hydrogen_against_pimc_and_mcss():
     k = q / BOHR_RADIUS
 
     bf_tot, ff_tot, dsf, Wr, iff, ibf = xdave.run(k=k, w=omega_array)
-    F_tot_inel, F_wff, F_wbf = xdave.get_itcf(
+    tau_array, F_tot_inel, F_wff, F_wbf = xdave.get_itcf(
         tau=tau_array, w=omega_array * J_TO_eV, ff=ff_tot / J_TO_eV, bf=bf_tot / J_TO_eV
     )
 
-    F_tot_inel_mcss, F_wff_mcss, F_wbf_mcss = xdave.get_itcf(tau=tau_array, w=mcss_En, ff=mcss_wff, bf=mcss_wbf)
+    tau_array, F_tot_inel_mcss, F_wff_mcss, F_wbf_mcss = xdave.get_itcf(
+        tau=tau_array, w=mcss_En, ff=mcss_wff, bf=mcss_wbf
+    )
 
     fig, axes = plt.subplots(1, 2, figsize=(14, 10))
 

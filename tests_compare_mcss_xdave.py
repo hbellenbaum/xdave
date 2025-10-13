@@ -61,8 +61,6 @@ def compare_mcss_xdave_be():
         charge_states=charge_states,
         partial_densities=partial_densities,
         rayleigh_weight=rayleigh_weight,
-        ipd=0.0,
-        sif=sif,
         user_defined_inputs=None,
     )
 
@@ -90,12 +88,12 @@ def compare_mcss_xdave_be():
     ax.plot(En_mcss, wbf_mcss / mcss_norm, c="brown", ls=":", label="MCSS: bf")
     ax.legend()
 
-    tau_array = np.linspace(0, 1 / (T * K_TO_eV), 2000)
+    # tau_array = np.linspace(0, 1 / (T * K_TO_eV), 2000)
 
-    F_tot_inel, F_wff, F_wbf = kernel.get_itcf(
-        tau=tau_array, w=omega_array * J_TO_eV, ff=ff_tot / J_TO_eV, bf=bf_tot / J_TO_eV
+    tau_array, F_tot_inel, F_wff, F_wbf = kernel.get_itcf(
+        w=omega_array * J_TO_eV, ff=ff_tot / J_TO_eV, bf=bf_tot / J_TO_eV
     )
-    F_tot_inel_mcss, F_wff_mcss, F_wbf_mcss = kernel.get_itcf(tau=tau_array, w=En_mcss, ff=wff_mcss, bf=wbf_mcss)
+    tau_array, F_tot_inel_mcss, F_wff_mcss, F_wbf_mcss = kernel.get_itcf(w=En_mcss, ff=wff_mcss, bf=wbf_mcss)
 
     ax = axes[1, 0]
     ax.set_title("ITCF")
@@ -161,8 +159,6 @@ def compare_mcss_xdave_c():
         charge_states=charge_states,
         elements=elements,
         rayleigh_weight=rayleigh_weight,
-        ipd=0.0,
-        sif=sif,
         user_defined_inputs=user_defined_inputs,
     )
 
@@ -194,12 +190,12 @@ def compare_mcss_xdave_c():
     ax.plot(En_mcss, wbf_mcss / mcss_norm, c="navy", ls=":", label="MCSS: bf")  # / np.max(wbf_mcss / mcss_norm)
     ax.legend()
 
-    tau_array = np.linspace(0, 1 / (T * K_TO_eV), 2000)
+    # tau_array = np.linspace(0, 1 / (T * K_TO_eV), 2000)
 
-    F_tot_inel, F_wff, F_wbf = kernel.get_itcf(
-        tau=tau_array, w=omega_array * J_TO_eV, ff=ff_tot / J_TO_eV, bf=bf_tot / J_TO_eV
+    tau_array, F_tot_inel, F_wff, F_wbf = kernel.get_itcf(
+        w=omega_array * J_TO_eV, ff=ff_tot / J_TO_eV, bf=bf_tot / J_TO_eV
     )
-    F_tot_inel_mcss, F_wff_mcss, F_wbf_mcss = kernel.get_itcf(tau=tau_array, w=En_mcss, ff=wff_mcss, bf=wbf_mcss)
+    tau_array, F_tot_inel_mcss, F_wff_mcss, F_wbf_mcss = kernel.get_itcf(w=En_mcss, ff=wff_mcss, bf=wbf_mcss)
 
     ax = axes[1, 0]
     ax.set_title("ITCF")
@@ -271,8 +267,6 @@ def compare_mcss_xdave_ch():
         elements=elements,
         partial_densities=partial_densities,
         rayleigh_weight=rayleigh_weight,
-        ipd=0.0,
-        sif=sif,
         user_defined_inputs=None,
     )
 
@@ -326,12 +320,12 @@ def compare_mcss_xdave_ch():
     ax.set_xlabel(r"$\omega$ [eV]")
     ax.set_ylabel(r"DSF [1/eV]")
 
-    tau_array = np.linspace(0, 1 / (T * K_TO_eV), 2000)
+    # tau_array = np.linspace(0, 1 / (T * K_TO_eV), 2000)
 
-    F_tot_inel, F_wff, F_wbf = kernel.get_itcf(
-        tau=tau_array, w=omega_array * J_TO_eV, ff=ff_tot / J_TO_eV, bf=bf_tot / J_TO_eV
+    tau_array, F_tot_inel, F_wff, F_wbf = kernel.get_itcf(
+        w=omega_array * J_TO_eV, ff=ff_tot / J_TO_eV, bf=bf_tot / J_TO_eV
     )
-    F_tot_inel_mcss, F_wff_mcss, F_wbf_mcss = kernel.get_itcf(tau=tau_array, w=En_mcss, ff=wff_mcss, bf=wbf_mcss)
+    tau_array, F_tot_inel_mcss, F_wff_mcss, F_wbf_mcss = kernel.get_itcf(w=En_mcss, ff=wff_mcss, bf=wbf_mcss)
 
     ax = axes[1, 0]
     ax.set_title("ITCF")
@@ -406,8 +400,6 @@ def compare_mcss_xdave_ch_static():
         elements=elements,
         partial_densities=partial_densities,
         rayleigh_weight=rayleigh_weight,
-        ipd=0.0,
-        sif=sif,
         user_defined_inputs=None,
     )
 

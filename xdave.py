@@ -39,11 +39,10 @@ class xDave:
         elements: np.array,
         partial_densities: np.array,
         charge_states: np.array,
-        user_defined_inputs: dict,
         models: ModelOptions,
         rayleigh_weight: float,
-        sif: None,
-        ipd: float = None,
+        enforce_fsum: bool = False,
+        user_defined_inputs: dict = None,
     ):
         assert np.sum(partial_densities) == 1.0, f"Fractional densities do not add up 1. Try again sucker."
         self.number_of_states = len(partial_densities)
@@ -55,10 +54,24 @@ class xDave:
         self.charge_states = charge_states
         self.models = models
         self.rayleigh_weight = rayleigh_weight
-        self.sif = sif
-        self.ipd_eV = ipd
+
+        self.enforce_fsum = enforce_fsum
+        self.tau_array = np.linspace(0, 1 / (electron_temperature * K_TO_eV), 1000)
 
         self.states, self.overlord_state = self.initialize()
+
+        self.user_defined_ipd = None
+        self.user_defined_lfc = None
+        self.ion_core_radius = None
+
+        if user_defined_inputs is not None:
+            keys = user_defined_inputs.keys()
+            if "ipd" in keys:
+                self.ipd_eV = user_defined_inputs["ipd"]
+            if "lfc" in keys:
+                self.user_defined_lfc = user_defined_inputs["lfc"]
+            if "ion_core_radius" in keys:
+                self.ion_core_radius = user_defined_inputs["ion_core_radius"]
 
     def initialize(self):
         states = []
@@ -99,6 +112,15 @@ class xDave:
         )
         self.ocp_flag = (len(np.unique(ANs)) < len(states)) and len(states) <= 2
         return np.array(states), overlord_state
+
+    def _bf_norm(self, w, ff, bf, k):
+        k /= BOHR_RADIUS
+        f_sum = k**2 / 2
+        F_tot, F_wff, F_wbf = self.get_itcf(tau=self.tau_array, w=w, ff=ff, bf=bf)
+        dF_ff = np.polyfit(self.tau_array[:3], F_wff[:3], deg=1)[0]
+        dF_bf = np.polyfit(self.tau_array[:3], F_wbf[:3], deg=1)[0]
+        A = -1 / dF_bf * (f_sum + dF_ff)
+        return A
 
     def run(self, k, w):
 
@@ -149,6 +171,9 @@ class xDave:
             # This is where the HNC stuff will have to go eventually
             WR = self.rayleigh_weight
 
+        if self.enforce_fsum:
+            bf *= self._bf_norm(w=w, ff=ff, bf=bf, k=k)
+
         # Divide by the atomic number to be consistent with the ff component
         bf_tot /= self.overlord_state.atomic_number
         dsf = ff_tot + bf_tot
@@ -191,8 +216,10 @@ class xDave:
         spectrum = inelastic + elastic
         return inelastic, elastic, spectrum
 
-    def get_itcf(self, tau, w, ff, bf):
-        return laplace(tau=tau, E=w, wff=ff, wbf=bf)
+    def get_itcf(self, w, ff, bf, tau=None):
+        if tau is None:
+            tau = self.tau_array
+        return laplace(tau=self.tau_array, E=w, wff=ff, wbf=bf)
 
     def _print_logo(self):
         # print(
@@ -209,6 +236,11 @@ class xDave:
         #     "' '----------------'  '----------------'  '----------------'  '----------------'  \n"
         # )
         print("\n -------------------------------- \n xDAVE C\n --------------------------------\n")
+
+
+## ----------------------------------------- ##
+## ----------------- TESTS ----------------- ##
+## ----------------------------------------- ##
 
 
 def test_setup():
@@ -247,7 +279,6 @@ def test_setup():
         charge_states=charge_states,
         user_defined_inputs=user_defined_inputs,
         rayleigh_weight=rayleigh_weight,
-        sif=sif,
     )
 
     bf_tot, ff_tot, dsf, WR, ff_i, bf_i = kernel.run(k=k, w=omega_array)
@@ -331,6 +362,8 @@ def test_be():
     elements = np.array(["Be", "Be"])
     charge_states = np.array([Z1, Z2])
 
+    user_defined_inputs = {"ipd": 0.0, "lfc": 1.0, "ion_core_radius": 2.0}
+
     xdave = xDave(
         models=models,
         electron_temperature=T,
@@ -340,8 +373,7 @@ def test_be():
         partial_densities=xs,
         charge_states=charge_states,
         rayleigh_weight=WR,
-        sif=np.zeros_like(omega_array),
-        user_defined_inputs=None,
+        user_defined_inputs=user_defined_inputs,
     )
 
     k = 8 / ang_TO_m
