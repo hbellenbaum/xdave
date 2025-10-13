@@ -27,15 +27,11 @@ from scipy.special import i1 as mod_bessel_first
 
 class LFC:
 
-    def __init__(self, models: ModelOptions, state: PlasmaState):
-        self._model = models.lfc_model
+    def __init__(self, state: PlasmaState):
         self.state = state
         self.theta = state.theta
-        # print(f"\ntheta = {self.theta}")
         self.rs = state.rs
-        # print(f"rs = {self.rs}")
 
-        # self.Gamma_ee = 1.05
         if state.electron_number_density == 0.0:
             print(f"Cannot calculate LFC.")
         else:
@@ -43,17 +39,12 @@ class LFC:
 
     def initialize(self, state: PlasmaState):
         self.z = 4 * (4 / (9 * PI)) ** (1 / 6) * np.sqrt(self.rs / PI)
-        # self.z = 4 * (4 / 9 * PI) ** (1 / 6) * np.sqrt(self.rs / PI)
-        # print(f"z = {self.z}")
+
         self.Gamma_ee = state.electron_electron_coupling_parameter(
             number_density=state.free_electron_number_density, temperature=state.electron_temperature
         )
-        # beta = 1 / (BOLTZMANN_CONSTANT * state.electron_temperature)
-        # radius = None
-        # self.Gamma_ee = UNIT_COULOMB_POTENTIAL * beta / radius
         self.gee0 = self._ee_pair_distribution_function(z=self.z)
         self.geeT = self._ee_pair_distribution_function_finite_T(Te=state.electron_temperature)
-        # print(f"Gamma_ee = {self.Gamma_ee}\n")
 
     def calculate_lfc(self, k, w, model="DORNHEIM_ESA"):
         if self.state.charge_state == 0:
@@ -68,6 +59,8 @@ class LFC:
             return self._geldart_vosko(k, w)
         elif model == "FARID":
             return self._farid_static(k, w)
+        elif model == "NONE":
+            return 0.0
         else:
             raise NotImplementedError(f"Model {model} not a recognized option.")
 
@@ -90,16 +83,13 @@ class LFC:
         )
         Gamma_ee = self.Gamma_ee
         C_sc = 1.0754
-        # H0 = C_sc * Gamma_ee ** (1 / 2) / ((C_sc / np.sqrt(3)) ** 4 + Gamma_ee**4) ** (1 / 4)
         H0 = C_sc * np.sqrt(Gamma_ee) / (1.0 + (C_sc / (Gamma_ee * SQRT_THREE)) ** 4) ** 0.25
-        # self._C_sc * sqrt(Gamma_ee) / (1.0 + (self._C_sc / (Gamma_ee * SQRT_THREE)) ** 4) ** 0.25
 
         def integral(u):
             X = np.tan(u * PI / 2)
             dXdu = PI / 2 * 1 / (np.cos(PI * u / 2)) ** 2
             return dXdu * (X * np.exp(-xi * X**2)) / (np.expm1(PI / X)) if X > 0 else 0.0
 
-        # print(integrate.quad(integral, 0, np.inf)[0])
         gbin = np.sqrt(2 * PI) * xi ** (3 / 2) * integrate.quad(integral, 0, 1, limit=200)[0]
         geeT = gbin * np.exp(H0)
         return geeT
@@ -108,9 +98,6 @@ class LFC:
         """
         Eqn. (10) Gregori et al., High Energy Density Phys. 3 (2007)
         """
-        # Gamma_ee = self.state.electron_electron_coupling_parameter(
-        #     number_density=self.state.free_electron_number_density, temperature=self.state.electron_temperature
-        # )
         Gamma_ee = self.Gamma_ee
         a = 0.0999305
         b = 0.0187058
@@ -118,56 +105,6 @@ class LFC:
         d = 0.0479236
         gammaT = (12 * PI**2) ** (1 / 3) * (a + b / Gamma_ee + c / Gamma_ee ** (4 / 3) - d / Gamma_ee ** (2 / 3))
         return gammaT
-
-    # def _gamma_0(self):
-    #     lambda_f = (4 / (9 * PI)) ** (1 / 3)
-    #     prefactor = PI * lambda_f / 24
-    #     rs = self.rs
-    #     sqrt_rs = np.sqrt(rs)
-    #     b0 = 0.0310907
-    #     b1 = 9.81379
-    #     b2 = 2.82224
-    #     b3 = 0.736411
-    #     dE = b0 / rs * (1 + b1 * sqrt_rs) / (1 + b1 * sqrt_rs + b2 * rs + b3 * sqrt_rs**3)
-    #     f_D = 1 + b1 * sqrt_rs + b2 * rs + b3 * sqrt_rs**3
-    #     f_N = 1 + b1 * sqrt_rs
-    #     f_N_prime = b0 / (2 * sqrt_rs)
-    #     f_D_prime = b1 / (2 * sqrt_rs) + b2 + 3 * b3 * sqrt_rs / 2
-    #     d2E = (f_D * f_N_prime - f_N * f_D_prime) / (f_D**2)
-    #     return 0.25 - prefactor * (rs**3 * d2E - 2 * rs**2 * dE)
-
-    # def _gamma_0(self):
-    #     """
-    #     Eqn. (17) - (18) in Farid et al., Phys. Rev. B (1993)
-    #     """
-    #     rs = self.rs
-    #     sqrt_rs = np.sqrt(rs)
-
-    #     b0 = 0.0310907
-    #     b1 = 9.81379
-    #     b2 = 2.82224
-    #     b3 = 0.736411
-
-    #     # f(r_s)
-    #     numerator_f = 1 + b1 * sqrt_rs
-    #     denominator_f = 1 + b1 * sqrt_rs + b2 * rs + b3 * rs ** (3 / 2)
-    #     f = numerator_f / denominator_f
-
-    #     # first derivative
-    #     dE = b0 * f / rs
-
-    #     # derivative f'(r_s)
-    #     numerator_f_prime = (b1 / (2 * sqrt_rs)) * denominator_f - numerator_f * (
-    #         b1 / (2 * sqrt_rs) + b2 + (3 / 2) * b3 * sqrt_rs
-    #     )
-    #     denominator_f_prime = denominator_f**2
-    #     f_prime = numerator_f_prime / denominator_f_prime
-
-    #     # second derivative
-    #     d2E = b0 * (rs * f_prime - f) / (rs**2)
-    #     lamda_f = (4 / (9 * PI)) ** (1 / 3)
-
-    #     return 0.25 - PI * lamda_f * (rs**3 * d2E - 2 * rs**2 * dE) / 24
 
     def _gamma_0(self):
         """
@@ -181,33 +118,12 @@ class LFC:
         d = 2.82224
         e = 0.736411
         diff1 = (a + b * sqrt_rs) / (1 + c * sqrt_rs + d * rs + e * sqrt_rs**3)
-        # numerator = -a * (rs ** (3 / 2) * (5 * c * sqrt_rs + 6 * d * rs + 4) + 7 * e * rs**3) - b * np.sqrt(rs) * (
-        #     rs ** (3 / 2) * (4 * c * sqrt_rs + 5 * d * rs + 3) + 6 * e * rs**3
-        # )
         numerator = a * (5 * c * sqrt_rs + 6 * d * rs + 7 * e * sqrt_rs**3) + b * sqrt_rs * (
             4 * c * sqrt_rs + 5 * d * rs + 6 * e * sqrt_rs**3 + 3
         )
-        # denominator = 2 * (rs**3) ** (3 / 2) * (c * sqrt_rs + d * rs + e * rs ** (3 / 2) + 1) ** 2
         denominator = 2 * rs**3 * (c * sqrt_rs + d * rs + e * sqrt_rs**3 + 1) ** 2
-        # Second derivative has virtually no effect on anything
         diff2 = -numerator / denominator
         return 0.25 - PI * (4 / (9 * PI)) ** (1 / 3) / 24 * (rs**3 * diff2 - 2 * rs * diff1)
-
-    # def calculate_lfc(self, k, w, model="DORNHEIM_ESA"):
-    #     if self.state.charge_state == 0:
-    #         return 0.0
-    #     if model == "DORNHEIM_ESA":
-    #         return self._dornheim_esa(k, w)
-    #     elif model == "PADE_INTERP":
-    #         return self._pade_interp_static(k, w)
-    #     elif model == "UI":
-    #         return self._utsumi_ichimaru_static(k, w)
-    #     elif model == "GV":
-    #         return self._geldart_vosko(k, w)
-    #     elif model == "FARID":
-    #         return self._farid_static(k, w)
-    #     else:
-    #         raise NotImplementedError(f"Model {model} not a recognized option.")
 
     def _f_extended(self, t, a, b, c):
         return a + b * t + c * t**1.5
@@ -273,7 +189,6 @@ class LFC:
         return 0.5 * (np.tanh(b * (x - a)) + 1.0)
 
     def _G_fit_wrap_extended(self, x, alpha, beta, gamma, delta):
-        # x = y[0]
         rs = self.rs
         theta = self.theta
 
@@ -312,7 +227,8 @@ class LFC:
         """
         rs = self.rs
         theta = self.theta
-        r = k / self.state.fermi_wave_number(self.state.free_electron_number_density)
+        kF = 1 / rs * (3 / 4 * np.pi) ** 3
+        r = k * BOHR_RADIUS / kF  # self.state.fermi_wave_number(self.state.free_electron_number_density)
 
         coeff = [
             0.66477593,
@@ -450,8 +366,7 @@ class LFC:
         Details in Gregori et al., High Energy Density Phys. 3 (2007)
         """
         kF = self.state.fermi_wave_number(self.state.free_electron_number_density)
-        # gee0 = self.gee0
-        geeT = self.geeT  # self._ee_pair_distribution_function_finite_T()
+        geeT = self.geeT
         gammaT = self._gamma_T()
         G_k = k**2 / (kF**2 / gammaT + k**2 / (1 - geeT))
         return G_k
@@ -542,8 +457,6 @@ def test():
 
     rho, T = get_rho_T_from_rs_theta(rs=rs, theta=theta)
     rho *= g_per_cm3_TO_kg_per_m3
-    # T *= eV_TO_K
-    # T = 20  # eV
     T *= eV_TO_K
 
     state = PlasmaState(
