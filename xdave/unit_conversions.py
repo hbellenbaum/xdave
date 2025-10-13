@@ -1,6 +1,6 @@
 # from numpy import PI
 # from constants.physics import ELEMENTARY_CHARGE, BOLTZMANN_CONSTANT
-from constants import (
+from xdave.constants import (
     DIRAC_CONSTANT,
     ELEMENTARY_CHARGE,
     BOLTZMANN_CONSTANT,

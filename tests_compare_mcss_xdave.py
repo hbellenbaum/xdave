@@ -1,4 +1,4 @@
-from xdave import *
+from xdave.xdave import *
 from mcss_tests.run_mcss_sim import run_be_sr_mode, run_ch_sr_mode, run_c_sr_mode, run_ch_ar_mode
 
 import numpy as np

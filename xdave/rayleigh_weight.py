@@ -1,6 +1,6 @@
-from ii_ff import PaulingShermanIonicFormFactor
-from screening_cloud import ScreeningCloud
-from static_sf import OCPStaticStructureFactor, MCPStaticStructureFactor
+from xdave.ii_ff import PaulingShermanIonicFormFactor
+from xdave.screening_cloud import ScreeningCloud
+from xdave.static_sf import OCPStaticStructureFactor, MCPStaticStructureFactor
 
 import numpy as np
 

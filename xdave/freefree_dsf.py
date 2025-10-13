@@ -1,16 +1,16 @@
-from constants import *
-from unit_conversions import *
+from xdave.constants import *
+from xdave.unit_conversions import *
 from maths import log1pexp
 from scipy import integrate
 
 
 # from fermi_integrals import fermi_integral
-from plasma_state import PlasmaState, get_rho_T_from_rs_theta
+from xdave.plasma_state import PlasmaState, get_rho_T_from_rs_theta
 
 from scipy.optimize import root_scalar
 from scipy.integrate import quad
 
-from models import ModelOptions
+from xdave.models import ModelOptions
 import numpy as np
 
 import warnings

@@ -13,12 +13,12 @@ More details:
 C. Fortmann et al., Phys. Rev. E 81 026405 (2010), DOI: 10.1103/physreve.81.026405
 """
 
-from plasma_state import PlasmaState, get_rho_T_from_rs_theta
-from unit_conversions import *
-from constants import *
-import fxc as gdb
+from xdave.plasma_state import PlasmaState, get_rho_T_from_rs_theta
+from xdave.unit_conversions import *
+from xdave.constants import *
+import xdave.fxc as gdb
+from xdave.models import ModelOptions
 
-from models import ModelOptions
 import numpy as np
 
 from scipy import integrate

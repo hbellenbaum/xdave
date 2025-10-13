@@ -1,5 +1,5 @@
-from constants import VACUUM_PERMITTIVITY, PI, ELEMENTARY_CHARGE, COULOMB_CONSTANT
-from utils import forward_transform_fft
+from xdave.constants import VACUUM_PERMITTIVITY, PI, ELEMENTARY_CHARGE, COULOMB_CONSTANT
+from xdave.utils import forward_transform_fft
 
 import numpy as np
 
