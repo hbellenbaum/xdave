@@ -4,7 +4,12 @@ from plasma_state import PlasmaState
 from scipy.interpolate import interp1d
 
 from bridge_functions import *
-from utils import forward_transform_fft, inverse_transform_fft, forward_transform_fftn, inverse_transform_fftn
+from utils import (
+    forward_transform_fft,
+    inverse_transform_fft,
+    forward_transform_fftn,
+    inverse_transform_fftn,
+)
 from constants import BOHR_RADIUS, ELEMENTARY_CHARGE, PI, BOLTZMANN_CONSTANT, VACUUM_PERMITTIVITY
 from potentials import *
 from unit_conversions import *
@@ -439,14 +444,12 @@ class MCPStaticStructureFactor:
         self,
         overlord_state: PlasmaState,
         states: np.array,
-        ion_core_radius=None,
         max_iterations=5000,
         mix_fraction=0.8,
         delta=1.0e-8,
         n=8192,
     ):
         self.overlord_state = overlord_state
-        self.ion_core_radius = ion_core_radius  # 1 * BOHR_RADIUS  ## this needs to be moved to the plasma state
         self.beta = 1 / (BOLTZMANN_CONSTANT * overlord_state.ion_temperature)  # [1/J]
         self.n = n  # per themis [#]
 
@@ -458,9 +461,10 @@ class MCPStaticStructureFactor:
         self.nis = []
         self.xs = []
         self.Qs = []
-        for i in (0, len(states) - 1):
+        for i in range(0, len(states)):
             self.nis.append(states[i].ion_number_density)
             self.Qs.append(states[i].ion_charge)
+            # TODO(Hannah): this should be done in the setup, ideally... and not repeated here
             self.xs.append(states[i].mass_density / overlord_state.mass_density)
 
         self.max_iterations = max_iterations
@@ -476,13 +480,13 @@ class MCPStaticStructureFactor:
             raise NotImplementedError(f"Model {sf_model} not recognized. Try HNC.")
 
         # consider switching out the interpolation with something like np.interpolate which is meant to be faster
-        interp_sf = interp1d(ks, Sabs)
+        interp_sf = interp1d(ks, Sabs, axis=-1, kind="linear")
         Sabs_new = interp_sf(k)
         if return_full:
             r = np.linspace(rs[0], rs[-1], len(k))
-            interp_giir = interp1d(rs, giir)
+            interp_giir = interp1d(rs, giir, axis=-1, kind="linear")
             giir_new = interp_giir(r)
-            interp_hiir = interp1d(rs, hiir)
+            interp_hiir = interp1d(rs, hiir, axis=-1, kind="linear")
             hiir_new = interp_hiir(r)
             return k, r, giir_new, hiir_new, Sabs_new
         else:
@@ -521,8 +525,8 @@ class MCPStaticStructureFactor:
         Ul_ks = np.zeros((b, a, n))
 
         # populate potentials: dimensionless
-        for n1 in (0, b - 1):
-            for n2 in (0, a - 1):
+        for n1 in range(b):
+            for n2 in range(a):
                 Uab = self._hnc_pseudopotential(k=ks, Qa=Qs[n2], Qb=Qs[n1], r=rs, alpha=alpha, model=pseudo_potential)
                 Us_rs[n1, n2, :] = beta * Uab[0]
                 Ul_ks[n1, n2, :] = beta * Uab[1]
@@ -610,8 +614,8 @@ class MCPStaticStructureFactor:
 
         Sabs = np.zeros((a, b, n))
         # This is only done once, so it could probably be sped up by generalizing the Fourier Transform for matrices, but it's not a priority right now
-        for n1 in (0, a - 1):
-            for n2 in (0, b - 1):
+        for n1 in range(a):
+            for n2 in range(b):
                 if n1 == n2:
                     Sabs[n1, n2, :] = 1 + np.sqrt(nis[n1] * nis[n2]) * forward_transform_fft(
                         yr=hiir[n1, n2, :], r=rs, k=ks, dk=dk, dr=dr

@@ -41,16 +41,11 @@ def compare_mcss_xdave_be():
 
     partial_densities = np.array([0.5, 0.5])
     charge_states = np.array([3, 4])
-    user_defined_inputs = dict()
 
     models = ModelOptions(polarisation_model="NUMERICAL", bf_model="SCHUMACHER", lfc_model="NONE", ipd_model="NONE")
     k = q / BOHR_RADIUS
 
     omega_array = np.arange(-4000, 4000, 0.5) * eV_TO_J
-
-    # angle = calculate_angle(q=q, energy=beam_energy)
-    rayleigh_weight = WR_mcss / mcss_norm
-    sif = np.zeros_like(omega_array)
 
     kernel = xDave(
         models=models,
@@ -60,7 +55,6 @@ def compare_mcss_xdave_be():
         elements=elements,
         charge_states=charge_states,
         partial_densities=partial_densities,
-        rayleigh_weight=rayleigh_weight,
         user_defined_inputs=None,
     )
 
@@ -87,8 +81,6 @@ def compare_mcss_xdave_be():
     ax.plot(omega_array * J_TO_eV, bf_tot / J_TO_eV, label="BF", ls="solid", c="dodgerblue")
     ax.plot(En_mcss, wbf_mcss / mcss_norm, c="brown", ls=":", label="MCSS: bf")
     ax.legend()
-
-    # tau_array = np.linspace(0, 1 / (T * K_TO_eV), 2000)
 
     tau_array, F_tot_inel, F_wff, F_wbf = kernel.get_itcf(
         w=omega_array * J_TO_eV, ff=ff_tot / J_TO_eV, bf=bf_tot / J_TO_eV
@@ -146,10 +138,6 @@ def compare_mcss_xdave_c():
 
     omega_array = np.arange(-4000, 4000, 0.5) * eV_TO_J
 
-    # angle = calculate_angle(q=q, energy=beam_energy)
-    rayleigh_weight = WR_mcss  # / mcss_norm
-    sif = np.zeros_like(omega_array)
-
     kernel = xDave(
         models=models,
         electron_temperature=T,
@@ -158,7 +146,6 @@ def compare_mcss_xdave_c():
         partial_densities=partial_densities,
         charge_states=charge_states,
         elements=elements,
-        rayleigh_weight=rayleigh_weight,
         user_defined_inputs=user_defined_inputs,
     )
 
@@ -254,10 +241,6 @@ def compare_mcss_xdave_ch():
 
     omega_array = np.arange(-4000, 4000, 0.5) * eV_TO_J
 
-    # angle = calculate_angle(q=q, energy=beam_energy)
-    rayleigh_weight = WR_mcss  # / mcss_norm
-    sif = np.zeros_like(omega_array)
-
     kernel = xDave(
         models=models,
         electron_temperature=T,
@@ -266,7 +249,6 @@ def compare_mcss_xdave_ch():
         charge_states=charge_states,
         elements=elements,
         partial_densities=partial_densities,
-        rayleigh_weight=rayleigh_weight,
         user_defined_inputs=None,
     )
 
@@ -274,6 +256,8 @@ def compare_mcss_xdave_ch():
 
     bf_tot, ff_tot, dsf, WR, ff_i, bf_i = kernel.run(k=k, w=omega_array)
     ff_tot[np.isnan(ff_tot)] = 0.0
+
+    print(f"Calculated Rayleigh weight = {WR}")
 
     # plot results
     fig, axes = plt.subplots(2, 3, figsize=(14, 10))
@@ -299,28 +283,11 @@ def compare_mcss_xdave_ch():
     ax = axes[0, 2]
     ax.set_title("BF DSF")
     ax.set_yscale("log")
-    # ax.plot(
-    #     omega_array * J_TO_eV, bf_tot / np.nanmax(bf_tot / J_TO_eV) / J_TO_eV, label="BF", ls="solid", c="dodgerblue"
-    # )
     ax.plot(omega_array * J_TO_eV, bf_tot / J_TO_eV, label="BF", ls="solid", c="dodgerblue")
-    # ax.plot(omega_array * J_TO_eV, bf_i[0, :] / J_TO_eV, label="BF: H", ls="-.", c="dodgerblue")
-    # ax.plot(omega_array * J_TO_eV, bf_i[1, :] / J_TO_eV, label="BF: C4", ls=":", c="dodgerblue")
-    # ax.plot(omega_array * J_TO_eV, bf_i[2, :] / J_TO_eV, label="BF: C5", ls="--", c="dodgerblue")
-    # ax.plot(
-    #     omega_array * J_TO_eV,
-    #     (bf_i[0, :] + bf_i[1, :] + bf_i[2, :]) / setup.overlord_state.charge_state / J_TO_eV,
-    #     label="Sum",
-    #     ls="solid",
-    #     c="gray",
-    # )
-    # ax.plot(omega_array * J_TO_eV, bf_tot / factor / J_TO_eV, label="Attempt", ls="solid", c="navy")
-    # ax.plot(En_mcss, wbf_mcss / np.max(wbf_mcss / mcss_norm) / mcss_norm, c="navy", ls=":", label="MCSS: bf")
     ax.plot(En_mcss, wbf_mcss / mcss_norm, c="navy", ls=":", label="MCSS: bf")
     ax.legend()
     ax.set_xlabel(r"$\omega$ [eV]")
     ax.set_ylabel(r"DSF [1/eV]")
-
-    # tau_array = np.linspace(0, 1 / (T * K_TO_eV), 2000)
 
     tau_array, F_tot_inel, F_wff, F_wbf = kernel.get_itcf(
         w=omega_array * J_TO_eV, ff=ff_tot / J_TO_eV, bf=bf_tot / J_TO_eV
@@ -331,6 +298,8 @@ def compare_mcss_xdave_ch():
     ax.set_title("ITCF")
     ax.plot(tau_array, F_tot_inel, label="xDave inel", ls="dashed", c="magenta")
     ax.plot(tau_array, F_tot_inel_mcss / mcss_norm, label="MCSS inel", ls="dotted", c="purple")
+    ax.axhline(WR_mcss / mcss_norm, c="black", ls="dotted", label="MCSS WR")
+    ax.axhline(WR, c="slategrey", ls="dashed", label="WR")
     ax.legend()
     ax.set_xlabel(r"$\tau$ [1/eV]")
     ax.set_ylabel(r"ITCF")
@@ -353,6 +322,21 @@ def compare_mcss_xdave_ch():
     plt.tight_layout()
     plt.show()
     fig.savefig(f"ch_test_T={T*K_TO_eV:.1f}_rho={rho*kg_per_m3_TO_g_per_cm3:.1f}_ZC={ZC}_q={q:.2f}.pdf")
+
+    fname = f"xdave_ch_T={T*K_TO_eV:.1f}_rho={rho*kg_per_m3_TO_g_per_cm3:.1f}_ZC={ZC}"
+    dirname = "/home/bellen85/code/dev/xdave/xdave_results"
+    kernel.save_result(
+        fname=fname,
+        dirname=dirname,
+        w=omega_array,
+        tau=tau_array,
+        bf=bf_tot,
+        ff=ff_tot,
+        dsf=dsf,
+        F_inel=F_tot_inel,
+        F_bf=F_wbf,
+        F_ff=F_wff,
+    )
 
 
 def compare_mcss_xdave_ch_static():
@@ -399,7 +383,6 @@ def compare_mcss_xdave_ch_static():
         charge_states=charge_states,
         elements=elements,
         partial_densities=partial_densities,
-        rayleigh_weight=rayleigh_weight,
         user_defined_inputs=None,
     )
 
@@ -457,7 +440,7 @@ def compare_mcss_xdave_ch_static():
 
 
 if __name__ == "__main__":
-    compare_mcss_xdave_be()
-    # compare_mcss_xdave_ch()
+    # compare_mcss_xdave_be()
+    compare_mcss_xdave_ch()
     # compare_mcss_xdave_c()
     # compare_mcss_xdave_ch_static()

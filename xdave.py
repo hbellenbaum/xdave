@@ -26,6 +26,8 @@ import warnings
 import scipy.stats as stats
 import matplotlib.pyplot as plt
 
+import os
+
 warnings.filterwarnings("ignore", category=FutureWarning)
 
 
@@ -40,7 +42,6 @@ class xDave:
         partial_densities: np.array,
         charge_states: np.array,
         models: ModelOptions,
-        rayleigh_weight: float,
         enforce_fsum: bool = False,
         user_defined_inputs: dict = None,
     ):
@@ -53,14 +54,13 @@ class xDave:
         self.elements = elements
         self.charge_states = charge_states
         self.models = models
-        self.rayleigh_weight = rayleigh_weight
 
         self.enforce_fsum = enforce_fsum
         self.tau_array = np.linspace(0, 1 / (electron_temperature * K_TO_eV), 1000)
 
         self.states, self.overlord_state = self.initialize()
 
-        self.user_defined_ipd = None
+        self.ipd_eV = None
         self.user_defined_lfc = None
         self.ion_core_radius = None
 
@@ -169,7 +169,32 @@ class xDave:
             bf_i[i] = x * bf_dsf  # * state.charge_state  # / state.atomic_number
 
             # This is where the HNC stuff will have to go eventually
-            WR = self.rayleigh_weight
+            # WR = self.rayleigh_weight
+
+        # Calculate the Rayleigh weight
+        if self.ocp_flag:
+            wr_kernel = OCPRayleighWeight(state=self.overlord_state, ion_core_radius=1.0 * BOHR_RADIUS)
+            rayleigh_weight = wr_kernel.get_rayleigh_weight(
+                k=k,
+                sf_model=self.models.static_structure_factor_approximation,
+                ii_potential=self.models.ii_potential,
+                bridge_function=self.models.bridge_function,
+                screening="None",
+            )
+        else:
+            wr_kernel = MCPRayleighWeight(
+                overlord_state=self.overlord_state, states=self.states, ion_core_radius=1.0 * BOHR_RADIUS
+            )
+            rayleigh_weight = wr_kernel.get_rayleigh_weight(
+                k=k,
+                lfc=lfc,
+                sf_model=self.models.static_structure_factor_approximation,
+                ii_potential=self.models.ii_potential,
+                ee_potential=self.models.ee_potential,
+                ei_potential=self.models.ei_potential,
+                screening_model=self.models.screening_model,
+                return_full=False,
+            )
 
         if self.enforce_fsum:
             bf *= self._bf_norm(w=w, ff=ff, bf=bf, k=k)
@@ -177,7 +202,7 @@ class xDave:
         # Divide by the atomic number to be consistent with the ff component
         bf_tot /= self.overlord_state.atomic_number
         dsf = ff_tot + bf_tot
-        return bf_tot, ff_tot, dsf, WR, ff_i, bf_i
+        return bf_tot, ff_tot, dsf, rayleigh_weight, ff_i, bf_i
 
     def run_static_mode(self, k):
         lfc_kernel = LFC(state=self.overlord_state)
@@ -220,6 +245,26 @@ class xDave:
         if tau is None:
             tau = self.tau_array
         return laplace(tau=self.tau_array, E=w, wff=ff, wbf=bf)
+
+    def save_result(self, fname, dirname, w, tau, ff, bf, dsf, F_inel, F_bf, F_ff, mode="all"):
+        if not os.path.exists(dirname):
+            os.mkdir(dirname)
+        output_file = os.path.join(dirname, fname + ".csv")
+        output_file_itcf = os.path.join(dirname, fname + "_itcf.csv")
+        if mode == "all":
+            np.savetxt(
+                output_file,
+                np.transpose(np.array([w, ff, bf, dsf])),
+                delimiter=",",
+                header="w[J] FF[1/J] BF[1/J] Inel[1/J]",
+            )
+            np.savetxt(
+                output_file_itcf,
+                np.transpose(np.array([tau, F_ff, F_bf, F_inel])),
+                delimiter=",",
+                header="tau[1/eV] F_FF F_BF F_Inel",
+            )
+        print(f"Saving output to file {fname}")
 
     def _print_logo(self):
         # print(
@@ -278,14 +323,12 @@ def test_setup():
         partial_densities=partial_densities,
         charge_states=charge_states,
         user_defined_inputs=user_defined_inputs,
-        rayleigh_weight=rayleigh_weight,
     )
 
     bf_tot, ff_tot, dsf, WR, ff_i, bf_i = kernel.run(k=k, w=omega_array)
     fig, axes = plt.subplots(2, 2, figsize=(14, 10))
 
     mcss_norm = 0.3 * 1 + (1 - 0.3) * 6
-
     ax = axes[0, 0]
     ax.set_title("Total DSF")
     ax.plot(omega_array * J_TO_eV, bf_tot / J_TO_eV, label="BF")
@@ -341,7 +384,7 @@ def test_setup():
 def test_be():
     rs = 3
     theta = 1
-    atomic_mass = 9.0121831  # amu
+    # atomic_mass = 9.0121831  # amu
     Z_mean = 3.73
     rho = 22.0 * g_per_cm3_TO_kg_per_m3
     T = 150 * eV_TO_K
@@ -372,7 +415,6 @@ def test_be():
         elements=elements,
         partial_densities=xs,
         charge_states=charge_states,
-        rayleigh_weight=WR,
         user_defined_inputs=user_defined_inputs,
     )
 
@@ -380,6 +422,8 @@ def test_be():
     q = k * BOHR_RADIUS
 
     bf_tot, ff_tot, dsf, WR, _, _ = xdave.run(k=k, w=omega_array)
+
+    print(f"Calculate Rayleigh weight: {WR}")
 
     fig, axes = plt.subplots(1, 2, figsize=(14, 10))
 

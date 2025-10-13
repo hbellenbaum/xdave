@@ -48,8 +48,12 @@ class MCPRayleighWeight:
         nspecies = self.nspecies
         states = self.states
 
-        qs = np.zeros((nspecies, len(k)))
-        fs = np.zeros((nspecies, len(k)))
+        if np.shape(k) == ():
+            qs = np.zeros((nspecies, 1))
+            fs = np.zeros((nspecies, 1))
+        else:
+            qs = np.zeros((nspecies, len(k)))
+            fs = np.zeros((nspecies, len(k)))
 
         for i in (0, nspecies - 1):
             qs[i, :] = ScreeningCloud(state=states[i]).get_screening_cloud(
@@ -67,7 +71,6 @@ class MCPRayleighWeight:
         sf = MCPStaticStructureFactor(
             overlord_state=self.overlord_state,
             states=states,
-            ion_core_radius=self.ion_core_radius,
             mix_fraction=0.9,
             delta=1.0e-8,
         )
@@ -78,16 +81,27 @@ class MCPRayleighWeight:
             return_full=False,
         )
 
-        # nis = sf.nis
         xs = sf.xs
 
-        rayleigh_weight = np.zeros_like(k)
-        for n1 in (0, nspecies - 1):
-            for n2 in (0, nspecies - 1):
-                rayleigh_weight += np.sqrt(xs[n1] * xs[n2]) * (fs[n1] + qs[n1]) * (fs[n2] + qs[n2]) * Sab[n1, n2, :]
+        if np.shape(k) == ():
+            rayleigh_weight = 0
+            # TODO(Hannah): there has to be a better way of doing this...
+            for n1 in range(nspecies):
+                for n2 in range(nspecies):
+                    rayleigh_weight += np.sqrt(xs[n1] * xs[n2]) * (fs[n1] + qs[n1]) * (fs[n2] + qs[n2]) * Sab[n1, n2]
 
-        if return_full:
-            return k, Sab, rayleigh_weight, qs, fs
+            if return_full:
+                return k, Sab, rayleigh_weight, qs, fs
+        else:
+            rayleigh_weight = np.zeros_like(k)
+            for n1 in range(nspecies):
+                for n2 in range(nspecies):
+                    rayleigh_weight += (
+                        np.sqrt(xs[n1] * xs[n2]) * (fs[n1] + qs[n1]) * (fs[n2] + qs[n2]) * Sab[n1, n2, :]
+                    )
+
+            if return_full:
+                return k, Sab, rayleigh_weight, qs, fs
         return rayleigh_weight
 
 

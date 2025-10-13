@@ -565,7 +565,6 @@ def compare_hydrogen_against_pimc_and_mcss():
         mass_density=rho,
         charge_states=charge_states,
         partial_densities=partial_densities,
-        rayleigh_weight=WR,
         ipd=ipd_best_fit,
         user_defined_inputs=user_defined_inputs,
     )
