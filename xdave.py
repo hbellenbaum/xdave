@@ -29,7 +29,7 @@ import matplotlib.pyplot as plt
 warnings.filterwarnings("ignore", category=FutureWarning)
 
 
-class Setup:
+class xDave:
 
     def __init__(
         self,
@@ -40,8 +40,11 @@ class Setup:
         partial_densities: np.array,
         charge_states: np.array,
         user_defined_inputs: dict,
+        models: ModelOptions,
+        rayleigh_weight: float,
+        sif: None,
+        ipd: float = None,
     ):
-        # TODO(Hannah): do these really need to be separate classes? -> the fact that they are is proving a bit difficult right now...
         assert np.sum(partial_densities) == 1.0, f"Fractional densities do not add up 1. Try again sucker."
         self.number_of_states = len(partial_densities)
         self.mass_density = mass_density
@@ -50,15 +53,14 @@ class Setup:
         self.partial_densities = partial_densities
         self.elements = elements
         self.charge_states = charge_states
-
-        # Not sure yet what the best way of handling this is yet, but I am hoping to include a dict of the optional inputs (LFC, IPD, etc.)
-        # to pass onto the state object
-        self.user_defined_inputs = user_defined_inputs
+        self.models = models
+        self.rayleigh_weight = rayleigh_weight
+        self.sif = sif
+        self.ipd_eV = ipd
 
         self.states, self.overlord_state = self.initialize()
 
     def initialize(self):
-
         states = []
         Z_mean = 0.0
         AN_mean = 0.0
@@ -98,30 +100,6 @@ class Setup:
         self.ocp_flag = (len(np.unique(ANs)) < len(states)) and len(states) <= 2
         return np.array(states), overlord_state
 
-
-class xDave:
-
-    def __init__(
-        self,
-        models: ModelOptions,
-        overlord_state: PlasmaState,
-        states: np.array,
-        fractions: np.array,
-        rayleigh_weight: float,
-        sif: None,
-        ipd: float = None,
-        ocp_flag: bool = False,
-    ):
-        self.models = models
-        self.states = states
-        self.fractions = fractions
-        self.rayleigh_weight = rayleigh_weight
-        self.sif = sif
-        self.ipd_eV = ipd
-
-        self.overlord_state = overlord_state
-        self.ocp_flag = ocp_flag  # (len(np.unique(overlord_state.elements)) < len(states)) and len(states) <= 2
-
     def run(self, k, w):
 
         self._print_logo()
@@ -150,7 +128,7 @@ class xDave:
 
         for i in range(0, len(self.states)):
             state = self.states[i]
-            x = self.fractions[i]
+            x = self.partial_densities[i]
             print(f"\nRunning state {i} with Z={state.charge_state} and x={x}\n")
             binding_energies = state.binding_energies * eV_TO_J
 
@@ -243,21 +221,7 @@ def test_setup():
     user_defined_inputs = None
 
     models = ModelOptions(polarisation_model="NUMERICAL", bf_model="SCHUMACHER", lfc_model="NONE", ipd_model="NONE")
-    # binding_energies = np.array([-13.6, -130]) * eV_TO_J
 
-    # c_emission_lines = get_emission_lines_for_element(element="C")
-
-    setup = Setup(
-        mass_density=rho,
-        electron_temperature=T,
-        ion_temperature=T,
-        # models=models,
-        elements=elements,
-        partial_densities=partial_densities,
-        charge_states=charge_states,
-        user_defined_inputs=user_defined_inputs,
-    )
-    states = setup.states
     omega_array = np.linspace(-1000, 1500, 1000) * eV_TO_J
 
     k = 8 / ang_TO_m
@@ -275,11 +239,14 @@ def test_setup():
 
     kernel = xDave(
         models=models,
-        states=states,
-        fractions=partial_densities,
+        electron_temperature=T,
+        ion_temperature=T,
+        mass_density=rho,
+        elements=elements,
+        partial_densities=partial_densities,
+        charge_states=charge_states,
+        user_defined_inputs=user_defined_inputs,
         rayleigh_weight=rayleigh_weight,
-        overlord_state=setup.overlord_state,
-        ipd=0.0,
         sif=sif,
     )
 
@@ -293,8 +260,8 @@ def test_setup():
     ax.plot(omega_array * J_TO_eV, bf_tot / J_TO_eV, label="BF")
     ax.plot(omega_array * J_TO_eV, ff_tot / J_TO_eV, label="FF")
     ax.plot(omega_array * J_TO_eV, dsf / J_TO_eV, label="Tot")
-    ax.plot(mcss_En, (mcss_wbf + mcss_wff) / mcss_norm, lw=2, c="black", label="MCSS / AN")
-    ax.plot(mcss_En, (mcss_wbf + mcss_wff), lw=2, c="black", ls="dashed", label="MCSS")
+    ax.plot(mcss_En, (mcss_wbf + mcss_wff) / mcss_norm, lw=2, ls="dashed", c="black", label="MCSS")
+    # ax.plot(mcss_En, (mcss_wbf + mcss_wff), lw=2, c="black", ls="dashed", label="MCSS")
     ax.legend()
 
     ax = axes[1, 0]
@@ -304,8 +271,8 @@ def test_setup():
     ax.plot(omega_array * J_TO_eV, ff_i[2] / J_TO_eV, label="C3: FF")
     ax.plot(omega_array * J_TO_eV, ff_i[3] / J_TO_eV, label="C4: FF")
     ax.plot(omega_array * J_TO_eV, ff_tot / J_TO_eV, label="Tot FF")
-    ax.plot(mcss_En, mcss_wff / mcss_norm, lw=2, c="black", ls="dashed", label="MCSS / AN")
-    ax.plot(mcss_En, mcss_wff, lw=2, c="black", ls="solid", label="MCSS")
+    ax.plot(mcss_En, mcss_wff / mcss_norm, lw=2, c="black", ls="dashed", label="MCSS")
+    # ax.plot(mcss_En, mcss_wff, lw=2, c="black", ls="solid", label="MCSS")
     ax.legend()
 
     ax = axes[1, 1]
@@ -316,7 +283,7 @@ def test_setup():
     ax.plot(omega_array * J_TO_eV, bf_i[3] / J_TO_eV, label="C4: BF")
     ax.plot(omega_array * J_TO_eV, bf_tot / J_TO_eV, label="Tot BF")
     ax.plot(mcss_En, mcss_wbf / mcss_norm, lw=2, c="black", ls="dashed", label="MCSS")
-    ax.plot(mcss_En, mcss_wbf, lw=2, c="black", ls="solid", label="MCSS")
+    # ax.plot(mcss_En, mcss_wbf, lw=2, c="black", ls="solid", label="MCSS")
     ax.legend()
 
     sif = stats.norm.pdf(omega_array, 0, 2 * eV_TO_J)
@@ -336,7 +303,7 @@ def test_setup():
     plt.tight_layout()
     plt.show()
     fig.savefig(
-        f"ch_test_T={T*K_TO_eV}_rho={rho*kg_per_m3_TO_g_per_cm3}_Z={setup.overlord_state.charge_state}.pdf", dpi=200
+        f"ch_test_T={T*K_TO_eV}_rho={rho*kg_per_m3_TO_g_per_cm3}_Z={kernel.overlord_state.charge_state}.pdf", dpi=200
     )
 
 
@@ -345,29 +312,8 @@ def test_be():
     theta = 1
     atomic_mass = 9.0121831  # amu
     Z_mean = 3.73
-    # rho, T = get_rho_T_from_rs_theta(rs=rs, theta=theta, atomic_mass=atomic_mass)
-    # rho *= g_per_cm3_TO_kg_per_m3
-    # T *= eV_TO_K
     rho = 22.0 * g_per_cm3_TO_kg_per_m3
     T = 150 * eV_TO_K
-
-    state_B3 = PlasmaState(
-        electron_temperature=T,
-        ion_temperature=T,
-        mass_density=rho,
-        charge_state=3.0,
-        atomic_mass=atomic_mass,
-        atomic_number=4,
-    )
-
-    state_B4 = PlasmaState(
-        electron_temperature=T,
-        ion_temperature=T,
-        mass_density=rho,
-        charge_state=4.0,
-        atomic_mass=atomic_mass,
-        atomic_number=4,
-    )
 
     beam_energy = 9.0e3  # * eV_TO_J
     angles = np.array([13, 30, 45, 60, 80, 100, 120, 140, 160])
@@ -379,48 +325,37 @@ def test_be():
     models = ModelOptions(
         polarisation_model="NUMERICAL", bf_model="SCHUMACHER", lfc_model="DORNHEIM_ESA", ipd_model="STEWART_PYATT"
     )
-    x1, x2 = get_fractions_from_Z(Z=Z_mean)
+    Z1, Z2, x1, x2 = get_fractions_from_Z(Z=Z_mean)
     xs = np.array([x1, x2])
 
-    setup = Setup(
-        mass_density=rho,
-        electron_temperature=T,
-        ion_temperature=T,
-        models=models,
-        partial_densities=xs,
-        binding_energies=np.array([-111.5]) * eV_TO_J,
-        atomic_weights=np.array([4, 4]),
-        charge_states=np.array([3, 4]),
-    )
+    elements = np.array(["Be", "Be"])
+    charge_states = np.array([Z1, Z2])
 
-    print(
-        f"Running fractions: {x1} for charge {state_B3.charge_state}\n"
-        f"and {x2} for charge {state_B4.charge_state}\n"
-    )
     xdave = xDave(
         models=models,
-        states=np.array([state_B3, state_B4]),
-        fractions=xs,
+        electron_temperature=T,
+        ion_temperature=T,
+        mass_density=rho,
+        elements=elements,
+        partial_densities=xs,
+        charge_states=charge_states,
         rayleigh_weight=WR,
         sif=np.zeros_like(omega_array),
+        user_defined_inputs=None,
     )
 
-    # q = ks[-1] * BOHR_RADIUS
-    # k = q / BOHR_RADIUS
     k = 8 / ang_TO_m
     q = k * BOHR_RADIUS
 
-    bf_tot, ff_tot, dsf, Wr = xdave.run(k=k, w=omega_array)
+    bf_tot, ff_tot, dsf, WR, _, _ = xdave.run(k=k, w=omega_array)
 
     fig, axes = plt.subplots(1, 2, figsize=(14, 10))
 
-    # plt.figure()
     ax = axes[0]
     ax.plot(omega_array * J_TO_eV, bf_tot / J_TO_eV, label="BF")
     ax.plot(omega_array * J_TO_eV, ff_tot / J_TO_eV, label="FF")
     ax.plot(omega_array * J_TO_eV, dsf / J_TO_eV, label="Tot")
     ax.legend()
-    # plt.show()
 
     sif = stats.norm.pdf(omega_array, 0, 2 * eV_TO_J)
     sif /= np.max(sif)
@@ -439,14 +374,15 @@ def test_be():
     fig.savefig(f"beryllium_test_rs={rs}_theta={theta}_Z={Z_mean}_q={q:.2f}.pdf", dpi=200)
 
 
-# if __name__ == "__main__":
+if __name__ == "__main__":
 
-#     ##TODO(Hannah):
-#     ## check that the mass density and number of electrons is being handled correctly across all states
-#     ## compare against MCSS and PIMC for this set of conditions
-#     ## Add IPD model: DONE
-#     ## Clean up bf call (arguments are a bit messy): DONE
-#     ## Start calculating things like kF, EF, omega_p, etc. for the plasma state upon initialisation to avoid extra computation
-#     ## Start timing and looking at how much this scales with number of points
-#     ## I should move away from defining states by their mass density (problematic when you have mixed species) and just look at electron number density... probably a lot easier to split up: STILL THINKING ABOUT THIS
-#     test_setup()
+    #     ##TODO(Hannah):
+    #     ## check that the mass density and number of electrons is being handled correctly across all states
+    #     ## compare against MCSS and PIMC for this set of conditions
+    #     ## Add IPD model: DONE
+    #     ## Clean up bf call (arguments are a bit messy): DONE
+    #     ## Start calculating things like kF, EF, omega_p, etc. for the plasma state upon initialisation to avoid extra computation
+    #     ## Start timing and looking at how much this scales with number of points
+    #     ## I should move away from defining states by their mass density (problematic when you have mixed species) and just look at electron number density... probably a lot easier to split up: STILL THINKING ABOUT THIS
+    # test_setup()
+    test_be()

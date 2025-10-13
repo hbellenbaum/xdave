@@ -5,7 +5,7 @@ from constants import BOHR_RADIUS, PLANCK_CONSTANT
 from freefree_dsf import FreeFreeDSF
 from boundfree_dsf import BoundFreeDSF
 from utils import calculate_angle, calculate_q, load_itcf_from_file, load_mcss_result
-from xdave import Setup, xDave
+from xdave import xDave
 
 import numpy as np
 import matplotlib.pyplot as plt
@@ -545,7 +545,7 @@ def compare_hydrogen_against_pimc_and_mcss():
     models = ModelOptions(
         polarisation_model="NUMERICAL", bf_model="SCHUMACHER", lfc_model="DORNHEIM_ESA", ipd_model="NONE"
     )
-    x1, x2 = get_fractions_from_Z(Z=Z_mean)
+    Z1, Z2, x1, x2 = get_fractions_from_Z(Z=Z_mean)
     xs = np.array([x1, x2])
 
     elements = np.array(["H", "H"])
@@ -557,25 +557,18 @@ def compare_hydrogen_against_pimc_and_mcss():
     sif /= np.max(sif)
     WR = WR_pimc * J_TO_eV
 
-    setup = Setup(
-        mass_density=rho,
-        electron_temperature=T,
-        ion_temperature=T,
-        # models=models,
-        elements=elements,
-        partial_densities=partial_densities,
-        charge_states=charge_states,
-        user_defined_inputs=user_defined_inputs,
-    )
-    states = setup.states
     xdave = xDave(
         models=models,
-        states=states,
-        fractions=partial_densities,
+        elements=elements,
+        electron_temperature=T,
+        ion_temperature=T,
+        mass_density=rho,
+        charge_states=charge_states,
+        partial_densities=partial_densities,
         rayleigh_weight=WR,
-        overlord_state=setup.overlord_state,
         ipd=ipd_best_fit,
         sif=sif,
+        user_defined_inputs=user_defined_inputs,
     )
 
     q = q_value

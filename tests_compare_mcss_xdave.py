@@ -22,16 +22,16 @@ def compare_mcss_xdave_be():
     q = calculate_q(angle=angle, energy=beam_energy)
     print(f"Running at q={q:.3f}")
 
-    try:
-        fname = "mcss_tests/be_runs_T=155.50_rho=30.00/mcss_run_be_T=155.50_rho=30.00_Z=3.0_angle=75.csv"
-        En_mcss, wff_mcss, wbf_mcss, ff_mcss, bf_mcss, el_mcss = load_mcss_result(filename=fname)
-        WR_mcss = get_mcss_wr_from_status_file(
-            status_file="mcss_tests/be_runs_T=155.50_rho=30.00/mcss_run_be_T=155.50_rho=30.00_Z=3.0_angle=75_status.txt"
-        )
-    except FileNotFoundError:
-        En_mcss, wff_mcss, wbf_mcss, ff_mcss, bf_mcss, el_mcss, WR_mcss = run_be_sr_mode(
-            T=T, rho=rho, Z=Z, angle=angle, user_defined_ipd=0.0, user_defined_lfc=0.0, plot=False
-        )
+    # try:
+    #     fname = "mcss_tests/be_runs_T=155.50_rho=30.00/mcss_run_be_T=155.50_rho=30.00_Z=3.0_angle=75.csv"
+    #     En_mcss, wff_mcss, wbf_mcss, ff_mcss, bf_mcss, el_mcss = load_mcss_result(filename=fname)
+    #     WR_mcss = get_mcss_wr_from_status_file(
+    #         status_file="mcss_tests/be_runs_T=155.50_rho=30.00/mcss_run_be_T=155.50_rho=30.00_Z=3.0_angle=75_status.txt"
+    #     )
+    # except FileNotFoundError:
+    En_mcss, wff_mcss, wbf_mcss, ff_mcss, bf_mcss, el_mcss, WR_mcss = run_be_sr_mode(
+        T=T, rho=rho, Z=Z, angle=angle, user_defined_ipd=0.0, user_defined_lfc=0.0, plot=False
+    )
 
     mcss_norm = 4
 
@@ -44,17 +44,6 @@ def compare_mcss_xdave_be():
     user_defined_inputs = dict()
 
     models = ModelOptions(polarisation_model="NUMERICAL", bf_model="SCHUMACHER", lfc_model="NONE", ipd_model="NONE")
-    setup = Setup(
-        mass_density=rho,
-        electron_temperature=T,
-        ion_temperature=T,
-        elements=elements,
-        partial_densities=partial_densities,
-        charge_states=charge_states,
-        user_defined_inputs=user_defined_inputs,
-    )
-
-    states = setup.states
     k = q / BOHR_RADIUS
 
     omega_array = np.arange(-4000, 4000, 0.5) * eV_TO_J
@@ -65,12 +54,16 @@ def compare_mcss_xdave_be():
 
     kernel = xDave(
         models=models,
-        states=states,
-        fractions=partial_densities,
+        electron_temperature=T,
+        ion_temperature=T,
+        mass_density=rho,
+        elements=elements,
+        charge_states=charge_states,
+        partial_densities=partial_densities,
         rayleigh_weight=rayleigh_weight,
-        overlord_state=setup.overlord_state,
         ipd=0.0,
         sif=sif,
+        user_defined_inputs=None,
     )
 
     bf_tot, ff_tot, dsf, WR, ff_i, bf_i = kernel.run(k=k, w=omega_array)
@@ -135,17 +128,6 @@ def compare_mcss_xdave_c():
     q = calculate_q(angle=angle, energy=beam_energy)
     print(f"Running at q={q:.3f}")
 
-    # try:
-    # fname = (
-    #     f"mcss_tests/c_runs_T={T:.2f}_rho={rho:.2f}/mcss_run_c_T={T:.2f}_rho={rho:.2f}_Z={Z:.1f}_angle={angle:.0f}.csv"
-    # )
-    # print(f"Reading mcss output from file: {fname}")
-    # En_mcss, wff_mcss, wbf_mcss, ff_mcss, bf_mcss, el_mcss = load_mcss_result(filename=fname)
-    # WR_mcss = get_mcss_wr_from_status_file(
-    #     status_file=f"mcss_tests/c_runs_T={T:.2f}_rho={rho:.2f}/mcss_run_c_T={T:.2f}_rho={rho:.2f}_Z={Z:.1f}_angle={angle:.0f}_status.txt"
-    # )
-    # except FileNotFoundError:
-    #     print(f"Cannot find file")
     En_mcss, wff_mcss, wbf_mcss, ff_mcss, bf_mcss, el_mcss, WR_mcss = run_c_sr_mode(
         T=T, rho=rho, Z=Z, angle=angle, user_defined_ipd=0.0, user_defined_lfc=0.0, plot=False
     )
@@ -161,36 +143,30 @@ def compare_mcss_xdave_c():
     user_defined_inputs = dict()
 
     models = ModelOptions(polarisation_model="NUMERICAL", bf_model="SCHUMACHER", lfc_model="NONE", ipd_model="NONE")
-    setup = Setup(
-        mass_density=rho,
-        electron_temperature=T,
-        ion_temperature=T,
-        elements=elements,
-        partial_densities=partial_densities,
-        charge_states=charge_states,
-        user_defined_inputs=user_defined_inputs,
-    )
 
-    states = setup.states
     k = q / BOHR_RADIUS
 
     omega_array = np.arange(-4000, 4000, 0.5) * eV_TO_J
 
-    mcss_norm = setup.overlord_state.atomic_number
-
     # angle = calculate_angle(q=q, energy=beam_energy)
-    rayleigh_weight = WR_mcss / mcss_norm
+    rayleigh_weight = WR_mcss  # / mcss_norm
     sif = np.zeros_like(omega_array)
 
     kernel = xDave(
         models=models,
-        states=states,
-        fractions=partial_densities,
+        electron_temperature=T,
+        ion_temperature=T,
+        mass_density=rho,
+        partial_densities=partial_densities,
+        charge_states=charge_states,
+        elements=elements,
         rayleigh_weight=rayleigh_weight,
-        overlord_state=setup.overlord_state,
         ipd=0.0,
         sif=sif,
+        user_defined_inputs=user_defined_inputs,
     )
+
+    mcss_norm = kernel.overlord_state.atomic_number
 
     bf_tot, ff_tot, dsf, WR, ff_i, bf_i = kernel.run(k=k, w=omega_array)
     ff_tot[np.isnan(ff_tot)] = 0.0
@@ -277,36 +253,30 @@ def compare_mcss_xdave_ch():
     user_defined_inputs = dict()
 
     models = ModelOptions(polarisation_model="NUMERICAL", bf_model="SCHUMACHER", lfc_model="NONE", ipd_model="NONE")
-    setup = Setup(
-        mass_density=rho,
-        electron_temperature=T,
-        ion_temperature=T,
-        elements=elements,
-        partial_densities=partial_densities,
-        charge_states=charge_states,
-        user_defined_inputs=user_defined_inputs,
-    )
 
-    states = setup.states
     k = q / BOHR_RADIUS
 
     omega_array = np.arange(-4000, 4000, 0.5) * eV_TO_J
 
-    mcss_norm = setup.overlord_state.atomic_number
-
     # angle = calculate_angle(q=q, energy=beam_energy)
-    rayleigh_weight = WR_mcss / mcss_norm
+    rayleigh_weight = WR_mcss  # / mcss_norm
     sif = np.zeros_like(omega_array)
 
     kernel = xDave(
         models=models,
-        states=states,
-        fractions=partial_densities,
+        electron_temperature=T,
+        ion_temperature=T,
+        mass_density=rho,
+        charge_states=charge_states,
+        elements=elements,
+        partial_densities=partial_densities,
         rayleigh_weight=rayleigh_weight,
-        overlord_state=setup.overlord_state,
         ipd=0.0,
         sif=sif,
+        user_defined_inputs=None,
     )
+
+    mcss_norm = kernel.overlord_state.atomic_number
 
     bf_tot, ff_tot, dsf, WR, ff_i, bf_i = kernel.run(k=k, w=omega_array)
     ff_tot[np.isnan(ff_tot)] = 0.0
@@ -418,37 +388,31 @@ def compare_mcss_xdave_ch_static():
     user_defined_inputs = dict()
 
     models = ModelOptions(polarisation_model="NUMERICAL", bf_model="SCHUMACHER", lfc_model="NONE", ipd_model="NONE")
-    setup = Setup(
-        mass_density=rho,
-        electron_temperature=T,
-        ion_temperature=T,
-        elements=elements,
-        partial_densities=partial_densities,
-        charge_states=charge_states,
-        user_defined_inputs=user_defined_inputs,
-    )
 
-    states = setup.states
     k = q / BOHR_RADIUS
 
-    # omega_array = np.arange(-4000, 4000, 0.5) * eV_TO_J
-
-    mcss_norm = setup.overlord_state.atomic_number
+    omega_array = np.arange(-4000, 4000, 0.5) * eV_TO_J
 
     # angle = calculate_angle(q=q, energy=beam_energy)
-    rayleigh_weight = WR_mcss / mcss_norm
-    # sif = np.zeros_like(omega_array)
+    rayleigh_weight = WR_mcss  # / mcss_norm
+    sif = np.zeros_like(omega_array)
 
     kernel = xDave(
         models=models,
-        states=states,
-        fractions=partial_densities,
+        electron_temperature=T,
+        ion_temperature=T,
+        mass_density=rho,
+        charge_states=charge_states,
+        elements=elements,
+        partial_densities=partial_densities,
         rayleigh_weight=rayleigh_weight,
-        overlord_state=setup.overlord_state,
         ipd=0.0,
-        sif=None,
-        ocp_flag=setup.ocp_flag,
+        sif=sif,
+        user_defined_inputs=None,
     )
+
+    mcss_norm = kernel.overlord_state.atomic_number
+
     k = np.linspace(0.5 / BOHR_RADIUS, 15 / BOHR_RADIUS, 200)
     k, Sab, WR, qs, fs = kernel.run_static_mode(k=k)
 
@@ -491,7 +455,7 @@ def compare_mcss_xdave_ch_static():
 
     ax = axes[1, 1]
     ax.plot(k * BOHR_RADIUS, WR, label=r"$W_R$", c="darkgreen", ls="-.")
-    ax.plot(k_mcss, WR_mcss / setup.overlord_state.atomic_number, label=r"MCSS: $W_R$/AN", c="limegreen", ls=":")
+    ax.plot(k_mcss, WR_mcss / kernel.overlord_state.atomic_number, label=r"MCSS: $W_R$/AN", c="limegreen", ls=":")
     ax.set_xlabel(r"$k$ [$a_B^{-1}$]")
     ax.set_ylabel(r"$W_R$ [ ]")
     ax.legend()
@@ -501,7 +465,7 @@ def compare_mcss_xdave_ch_static():
 
 
 if __name__ == "__main__":
-    # compare_mcss_xdave_be()
+    compare_mcss_xdave_be()
     # compare_mcss_xdave_ch()
     # compare_mcss_xdave_c()
-    compare_mcss_xdave_ch_static()
+    # compare_mcss_xdave_ch_static()
