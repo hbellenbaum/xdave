@@ -1,5 +1,5 @@
 # Ionic form factors
-from xdave.constants import BOHR_RADIUS
+from constants import BOHR_RADIUS
 from numpy import zeros, arange
 
 

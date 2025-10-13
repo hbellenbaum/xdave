@@ -1,5 +1,5 @@
-from xdave.constants import *
-from xdave.unit_conversions import *
+from constants import *
+from unit_conversions import *
 
 import numpy as np
 

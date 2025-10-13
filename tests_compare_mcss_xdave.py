@@ -1,4 +1,11 @@
-from xdave.xdave import *
+import sys
+
+sys.path.insert(1, "/home/bellen85/code/dev/xdave/xdave")
+sys.path.insert(1, "/home/bellen85/code/dev/xdave/mcss_tests")
+
+from xdave import *
+
+# from utils import calculate_q
 from mcss_tests.run_mcss_sim import run_be_sr_mode, run_ch_sr_mode, run_c_sr_mode, run_ch_ar_mode
 
 import numpy as np

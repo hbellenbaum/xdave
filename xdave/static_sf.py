@@ -1,17 +1,17 @@
 # Ionic form factors
-from xdave.models import ModelOptions
-from xdave.plasma_state import PlasmaState
+from models import ModelOptions
+from plasma_state import PlasmaState
 
-from xdave.bridge_functions import *
-from xdave.utils import (
+from bridge_functions import *
+from utils import (
     forward_transform_fft,
     inverse_transform_fft,
     forward_transform_fftn,
     inverse_transform_fftn,
 )
-from xdave.constants import BOHR_RADIUS, ELEMENTARY_CHARGE, PI, BOLTZMANN_CONSTANT, VACUUM_PERMITTIVITY
-from xdave.potentials import *
-from xdave.unit_conversions import *
+from constants import BOHR_RADIUS, ELEMENTARY_CHARGE, PI, BOLTZMANN_CONSTANT, VACUUM_PERMITTIVITY
+from potentials import *
+from unit_conversions import *
 
 from scipy.interpolate import interp1d
 from scipy.optimize import minimize

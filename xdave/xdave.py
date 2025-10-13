@@ -1,12 +1,12 @@
-from xdave.plasma_state import PlasmaState, get_rho_T_from_rs_theta, get_fractions_from_Z, get_fractions_from_Z_partial
-from xdave.models import ModelOptions
-from xdave.freefree_dsf import FreeFreeDSF
-from xdave.boundfree_dsf import BoundFreeDSF
-from xdave.rayleigh_weight import OCPRayleighWeight, MCPRayleighWeight
-from xdave.lfc import LFC
-from xdave.ipd import get_ipd
+from plasma_state import PlasmaState, get_rho_T_from_rs_theta, get_fractions_from_Z, get_fractions_from_Z_partial
+from models import ModelOptions
+from freefree_dsf import FreeFreeDSF
+from boundfree_dsf import BoundFreeDSF
+from rayleigh_weight import OCPRayleighWeight, MCPRayleighWeight
+from lfc import LFC
+from ipd import get_ipd
 
-from xdave.utils import (
+from utils import (
     calculate_q,
     laplace,
     get_atomic_mass_for_element,
@@ -16,8 +16,8 @@ from xdave.utils import (
     get_mcss_wr_from_status_file,
     load_mcss_result,
 )
-from xdave.unit_conversions import *
-from xdave.constants import *
+from unit_conversions import *
+from constants import *
 
 import numpy as np
 from scipy.signal import fftconvolve

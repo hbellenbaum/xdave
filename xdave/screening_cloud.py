@@ -1,10 +1,10 @@
-from xdave.models import ModelOptions
-from xdave.plasma_state import PlasmaState
-from xdave.constants import ELEMENTARY_CHARGE, BOHR_RADIUS
-from xdave.potentials import *
-from xdave.freefree_dsf import FreeFreeDSF
+from models import ModelOptions
+from plasma_state import PlasmaState
+from constants import ELEMENTARY_CHARGE, BOHR_RADIUS
+from potentials import *
+from freefree_dsf import FreeFreeDSF
 
-from xdave.unit_conversions import *
+from unit_conversions import *
 
 import numpy as np
 import matplotlib.pyplot as plt

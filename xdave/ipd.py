@@ -1,7 +1,7 @@
-from xdave.plasma_state import PlasmaState
+from plasma_state import PlasmaState
 
-from xdave.constants import *
-from xdave.unit_conversions import *
+from constants import *
+from unit_conversions import *
 
 # from fermi_integrals import fermi_integral
 
