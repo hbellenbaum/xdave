@@ -222,7 +222,7 @@ class FreeFreeDSF:
             self.state.electron_temperature, self.state.free_electron_number_density, ELECTRON_MASS
         )  # [J]
         alpha = mu / EF
-        eta = self.state.reduced_chemical_potential_tobias(theta=theta)
+        # eta = self.state.reduced_chemical_potential_tobias(theta=theta)
         # alpha = eta * t
 
         def g_ancarni(lambda_val):
@@ -446,6 +446,7 @@ def test():
         ion_temperature=Te,
         mass_density=rho,
         charge_state=charge_state,
+        binding_energies=None,
         # frequency=omega,
         atomic_mass=atomic_mass,
         atomic_number=atomic_number,
@@ -454,8 +455,6 @@ def test():
     # models = ModelOptions(polarisation_model=model)
     fig, axes = plt.subplots(1, 1, figsize=(14, 8))
     colors = ["magenta", "crimson", "orange", "dodgerblue", "lightgreen", "lightgray", "yellow", "cyan"]
-
-    # fig2, axes2 = plt.subplots(1, 2, figsize=(12, 6))
 
     for k, cs in zip(ks, colors):
         # int_terms = []
@@ -471,7 +470,7 @@ def test():
         # reals_rpa = np.zeros_like(omega_array)
         # for i in range(0, len(omega_array)):
         w = omega_array  # [i]
-        kernel = FreeFreeDSF(state=state, models=models)
+        kernel = FreeFreeDSF(state=state)
         # int_term = kernel._real_dielectric_rpa(k=k, w=w)
         dsfs = kernel.get_dsf(k=k, w=w, lfc=lfc, model="NUMERICAL_RPA")
         dsfs2 = kernel.get_dsf(k=k, w=w, lfc=lfc, model="DANDREA_FIT")
@@ -488,11 +487,6 @@ def test():
         # dsfs_new *= 1 / J_TO_eV  # DIRAC_CONSTANT
         # twinx = axes.twinx()
         # axes.plot(omega_new * J_TO_eV, dsfs_new / J_TO_eV, label=f"q={q} 1/aB", c=cs)  #  /  np.max(dsfs_new)
-
-        # axes2[0].plot(omega_array * J_TO_eV, reals_dandrea, label=f"Fit")
-        # axes2[0].plot(omega_array * J_TO_eV, reals_rpa - 1, label=f"RPA")
-        # axes2[1].plot(omega_array * J_TO_eV, ims_dandrea, label=f"Fit")
-        # axes2[1].plot(omega_array * J_TO_eV, ims_rpa, label=f"RPA")
 
         # axes[1].plot(omega_array * J_TO_eV, real_dielectrics, label=f"k={k}", c=cs)
         # axes[2].plot(omega_array * J_TO_eV, im_dielectric, label=f"k={k}", c=cs)

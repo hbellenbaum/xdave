@@ -32,10 +32,10 @@ class LFC:
         self.theta = state.theta
         self.rs = state.rs
 
-        if state.electron_number_density == 0.0:
-            print(f"Cannot calculate LFC.")
-        else:
-            self.initialize(state=state)
+        # if state.electron_number_density == 0.0:
+        #     print(f"Cannot calculate LFC.")
+        # else:
+        #     self.initialize(state=state)
 
     def initialize(self, state: PlasmaState):
         self.z = 4 * (4 / (9 * PI)) ** (1 / 6) * np.sqrt(self.rs / PI)
@@ -49,6 +49,9 @@ class LFC:
     def calculate_lfc(self, k, w, model="DORNHEIM_ESA"):
         if self.state.charge_state == 0:
             return 0.0
+        elif model == "NONE":
+            return 0.0
+        self.initialize(state=self.state)
         if model == "DORNHEIM_ESA":
             return self._dornheim_esa(k, w)
         elif model == "PADE_INTERP":

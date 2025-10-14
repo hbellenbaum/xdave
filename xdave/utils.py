@@ -208,9 +208,21 @@ def laplace(tau, E, wff, wbf):
 
 
 def get_atomic_mass_for_element(e):
+    ANs, elements, amus, _ = np.genfromtxt(
+        "/home/bellen85/code/dev/xdave/xdave/data/atomic_data.csv",
+        delimiter=",",
+        skip_header=1,
+        dtype=None,
+        unpack=True,
+    )
+    idx = np.where(elements == e)[0][0]
+    atomic_weight = amus[idx]
+    atomic_number = ANs[idx]
+    return atomic_weight, atomic_number
+
     # y = element(int(AN))
     # amu = y.atomic_weight
-    return element(str(e)).atomic_weight, element(str(e)).atomic_number
+    # return element(str(e)).atomic_weight, element(str(e)).atomic_number
 
 
 def get_binding_energies_from_elements(AN):
@@ -326,3 +338,8 @@ def inverse_transform_fftn(yk, k, norm):
     yr[..., 1:] = norm * sum_vals
 
     return yr
+
+
+if __name__ == "__main__":
+    amu = get_atomic_mass_for_element(e="He")
+    print(amu)

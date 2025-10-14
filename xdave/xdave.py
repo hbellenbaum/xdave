@@ -31,6 +31,7 @@ import os
 warnings.filterwarnings("ignore", category=FutureWarning)
 
 
+# @profile
 class xDave:
     """
     A class containing all functionality to create dynamic structure factors from the Chihara decomposition.
@@ -475,7 +476,7 @@ def test_be():
     ks = calculate_q(angle=angles, energy=beam_energy) / BOHR_RADIUS  # 1/a_B
     omega_array = np.linspace(-800, 1400, 1000)  # eV
 
-    WR = 0.1
+    # WR = 0.1
 
     models = ModelOptions(
         polarisation_model="NUMERICAL", bf_model="SCHUMACHER", lfc_model="DORNHEIM_ESA", ipd_model="STEWART_PYATT"
@@ -527,7 +528,7 @@ def test_be():
     ax.legend()
     ax.set_xlim(-800, 750)
 
-    plt.show()
+    # plt.show()
     fig.savefig(f"beryllium_test_rs={rs}_theta={theta}_Z={Z_mean}_q={q:.2f}.pdf", dpi=200)
 
 
