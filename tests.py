@@ -1,11 +1,17 @@
-from xdave.plasma_state import PlasmaState, get_rho_T_from_rs_theta, get_fractions_from_Z, get_rho_T_from_rs_theta_SI
-from xdave.models import ModelOptions
-from xdave.unit_conversions import *
-from xdave.constants import BOHR_RADIUS, PLANCK_CONSTANT
-from xdave.freefree_dsf import FreeFreeDSF
-from xdave.boundfree_dsf import BoundFreeDSF
-from xdave.utils import calculate_angle, calculate_q, load_itcf_from_file, load_mcss_result
-from xdave.xdave import xDave
+import sys
+
+sys.path.insert(1, "/home/bellen85/code/dev/xdave/xdave")
+sys.path.insert(1, "/home/bellen85/code/dev/xdave/mcss_tests")
+
+
+from plasma_state import PlasmaState, get_rho_T_from_rs_theta, get_fractions_from_Z, get_rho_T_from_rs_theta_SI
+from models import ModelOptions
+from unit_conversions import *
+from constants import BOHR_RADIUS, PLANCK_CONSTANT, ELECTRON_MASS
+from freefree_dsf import FreeFreeDSF
+from boundfree_dsf import BoundFreeDSF
+from utils import calculate_angle, calculate_q, load_itcf_from_file, load_mcss_result
+from xdave import xDave
 
 import numpy as np
 import matplotlib.pyplot as plt
@@ -521,8 +527,8 @@ def compare_hydrogen_against_pimc_and_mcss():
     Z_mean = 0.51
     ipd_best_fit = -3.43  # eV
     rho, T = get_rho_T_from_rs_theta(rs=rs, theta=theta, atomic_mass=atomic_mass)
-    rho *= g_per_cm3_TO_kg_per_m3
-    T *= eV_TO_K
+    # rho *= g_per_cm3_TO_kg_per_m3
+    # T *= eV_TO_K
 
     N = 14
     pimc_data_dir = f"/home/bellen85/code/dev/itcf_fitting/data/N{N}_rs{rs}_theta{theta:.0f}"
@@ -538,7 +544,7 @@ def compare_hydrogen_against_pimc_and_mcss():
 
     binding_energies = np.array([-13.6 * eV_TO_J])
 
-    omega_array = np.linspace(-70, 200, 9000) * eV_TO_J
+    omega_array = np.linspace(-70, 200, 9000)  # * eV_TO_J
 
     # WR = 1.2
 
@@ -551,7 +557,7 @@ def compare_hydrogen_against_pimc_and_mcss():
     elements = np.array(["H", "H"])
     partial_densities = np.array([0.485, 0.515])
     charge_states = np.array([0.0, 1.0])
-    user_defined_inputs = None
+    user_defined_inputs = {"ipd": ipd_best_fit}
 
     sif = stats.norm.pdf(omega_array, 0, 2 * eV_TO_J)
     sif /= np.max(sif)
@@ -565,29 +571,24 @@ def compare_hydrogen_against_pimc_and_mcss():
         mass_density=rho,
         charge_states=charge_states,
         partial_densities=partial_densities,
-        ipd=ipd_best_fit,
         user_defined_inputs=user_defined_inputs,
     )
 
     q = q_value
-    k = q / BOHR_RADIUS
+    k = q  # / BOHR_RADIUS
 
     bf_tot, ff_tot, dsf, Wr, iff, ibf = xdave.run(k=k, w=omega_array)
-    tau_array, F_tot_inel, F_wff, F_wbf = xdave.get_itcf(
-        tau=tau_array, w=omega_array * J_TO_eV, ff=ff_tot / J_TO_eV, bf=bf_tot / J_TO_eV
-    )
+    _, F_tot_inel, F_wff, F_wbf = xdave.get_itcf(tau=tau_array, w=omega_array, ff=ff_tot, bf=bf_tot)
 
-    tau_array, F_tot_inel_mcss, F_wff_mcss, F_wbf_mcss = xdave.get_itcf(
-        tau=tau_array, w=mcss_En, ff=mcss_wff, bf=mcss_wbf
-    )
+    _, F_tot_inel_mcss, F_wff_mcss, F_wbf_mcss = xdave.get_itcf(tau=tau_array, w=mcss_En, ff=mcss_wff, bf=mcss_wbf)
 
     fig, axes = plt.subplots(1, 2, figsize=(14, 10))
 
     # plt.figure()
     ax = axes[0]
-    ax.plot(omega_array * J_TO_eV, bf_tot / J_TO_eV, label="BF", c="navy")
-    ax.plot(omega_array * J_TO_eV, ff_tot / J_TO_eV, label="FF", c="crimson")
-    ax.plot(omega_array * J_TO_eV, dsf / J_TO_eV, label="Tot", c="darkgreen")
+    ax.plot(omega_array, bf_tot, label="BF", c="navy")
+    ax.plot(omega_array, ff_tot, label="FF", c="crimson")
+    ax.plot(omega_array, dsf, label="Tot", c="darkgreen")
     ax.plot(mcss_En, mcss_wbf, label="MCSS: BF", c="navy", ls="-.")
     ax.plot(mcss_En, mcss_wff, label="MCSS: FF", c="crimson", ls="-.")
     ax.plot(mcss_En, mcss_wbf + mcss_wff, label="MCSS", c="darkgreen", ls="-.")
@@ -597,7 +598,9 @@ def compare_hydrogen_against_pimc_and_mcss():
     ax.set_ylabel(r"DSF [1/eV]")
     # plt.show()
 
-    inelastic, elastic, spectrum = xdave.convolve_with_sif(sif=sif, bf=bf_tot, ff=ff_tot, WR=WR)
+    inelastic, elastic, spectrum = xdave.convolve_with_sif(
+        sif=sif, bf=bf_tot, ff=ff_tot, WR=WR, type="GAUSSIAN", fwhm=10, omega=omega_array
+    )
     mcss_tot = mcss_ff + mcss_bf + mcss_el
 
     # ax = axes[1]

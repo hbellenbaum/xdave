@@ -10,9 +10,10 @@ class OCPRayleighWeight:
         self.state = state
         self.ion_core_radius = ion_core_radius
 
-    def get_rayleigh_weight(self, k, sf_model, ii_potential, bridge_function, screening="NONE"):
+    def get_rayleigh_weight(self, k, sf_model, ii_potential, bridge_function, screening="NONE", return_full=False):
         sf = OCPStaticStructureFactor(state=self.state, ion_core_radius=self.ion_core_radius)
 
+        # TODO(Hannah): check this part, I'm really unsure about this...
         if screening == "NONE":
             Siik = sf.get_ii_static_structure_factor(
                 k=k,
@@ -30,7 +31,10 @@ class OCPRayleighWeight:
                 return_full=False,
             )
 
-        return Siik
+        if return_full:
+            return k, Siik, Siik, np.zeros_like(k), np.zeros_like(k)
+        else:
+            return Siik
 
 
 class MCPRayleighWeight:

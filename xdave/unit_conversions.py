@@ -65,6 +65,9 @@ m_TO_fm = 1e15
 fm_TO_m = 1e-15
 
 aB_TO_A = 0.529177249
+A_TO_aB = 1 / aB_TO_A
+per_A_TO_per_aB = 1 / A_TO_aB
+per_aB_TO_per_A = 1 / per_A_TO_per_aB
 
 
 ######################

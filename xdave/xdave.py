@@ -32,6 +32,21 @@ warnings.filterwarnings("ignore", category=FutureWarning)
 
 
 class xDave:
+    """
+    A class containing all functionality to create dynamic structure factors from the Chihara decomposition.
+    corresponding ITCFs and convolve the output with a source function to create a spectrum.
+
+    Attributes:
+        mass_density (float): in g/cc
+        electron_temperature (float): in eV
+        ion_temperature (float): in eV, currently, these can be set separately, but the models assume equilibrium
+        elements (array): array of the element of each species by symbol
+        partial_densities (array): array of the partial densities for each species
+        charge_states (array): array of charge state for each species
+        models (ModelOptions): instance of the class model options to specify the models used for each
+        enforce_fsum (bool): flag to specify whether the bound-free output should be forced to obey the f-sum, default is False
+        user_defined_inputs (dict): list containing values set by the user for LFC, IPD and the ion core radius; this is optional
+    """
 
     def __init__(
         self,
@@ -47,16 +62,20 @@ class xDave:
     ):
         assert np.sum(partial_densities) == 1.0, f"Fractional densities do not add up 1. Try again sucker."
         self.number_of_states = len(partial_densities)
-        self.mass_density = mass_density
-        self.electron_temperature = electron_temperature
-        self.ion_temperature = ion_temperature
+        self.mass_density = mass_density * g_per_cm3_TO_kg_per_m3
+        self.electron_temperature = electron_temperature * eV_TO_K
+        self.ion_temperature = ion_temperature * eV_TO_K
+        if not np.isclose(electron_temperature, ion_temperature, rtol=1.0e-6):
+            raise UserWarning(
+                f"You have set non-equilibrium conditions. The models implemented currently do not allow this and will give non-sensical results. Sorry :/"
+            )
         self.partial_densities = partial_densities
         self.elements = elements
         self.charge_states = charge_states
         self.models = models
 
         self.enforce_fsum = enforce_fsum
-        self.tau_array = np.linspace(0, 1 / (electron_temperature * K_TO_eV), 1000)
+        self.tau_array = np.linspace(0, 1 / (electron_temperature), 1000)
 
         self.states, self.overlord_state = self.initialize()
 
@@ -74,6 +93,15 @@ class xDave:
                 self.ion_core_radius = user_defined_inputs["ion_core_radius"]
 
     def initialize(self):
+        """
+        Initialize an xDave object.
+        This will define a mean plasma state and individual states describing each species.
+        Note that temperatures are kept consistent for each species, mass density is accounted for using the partial densities.
+
+        Returns:
+            states (array): array of states for each species
+            overlord_state (PlasmaState): instance of class PlasmaState containing the mean variables
+        """
         states = []
         Z_mean = 0.0
         AN_mean = 0.0
@@ -114,6 +142,9 @@ class xDave:
         return np.array(states), overlord_state
 
     def _bf_norm(self, w, ff, bf, k):
+        """
+        Calculate normalization on the BF factor to enforce the f-sum rule.
+        """
         k /= BOHR_RADIUS
         f_sum = k**2 / 2
         F_tot, F_wff, F_wbf = self.get_itcf(tau=self.tau_array, w=w, ff=ff, bf=bf)
@@ -123,11 +154,29 @@ class xDave:
         return A
 
     def run(self, k, w):
+        """
+        Main run function. Internally, everything is run in SI units.
+
+        Parameters:
+            k (float): scattering wavenumber in units of a_B^{-1}
+            w (array): array of energies in eV
+
+        Returns:
+            array: total bound-free DSF in units of 1/eV
+            array: total free-free DSF in units of 1/eV
+            float: Rayleigh Weight, dimensionless
+            array: Contributions to the ff DSF by each species in units of 1/eV (non-sensical, for completeness only)
+            array: Contributions to the bf DSF by each species in units of 1/eV
+        """
+        # k /= BOHR_RADIUS
+        k_value = k / BOHR_RADIUS
+        # w *= eV_TO_J
+        omega_array = w.copy() * eV_TO_J
 
         self._print_logo()
 
         lfc_kernel = LFC(state=self.overlord_state)
-        lfc = lfc_kernel.calculate_lfc(k=k, w=w, model=self.models.lfc_model)
+        lfc = lfc_kernel.calculate_lfc(k=k_value, w=omega_array, model=self.models.lfc_model)
         print(f"Calculated LFC={lfc}")
 
         if self.ipd_eV is not None:
@@ -138,13 +187,13 @@ class xDave:
             print(f"Calculated IPD={ipd * J_TO_eV} eV")
 
         ff = FreeFreeDSF(state=self.overlord_state)
-        ff_dsf = ff.get_dsf(k=k, w=w, lfc=lfc, model=self.models.polarisation_model)
+        ff_dsf = ff.get_dsf(k=k_value, w=omega_array, lfc=lfc, model=self.models.polarisation_model)
         # the factor of Z/AN is needed to match MCSS results, I will need to figure out where it comes from
         ff_tot = ff_dsf * self.overlord_state.charge_state / self.overlord_state.atomic_number
 
-        bf_tot = np.zeros_like(w)
-        ff_i = np.zeros((len(self.states), len(w)))
-        bf_i = np.zeros((len(self.states), len(w)))
+        bf_tot = np.zeros_like(omega_array)
+        ff_i = np.zeros((len(self.states), len(omega_array)))
+        bf_i = np.zeros((len(self.states), len(omega_array)))
 
         print(f"Mean charge state = {self.overlord_state.charge_state}.")
 
@@ -164,18 +213,17 @@ class xDave:
                 )
 
             bf = BoundFreeDSF(state=state)
-            bf_dsf = bf.get_dsf(ZA=state.atomic_number, Zb=state.Zb, k=k, w=w, Eb=Eb, model=self.models.bf_model)
+            bf_dsf = bf.get_dsf(
+                ZA=state.atomic_number, Zb=state.Zb, k=k_value, w=omega_array, Eb=Eb, model=self.models.bf_model
+            )
             bf_tot += x * bf_dsf  # * state.charge_state  # / state.atomic_number
             bf_i[i] = x * bf_dsf  # * state.charge_state  # / state.atomic_number
-
-            # This is where the HNC stuff will have to go eventually
-            # WR = self.rayleigh_weight
 
         # Calculate the Rayleigh weight
         if self.ocp_flag:
             wr_kernel = OCPRayleighWeight(state=self.overlord_state, ion_core_radius=1.0 * BOHR_RADIUS)
             rayleigh_weight = wr_kernel.get_rayleigh_weight(
-                k=k,
+                k=k_value,
                 sf_model=self.models.static_structure_factor_approximation,
                 ii_potential=self.models.ii_potential,
                 bridge_function=self.models.bridge_function,
@@ -186,7 +234,7 @@ class xDave:
                 overlord_state=self.overlord_state, states=self.states, ion_core_radius=1.0 * BOHR_RADIUS
             )
             rayleigh_weight = wr_kernel.get_rayleigh_weight(
-                k=k,
+                k=k_value,
                 lfc=lfc,
                 sf_model=self.models.static_structure_factor_approximation,
                 ii_potential=self.models.ii_potential,
@@ -202,36 +250,54 @@ class xDave:
         # Divide by the atomic number to be consistent with the ff component
         bf_tot /= self.overlord_state.atomic_number
         dsf = ff_tot + bf_tot
-        return bf_tot, ff_tot, dsf, rayleigh_weight, ff_i, bf_i
+        return bf_tot / J_TO_eV, ff_tot / J_TO_eV, dsf / J_TO_eV, rayleigh_weight, ff_i / J_TO_eV, bf_i / J_TO_eV
 
     def run_static_mode(self, k):
+        """
+        Main run function. Internally, everything is run in SI units.
+
+        Parameters:
+            k (array): array of scattering wavenumbers in units of a_B^{-1}
+
+        Returns:
+        k, Sab, rayleigh_weight, qs, fs
+            array: array of k values in units of a_B^{-1}
+            array: array of static structure factors for each species, non-dimensional
+            float: Rayleigh Weight, dimensionless
+            array: array of the screening cloud for each species, non-dimensional
+            array: array of the form factors for each species, non-dimensional
+        """
+
+        k_array = k.copy() / BOHR_RADIUS
         lfc_kernel = LFC(state=self.overlord_state)
-        lfc = lfc_kernel.calculate_lfc(k=k, w=0, model=self.models.lfc_model)
+        lfc = lfc_kernel.calculate_lfc(k=k_array, w=0, model=self.models.lfc_model)
         print(f"Calculated LFC={lfc}")
 
         if self.ocp_flag:
             wr_kernel = OCPRayleighWeight(state=self.overlord_state, ion_core_radius=1.0 * BOHR_RADIUS)
-            return wr_kernel.get_rayleigh_weight(
-                k=k,
+            _, Sab, rayleigh_weight, qs, fs = wr_kernel.get_rayleigh_weight(
+                k=k_array,
                 sf_model=self.models.static_structure_factor_approximation,
                 ii_potential=self.models.ii_potential,
                 bridge_function=self.models.bridge_function,
                 screening="HARD_CORE",
             )
 
-        wr_kernel = MCPRayleighWeight(
-            overlord_state=self.overlord_state, states=self.states, ion_core_radius=1.0 * BOHR_RADIUS
-        )
-        k, Sab, rayleigh_weight, qs, fs = wr_kernel.get_rayleigh_weight(
-            k=k,
-            lfc=lfc,
-            sf_model=self.models.static_structure_factor_approximation,
-            ii_potential=self.models.ii_potential,
-            ee_potential=self.models.ee_potential,
-            ei_potential=self.models.ei_potential,
-            screening_model=self.models.screening_model,
-            return_full=True,
-        )
+        else:
+            wr_kernel = MCPRayleighWeight(
+                overlord_state=self.overlord_state, states=self.states, ion_core_radius=1.0 * BOHR_RADIUS
+            )
+            _, Sab, rayleigh_weight, qs, fs = wr_kernel.get_rayleigh_weight(
+                k=k_array,
+                lfc=lfc,
+                sf_model=self.models.static_structure_factor_approximation,
+                ii_potential=self.models.ii_potential,
+                ee_potential=self.models.ee_potential,
+                ei_potential=self.models.ei_potential,
+                screening_model=self.models.screening_model,
+                return_full=True,
+            )
+        # k *= BOHR_RADIUS
         return k, Sab, rayleigh_weight, qs, fs
 
     def convolve_with_sif(self, bf, ff, WR, omega=None, sif=None, fwhm=10, type="GAUSSIAN"):
@@ -253,7 +319,7 @@ class xDave:
     def get_itcf(self, w, ff, bf, tau=None):
         if tau is None:
             tau = self.tau_array
-        return laplace(tau=self.tau_array, E=w, wff=ff, wbf=bf)
+        return laplace(tau=tau, E=w, wff=ff, wbf=bf)
 
     def save_result(self, fname, dirname, w, tau, ff, bf, dsf, F_inel, F_bf, F_ff, mode="all"):
         if not os.path.exists(dirname):
@@ -400,15 +466,14 @@ def test_setup():
 def test_be():
     rs = 3
     theta = 1
-    # atomic_mass = 9.0121831  # amu
     Z_mean = 3.73
-    rho = 22.0 * g_per_cm3_TO_kg_per_m3
-    T = 150 * eV_TO_K
+    rho = 22.0  # g/cc
+    T = 150  # eV
 
-    beam_energy = 9.0e3  # * eV_TO_J
+    beam_energy = 9.0e3  # eV
     angles = np.array([13, 30, 45, 60, 80, 100, 120, 140, 160])
-    ks = calculate_q(angle=angles, energy=beam_energy) / BOHR_RADIUS
-    omega_array = np.linspace(-800, 1400, 1000) * eV_TO_J
+    ks = calculate_q(angle=angles, energy=beam_energy) / BOHR_RADIUS  # 1/a_B
+    omega_array = np.linspace(-800, 1400, 1000)  # eV
 
     WR = 0.1
 
@@ -434,31 +499,31 @@ def test_be():
         user_defined_inputs=user_defined_inputs,
     )
 
-    k = 8 / ang_TO_m
-    q = k * BOHR_RADIUS
+    k = 8 / A_TO_aB
+    q = k  # 1/ aB
 
     bf_tot, ff_tot, dsf, WR, _, _ = xdave.run(k=k, w=omega_array)
+    ff_tot[np.isnan(ff_tot)] = 0.0
 
     print(f"Calculate Rayleigh weight: {WR}")
 
     fig, axes = plt.subplots(1, 2, figsize=(14, 10))
 
     ax = axes[0]
-    ax.plot(omega_array * J_TO_eV, bf_tot / J_TO_eV, label="BF")
-    ax.plot(omega_array * J_TO_eV, ff_tot / J_TO_eV, label="FF")
-    ax.plot(omega_array * J_TO_eV, dsf / J_TO_eV, label="Tot")
+    ax.plot(omega_array, bf_tot, label="BF")
+    ax.plot(omega_array, ff_tot, label="FF")
+    ax.plot(omega_array, dsf, label="Tot")
     ax.legend()
 
-    sif = stats.norm.pdf(omega_array, 0, 2 * eV_TO_J)
+    sif = stats.norm.pdf(omega_array, 0, 2)
     sif /= np.max(sif)
-    WR *= J_TO_eV
 
     inelastic, elastic, spectrum = xdave.convolve_with_sif(sif=sif, bf=bf_tot, ff=ff_tot, WR=WR, type="USER_INPUT")
 
     ax = axes[1]
-    ax.plot(omega_array * J_TO_eV, inelastic / np.max(spectrum), label="inel", ls="-.")
-    ax.plot(omega_array * J_TO_eV, elastic / np.max(spectrum), label="el", ls="-.")
-    ax.plot(omega_array * J_TO_eV, spectrum / np.max(spectrum), label="tot", ls="-.")
+    ax.plot(omega_array, inelastic / np.max(spectrum), label="inel", ls="-.")
+    ax.plot(omega_array, elastic / np.max(spectrum), label="el", ls="-.")
+    ax.plot(omega_array, spectrum / np.max(spectrum), label="tot", ls="-.")
     ax.legend()
     ax.set_xlim(-800, 750)
 
