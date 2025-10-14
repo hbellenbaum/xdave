@@ -234,7 +234,16 @@ class xDave:
         )
         return k, Sab, rayleigh_weight, qs, fs
 
-    def convolve_with_sif(self, sif, bf, ff, WR):
+    def convolve_with_sif(self, bf, ff, WR, omega=None, sif=None, fwhm=10, type="GAUSSIAN"):
+        if type == "GAUSSIAN":
+            assert omega is not None
+            assert fwhm is not None
+            sigma = fwhm / 2.355
+            sif = 1 / np.sqrt(2 * np.pi * sigma**2) * np.exp(-(omega**2) / (2 * sigma**2))
+        elif type == "USER_INPUT":
+            assert sif is not None
+        else:
+            raise NotImplementedError(f"SIF type {type} not recognized.")
         tot_dsf = bf + ff
         inelastic = fftconvolve(tot_dsf, sif, mode="same")  # + WR * sif
         elastic = WR * sif
@@ -263,6 +272,13 @@ class xDave:
                 np.transpose(np.array([tau, F_ff, F_bf, F_inel])),
                 delimiter=",",
                 header="tau[1/eV] F_FF F_BF F_Inel",
+            )
+        else:
+            np.savetxt(
+                output_file,
+                np.transpose(np.array([w, ff, bf, dsf])),
+                delimiter=",",
+                header="w[J] FF[1/J] BF[1/J] Inel[1/J]",
             )
         print(f"Saving output to file {fname}")
 
@@ -364,7 +380,7 @@ def test_setup():
     sif /= np.max(sif)
     WR *= J_TO_eV
 
-    inelastic, elastic, spectrum = kernel.convolve_with_sif(sif=sif, bf=bf_tot, ff=ff_tot, WR=WR)
+    inelastic, elastic, spectrum = kernel.convolve_with_sif(sif=sif, bf=bf_tot, ff=ff_tot, WR=WR, type="USER_INPUT")
 
     ax = axes[0, 1]
     ax.set_title("Spectrum")
@@ -437,7 +453,7 @@ def test_be():
     sif /= np.max(sif)
     WR *= J_TO_eV
 
-    inelastic, elastic, spectrum = xdave.convolve_with_sif(sif=sif, bf=bf_tot, ff=ff_tot, WR=WR)
+    inelastic, elastic, spectrum = xdave.convolve_with_sif(sif=sif, bf=bf_tot, ff=ff_tot, WR=WR, type="USER_INPUT")
 
     ax = axes[1]
     ax.plot(omega_array * J_TO_eV, inelastic / np.max(spectrum), label="inel", ls="-.")
