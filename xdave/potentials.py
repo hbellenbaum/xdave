@@ -39,6 +39,14 @@ def ei_coulomb_k(Qa, k):
     return coulomb_k(Qa=Qa, Qb=1, k=k)
 
 
+def ei_yukawa_r(Qa, r, alpha):
+    return yukawa_r(Qa=Qa, Qb=-1, r=r, alpha=alpha)
+
+
+def ei_yukawa_k(Qa, k, alpha):
+    return yukawa_k(Qa=Qa, Qb=-1, k=k, alpha=alpha)
+
+
 def effective_ei_coulomb_r(Qa, r):
     return -Qa * ELEMENTARY_CHARGE**2 * COULOMB_CONSTANT / r
 
