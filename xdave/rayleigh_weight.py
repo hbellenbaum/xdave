@@ -60,7 +60,7 @@ class MCPRayleighWeight:
             fs = np.zeros((nspecies, len(k)))
 
         for i in (0, nspecies - 1):
-            qs[i, :] = ScreeningCloud(state=states[i]).get_screening_cloud(
+            qs[i, :] = ScreeningCloud(state=self.states[i], overlord_state=self.overlord_state).get_screening_cloud(
                 k=k,
                 ion_core_radius=self.ion_core_radius,
                 lfc=lfc,

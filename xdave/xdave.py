@@ -11,7 +11,6 @@ from utils import (
     laplace,
     get_atomic_mass_for_element,
     get_binding_energies_from_elements,
-    get_emission_lines_for_element,
     calculate_angle,
     get_mcss_wr_from_status_file,
     load_mcss_result,
@@ -107,28 +106,42 @@ class xDave:
         Z_mean = 0.0
         AN_mean = 0.0
         ANs = []
+        atomic_masses = []
         amu_mean = 0.0
+
+        # TODO(Hannah): clean this up, two for loops seems unnecessary
         for i in range(0, self.number_of_states):
             element = self.elements[i]
             amu, AN = get_atomic_mass_for_element(element)
+            atomic_masses.append(amu * ATOMIC_MASS_UNIT)
             ANs.append(AN)
             x = self.partial_densities[i]
             Z = self.charge_states[i]
             assert Z <= AN, f"Ionization degree for state {i} is larger than the atomic number {AN}. Check your setup."
             binding_energies = get_binding_energies_from_elements(AN)
+
+            Z_mean += x * Z
+            AN_mean += x * AN
+            amu_mean += x * amu
+
+        sum_term = np.sum(self.partial_densities * atomic_masses)
+        for i in range(0, self.number_of_states):
+            x = self.partial_densities[i]
+            Z = self.charge_states[i]
+            ni = x * self.mass_density / sum_term
+            AN = ANs[i]
+            amu = atomic_masses[i] / ATOMIC_MASS_UNIT  # this is also dumb!
             state = PlasmaState(
                 electron_temperature=self.electron_temperature,
                 ion_temperature=self.ion_temperature,
                 mass_density=x * self.mass_density,
+                ion_number_density=ni,
                 charge_state=Z,
                 binding_energies=binding_energies,
                 atomic_mass=amu,
                 atomic_number=AN,
             )
             states.append(state)
-            Z_mean += x * Z
-            AN_mean += x * AN
-            amu_mean += x * amu
 
         overlord_state = PlasmaState(
             electron_temperature=self.electron_temperature,
