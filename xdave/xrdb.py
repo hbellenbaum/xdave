@@ -5,6 +5,7 @@ Scraping data from x-ray data booklet.
 import pandas as pd
 import requests
 import re
+import csv
 
 import tempfile
 import pdfplumber
@@ -147,5 +148,79 @@ def extract_emission_line_data():
         os.unlink(tmp.name)
 
 
+def parse_line_data(line):
+    # remove footnotes
+    line = re.sub(r"[\*\†\‡]", "", line)
+    # split on whitespace
+    parts = line.strip().split()
+    if len(parts) < 4:
+        return None  # need at least Z, symbol, mass, density
+
+    # first column: Z
+    try:
+        z = int(parts[0])
+    except ValueError:
+        return None
+
+    # second column: name
+    symbol = parts[1]
+
+    def parse_number(s):
+        s_clean = re.sub(r"[^0-9\.\-eE]", "", s)
+        try:
+            return float(s_clean)
+        except ValueError:
+            return None
+
+    mass = parse_number(parts[2])
+    dens = parse_number(parts[3])
+
+    return {"atomic_number": z, "symbol": symbol, "atomic_mass": mass, "density": dens}
+
+
+def scrape_pdf_with_symbol(pdf_path):
+    data = []
+    with pdfplumber.open(pdf_path) as pdf:
+        for page in pdf.pages:
+            text = page.extract_text()
+            lines = text.split("\n")
+
+            # search for header
+            start = 0
+            for i, line in enumerate(lines):
+                if re.search(r"\bZ\b", line) and "Density" in line:
+                    start = i + 1
+                    break
+
+            for line in lines[start:]:
+                row = parse_line_data(line)
+                if row:
+                    data.append(row)
+    return data
+
+
+def extract_atomic_data():
+    url = "https://xdb.lbl.gov/Section5/Table_5.2.pdf"
+    print("Downloading PDF...")
+    resp = requests.get(url)
+    resp.raise_for_status()
+
+    with tempfile.NamedTemporaryFile(suffix=".pdf", delete=False) as tmp:
+        tmp.write(resp.content)
+        tmp_path = tmp.name
+
+    print("Extracting data from PDF...")
+    data = scrape_pdf_with_symbol(tmp_path)
+
+    output_file = "/home/bellen85/code/dev/xdave/xdave/data/atomic_data_new.csv"
+    with open(output_file, "w", newline="") as f:
+        writer = csv.DictWriter(f, fieldnames=["atomic_number", "symbol", "atomic_mass", "density"])
+        writer.writeheader()
+        writer.writerows(data)
+
+    print(f"Data saved to: {output_file}")
+    print(f"Extracted {len(data)} rows.")
+
+
 if __name__ == "__main__":
-    extract_emission_line_data()
+    extract_atomic_data()

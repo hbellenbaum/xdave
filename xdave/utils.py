@@ -1,7 +1,7 @@
 from constants import DIRAC_CONSTANT, SPEED_OF_LIGHT, BOHR_RADIUS, PI
 from unit_conversions import eV_TO_J
 
-from mendeleev import element
+# from mendeleev import element
 from scipy.fft import dst
 import pandas as pd
 import numpy as np
