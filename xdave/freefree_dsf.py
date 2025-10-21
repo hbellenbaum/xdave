@@ -26,17 +26,7 @@ class FreeFreeDSF:
         self.state = state
 
     def get_dsf(self, k, w, lfc, model="NUMERICAL_RPA"):
-        # dielectric_func = self.dielectric_function(k=k, w=w)
-        # im_dielectric = -np.imag(dielectric_func) / ((np.real(dielectric_func)) ** 2 + (np.imag(dielectric_func)) ** 2)
 
-        # S_EG = (
-        #     -1
-        #     / (1 - np.exp(-w / (BOLTZMANN_CONSTANT * self.state.electron_temperature)))
-        #     * VACUUM_PERMITTIVITY
-        #     * k**2
-        #     / (PI * ELEMENTARY_CHARGE**2 * self.state.free_electron_number_density)
-        #     * im_dielectric
-        # )
         if self.state.free_electron_number_density == 0.0:
             return 0.0
 
@@ -45,8 +35,8 @@ class FreeFreeDSF:
         chilfc = chi0 / (1 - Vee * (1 - lfc) * chi0)
         im_suspectibility = np.imag(chilfc)
         S_EG_LFC = (
-            -(1)  # DIRAC_CONSTANT
-            / (PI * self.state.free_electron_number_density)  # * Vee)
+            -(1)
+            / (PI * self.state.free_electron_number_density)
             * 1
             / (1 - np.exp(-w / (BOLTZMANN_CONSTANT * self.state.electron_temperature)))
             * im_suspectibility
@@ -63,8 +53,7 @@ class FreeFreeDSF:
             pol_func = self.dandrea_fit(k=k, omega=w)
             dielectric_func = 1 - potential_func * pol_func
         elif model == "NUMERICAL":
-            dielectric_func = self.rpa_numerical_dielectric_func(k=k, w=w)  # * potential_func
-            # dielectric_func = self.rpa_numerical_dielectric_func_pontus(k=k, w=w)
+            dielectric_func = self.rpa_numerical_dielectric_func(k=k, w=w)
         else:
             dielectric_func = self.rpa_numerical_dielectric_func(k=k, w=w)
             warnings.warn(f"Model {model} not recognized. Overwriting using NUMERICAL.")
@@ -103,8 +92,6 @@ class FreeFreeDSF:
         vF = DIRAC_CONSTANT * kF / ELECTRON_MASS  # m/s
         U = w / (k * vF * DIRAC_CONSTANT)  # dimensionless
         Z = k / (2 * kF)  # dimensionless
-        # Z = np.abs(k / (2 * kF))
-        # U = w / (4 * Z * EF)
         prefactor = -(3 * k**2 / (512 * PI * gamma**2 * Z**3 * ELEMENTARY_CHARGE_SQR * COULOMB_CONSTANT))
         input1 = (U - Z - 1) / (U - Z + 1)
         input2 = (U + Z - 1) / (U + Z + 1)
@@ -127,8 +114,8 @@ class FreeFreeDSF:
         kF = self.state.fermi_wave_number(self.state.free_electron_number_density)
         vF = DIRAC_CONSTANT * kF / ELECTRON_MASS  # m/s
 
-        q0 = k / (2 * kF)  # k / (2 * kF)0.5 * k / kF
-        w0 = w / (k * vF * DIRAC_CONSTANT)  # 0.25 * w / (EF * q0)
+        q0 = k / (2 * kF)  # []
+        w0 = w / (k * vF * DIRAC_CONSTANT)  # []
 
         def lindhard_func(x):
             real_part = -x - 1 / 2 * (1 - x**2) * np.log(np.abs((x + 1) / (x - 1)))
@@ -143,12 +130,6 @@ class FreeFreeDSF:
 
     def rpa_numerical_dielectric_func(self, k, w):
         ## taken from Eqn. (5.5) in K. W\"unsch PhD Thesis (2011)
-        # kF = self.state.fermi_wave_number(self.state.free_electron_number_density)
-        # wF = self.state.fermi_frequency(self.state.free_electron_number_density, ELECTRON_MASS)
-
-        # if use_long_wavelength_limit:
-        #     return
-
         im_part = self._im_dielectric_rpa(k, w)  # [#]
         real_part = self._real_dielectric_rpa(k, w)
         dielectric_function = real_part + 1.0j * im_part
@@ -211,13 +192,11 @@ class FreeFreeDSF:
         t = self.state.electron_temperature * BOLTZMANN_CONSTANT / EF  # [#]
         t = self.state.electron_temperature / TF  # [#]
 
-        theta = t  # BOLTZMANN_CONSTANT * self.state.electron_temperature / EF
+        theta = t  # []
         mu = self.state.chemical_potential_ichimaru(
             self.state.electron_temperature, self.state.free_electron_number_density, ELECTRON_MASS
         )  # [J]
         alpha = mu / EF
-        # eta = self.state.reduced_chemical_potential_tobias(theta=theta)
-        # alpha = eta * t
 
         def g_ancarni(lambda_val):
             # if lambda_val < 0.0:
@@ -232,17 +211,6 @@ class FreeFreeDSF:
             B = alpha / t
 
             def f_prime(X):
-                # y = A * X**2 - B
-                # # scalar implementation; if X can be array, vectorize with np.where
-                # if y >= 0.0:
-                #     # exp(-y) is safe (<= 1)
-                #     exp_neg = np.exp(-y)
-                #     s = 1.0 / (1.0 + exp_neg)
-                # else:
-                #     # exp(y) is safe (<= 1)
-                #     exp_pos = np.exp(y)
-                #     s = exp_pos / (1.0 + exp_pos)
-                # return -2.0 * A * X * (s * (1.0 - s))
                 y = A * X**2 - B
                 s = np.empty_like(y)
 
@@ -281,6 +249,7 @@ class FreeFreeDSF:
         return real_part
 
     def rpa_correction_collisional(self, k, w):
+        # TODO(Hannah): this is currently broken
         collision_freq = 0.0  # complex number!!!!!!!
 
         real_part = None
@@ -414,105 +383,3 @@ class FreeFreeDSF:
         pol_func = Pi_aa_0_MB * (Re_X_kw + 1.0j * Im_X_kw) / (4.0 * F_p0p5 * q)
 
         return pol_func
-
-
-def test():
-    import matplotlib.pyplot as plt
-
-    rs = 2
-    theta = 1
-    rho, Te = get_rho_T_from_rs_theta(rs=rs, theta=theta)
-    ks = np.array((0.5, 1.0, 2.0, 4.0)) / BOHR_RADIUS  #  0.5, 1.0, 2.0, 4.0
-    rho *= g_per_cm3_TO_kg_per_m3
-    Te *= eV_TO_K
-    # Te = 200  #
-    charge_state = 1.0
-    atomic_mass = 1.0
-    atomic_number = 1.0
-    lfc = 0.0
-
-    models = ModelOptions(polarisation_model="NUMERICAL")
-    models2 = ModelOptions(polarisation_model="DANDREA_FIT")
-
-    omega_array = np.linspace(-100, 100, 100) * eV_TO_J  # + 8.5e3 * eV_TO_J
-    state = PlasmaState(
-        electron_temperature=Te,
-        ion_temperature=Te,
-        mass_density=rho,
-        charge_state=charge_state,
-        binding_energies=None,
-        # frequency=omega,
-        atomic_mass=atomic_mass,
-        atomic_number=atomic_number,
-    )
-
-    # models = ModelOptions(polarisation_model=model)
-    fig, axes = plt.subplots(1, 1, figsize=(14, 8))
-    colors = ["magenta", "crimson", "orange", "dodgerblue", "lightgreen", "lightgray", "yellow", "cyan"]
-
-    for k, cs in zip(ks, colors):
-        # int_terms = []
-        # real_dielectrics = np.zeros_like(omega_array)
-        # im_dielectric = np.zeros_like(omega_array)
-        dsfs = np.zeros_like(omega_array)
-        dsfs2 = np.zeros_like(omega_array)
-        q = k * BOHR_RADIUS
-
-        # ims_dandrea = np.zeros_like(omega_array)
-        # ims_rpa = np.zeros_like(omega_array)
-        # reals_dandrea = np.zeros_like(omega_array)
-        # reals_rpa = np.zeros_like(omega_array)
-        # for i in range(0, len(omega_array)):
-        w = omega_array  # [i]
-        kernel = FreeFreeDSF(state=state)
-        # int_term = kernel._real_dielectric_rpa(k=k, w=w)
-        dsfs = kernel.get_dsf(k=k, w=w, lfc=lfc, model="NUMERICAL_RPA")
-        dsfs2 = kernel.get_dsf(k=k, w=w, lfc=lfc, model="DANDREA_FIT")
-        # dielectric_func, im_part_rpa, real_part_rpa = kernel.rpa_numerical_dielectric_func(k, w)
-        # real_dielectrics[i] = np.real(dielectric_func)
-        # im_dielectric[i] = np.imag(dielectric_func)
-        # dsfs[i] = dsf
-        # dsfs2[i] = dsf2
-
-        idx = np.argwhere(np.isnan(dsfs))
-        dsfs_new = np.delete(dsfs, idx)
-        dsfs2_new = np.delete(dsfs2, idx)
-        omega_new = np.delete(omega_array, idx)
-        # dsfs_new *= 1 / J_TO_eV  # DIRAC_CONSTANT
-        # twinx = axes.twinx()
-        # axes.plot(omega_new * J_TO_eV, dsfs_new / J_TO_eV, label=f"q={q} 1/aB", c=cs)  #  /  np.max(dsfs_new)
-
-        # axes[1].plot(omega_array * J_TO_eV, real_dielectrics, label=f"k={k}", c=cs)
-        # axes[2].plot(omega_array * J_TO_eV, im_dielectric, label=f"k={k}", c=cs)
-
-        fname = f"validation/ff_dsf/4hannah_rs_{int(rs)}_theta_{int(theta)}_{q}.txt"
-        dat_j = np.genfromtxt(fname=fname, skip_header=22)
-        # print(dat_j)
-        axes.plot(
-            dat_j[:, 0] * RYDBERG_TO_eV,
-            dat_j[:, 4] / RYDBERG_TO_eV,
-            ls=":",
-            label=f"Jan: q={q}",
-            marker="*",
-            markevery=50,
-            c=cs,
-        )  # / np.max(dat_j[:, 4])
-        # ax0.plot(dat_j[:, 0] * RYBBERG_TO_eV, dat_j[:, 5] / np.max(dat_j[:, 5]), c=c, ls="dotted", label=f"LFC: q={q}")
-        axes.plot(omega_new * J_TO_eV, dsfs2_new / J_TO_eV, label=f"Fit: q={q}", c=cs, ls="-.")  #  /  np.max(dsfs_new)
-
-    axes.set_xlabel(r"$\omega$ [eV]")
-    axes.set_ylabel(r"DSF [1/eV]")
-    # axes[1].set_xlabel(r"$\omega$ [eV]")
-    # axes[1].set_ylabel(r"$Re\{\epsilon^{RPA}\}$")
-    # axes[2].set_xlabel(r"$\omega$ [eV]")
-    # axes[2].set_ylabel(r"$Im\{\epsilon^{RPA}\}$")
-    axes.legend()
-
-    # axes2[0].legend()
-    plt.tight_layout()
-    plt.show()
-    # fig.savefig("ff_dsf_test3.pdf", dpi=200)
-
-
-if __name__ == "__main__":
-    test()
