@@ -1,6 +1,6 @@
 # Ionic form factors
 from constants import BOHR_RADIUS
-from numpy import zeros, arange
+from numpy import zeros
 
 
 class ScreeningConstants(object):

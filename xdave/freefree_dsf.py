@@ -2,20 +2,14 @@ from constants import *
 from unit_conversions import *
 from maths import log1pexp
 from scipy import integrate
-
-
-# from fermi_integrals import fermi_integral
 from plasma_state import PlasmaState, get_rho_T_from_rs_theta
-
-from scipy.optimize import root_scalar
-from scipy.integrate import quad
-
 from models import ModelOptions
+
+from plasmapy.formulary.mathematics import Fermi_integral as fdi
+
 import numpy as np
 
 import warnings
-
-from plasmapy.formulary.mathematics import Fermi_integral as fdi
 
 
 def effective_coulomb_potential(ionisation, wave_number):

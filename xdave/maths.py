@@ -1,4 +1,4 @@
-from numpy import exp, log1p, expm1, log
+from numpy import exp, log1p
 
 
 def is_iterable(test_variable):

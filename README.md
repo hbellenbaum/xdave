@@ -2,4 +2,63 @@
 
 X-Ray Diagnostics, Analysis, Verification and Exploration Code
 
-### XRTS Analysis
+xDave is an open-source Python code for analyisng of x-ray Thomson scattering spectra and obtaining quick estimates of the dynamic structure factor in the chemical picture.
+
+The code uses the Chihara decomposition [1] to split the elastic scattering into bound-free/free-bound and free-free scattering contributions.
+
+It is based on the work by Glenzer et al.[2] and Gregori et al.[3], with the multi-component description taken from Wuensch et al.[4].
+
+## Getting started
+
+More detail to be added.
+
+The code was written using Python (Verion 3.12.8) using mostly standard library packages.
+
+For now, the following python packages need to be installed outside of the standard distribution (e.g. conda):
+
+<!-- ``numpy``
+
+``matplotlib``
+
+``pandas``
+
+``scipy`` -->
+
+``plasmapy``: for details on installation see [here](https://pypi.org/project/plasmapy/).
+
+## Usage
+
+A test suite is included which can be used for building examples.
+
+## Citation and Attribution
+
+TBA.
+
+## Contributions
+
+All suggestions for improvements or additional models are welcome. Submit a merge request or contact the author: h.bellenbaum@hzdr.de .
+
+
+## Authors and Acknowledgements
+
+Version 1 was developed by Hannah Bellenbaum ([CASUS], [HZDR]).
+
+
+*This work was partially supported by the Center for Advanced Systems Understanding ([CASUS]), financed by Germany’s Federal Ministry of Education and Research and the Saxon state government out of the State budget approved by the Saxon State Parliament. This work has received funding from the European Union's Just Transition Fund (JTF) within the project Röntgenlaser-Optimierung der Laserfusion (ROLF), contract number 5086999001, co-financed by the Saxon state government out of the State budget approved by the Saxon State Parliament. This work has received funding from the European Research Council (ERC) under the European Union’s Horizon 2022 research and innovation programme (Grant agreement No. 101076233, "PREXTREME"). 
+Views and opinions expressed are however those of the authors only and do not necessarily reflect those of the European Union or the European Research Council Executive Agency. Neither the European Union nor the granting authority can be held responsible for them.*
+
+
+
+
+[1]: Chihara, J. (2000). "Interaction of photons with plasmas and liquid metals - photoabsorption and scattering." *J. Phys. Condens. Matter, 12*
+
+[2]: Glenzer, S., and Redmer, R. (2009). "X-ray Thomson scattering in high energy density plasmas." *Reviews of Modern Physics, 81*
+
+[3]: Gregori, G., et al. (2003). "Theoretical model of x-ray scattering as a dense matter probe." *Physical Review E, 67*
+
+[4]: Wünsch, K., et al. (2008). "Structure of strongly coupled multicomponent plasmas." *Physical Review E, 77*
+
+
+
+[CASUS]: https://www.casus.science
+[HZDR]: https://www.hzdr.de

@@ -17,7 +17,6 @@ from scipy.interpolate import interp1d
 from scipy.optimize import minimize
 import matplotlib.pyplot as plt
 import numpy as np
-import os
 
 
 def h0(eta, chi):
