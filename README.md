@@ -12,7 +12,7 @@ It is based on the work by Glenzer et al.[2] and Gregori et al.[3], with the mul
 
 More detail to be added.
 
-The code was written using Python (Verion 3.12.8) using mostly standard library packages.
+The code was written using Python (Version 3.12.8) using mostly standard library packages.
 
 For now, the following python packages need to be installed outside of the standard distribution (e.g. conda):
 
@@ -48,7 +48,7 @@ Version 1 was developed by Hannah Bellenbaum ([CASUS], [HZDR]).
 Views and opinions expressed are however those of the authors only and do not necessarily reflect those of the European Union or the European Research Council Executive Agency. Neither the European Union nor the granting authority can be held responsible for them.*
 
 
-
+## References
 
 [1]: Chihara, J. (2000). "Interaction of photons with plasmas and liquid metals - photoabsorption and scattering." *J. Phys. Condens. Matter, 12*
 

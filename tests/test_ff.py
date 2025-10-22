@@ -9,10 +9,10 @@ from models import ModelOptions
 from freefree_dsf import FreeFreeDSF
 
 import numpy as np
+import matplotlib.pyplot as plt
 
 
 def test_ff():
-    import matplotlib.pyplot as plt
 
     rs = 2
     theta = 1

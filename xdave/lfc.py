@@ -32,19 +32,19 @@ class LFC:
         self.theta = state.theta
         self.rs = state.rs
 
-        # if state.electron_number_density == 0.0:
-        #     print(f"Cannot calculate LFC.")
-        # else:
-        #     self.initialize(state=state)
-
     def initialize(self, state: PlasmaState):
         self.z = 4 * (4 / (9 * PI)) ** (1 / 6) * np.sqrt(self.rs / PI)
 
+        TF = self.state.fermi_temperature(ELECTRON_MASS, self.state.free_electron_number_density)
+        Tq = TF * K_TO_eV / (1.32510 - 1.779 * np.sqrt(self.rs))
+        Tee = np.sqrt((self.state.electron_temperature * K_TO_eV) ** 2 + Tq**2)
+        Tee *= eV_TO_K
+
         self.Gamma_ee = state.electron_electron_coupling_parameter(
-            number_density=state.free_electron_number_density, temperature=state.electron_temperature
+            number_density=state.free_electron_number_density, temperature=Tee
         )
         self.gee0 = self._ee_pair_distribution_function(z=self.z)
-        self.geeT = self._ee_pair_distribution_function_finite_T(Te=state.electron_temperature)
+        self.geeT = self._ee_pair_distribution_function_finite_T(Te=Tee)
 
     def calculate_lfc(self, k, w, model="DORNHEIM_ESA"):
         if self.state.charge_state == 0:
@@ -86,7 +86,7 @@ class LFC:
         )
         Gamma_ee = self.Gamma_ee
         C_sc = 1.0754
-        H0 = C_sc * np.sqrt(Gamma_ee) / (1.0 + (C_sc / (Gamma_ee * SQRT_THREE)) ** 4) ** 0.25
+        H0 = C_sc * Gamma_ee ** (3 / 2) / (Gamma_ee**4 + (C_sc / SQRT_THREE)) ** 0.25
 
         def integral(u):
             X = np.tan(u * PI / 2)
@@ -126,7 +126,7 @@ class LFC:
         )
         denominator = 2 * rs**3 * (c * sqrt_rs + d * rs + e * sqrt_rs**3 + 1) ** 2
         diff2 = -numerator / denominator
-        return 0.25 - PI * (4 / (9 * PI)) ** (1 / 3) / 24 * (rs**3 * diff2 - 2 * rs * diff1)
+        return 0.25 - (PI * (4 / (9 * PI)) ** (1 / 3) / 24) * (rs**3 * diff2 - 2 * rs * diff1)
 
     def _f_extended(self, t, a, b, c):
         return a + b * t + c * t**1.5
@@ -343,10 +343,12 @@ class LFC:
         and Farid et al., Phys. Rev. B 48 (1993)
         """
         kF = self.state.fermi_wave_number(self.state.free_electron_number_density)
+        kF = (3 * np.pi * np.pi * self.state.free_electron_number_density) ** (1 / 3)
         Q = k / kF
         gee0 = self.gee0
-
+        # gee0 = 7.2687180436081550e-002  # self.gee0
         gamma0 = self._gamma_0()
+        # gamma0 = 0.26046315889562777  # self._gamma_0()
 
         A = 0.029
         B = 9 / 16 * gamma0 - 3 / 64 * (1 - gee0) - 16 / 15 * A
@@ -355,12 +357,19 @@ class LFC:
         if np.isclose(Q, 2.0, rtol=1.0e-4):
             G_k = A * Q**4 + B * Q**2 + C
         else:
+            # G_k = (
+            #     A * Q**4
+            #     + B * Q**2
+            #     + C
+            #     + (A * Q**4 + (B + 8 * A / 3) * Q**2 - C) * (4 - Q**2) / (4 * Q) * np.log(np.abs((2 + Q) / (2 - Q)))
+            # )
             G_k = (
                 A * Q**4
                 + B * Q**2
                 + C
-                + (A * Q**4 + (B + 8 * A / 3) * Q**2 - C) * (4 - Q**2) / (4 * Q) * np.log(np.abs((2 + Q) / (2 - Q)))
+                + (A * Q**4 + (B + 8 * A / 3) * Q**2 - C) * ((4 - Q**2) / (4 * Q)) * np.log(abs((2 + Q) / (2 - Q)))
             )
+
         return G_k
 
     def _geldart_vosko(self, k, w):
@@ -368,10 +377,24 @@ class LFC:
         D.J.W. Geldart, S.H. Vosko, Can. J. Phys. 44 (1966), DOI: 10.1139/p64-183
         Details in Gregori et al., High Energy Density Phys. 3 (2007)
         """
+        TF = self.state.fermi_temperature(mass=ELECTRON_MASS, number_density=self.state.free_electron_number_density)
         kF = self.state.fermi_wave_number(self.state.free_electron_number_density)
-        geeT = self.geeT
+        Tq = TF * K_TO_eV / (1.32510 - 1.779 * np.sqrt(self.rs))
+        Tee = np.sqrt((self.state.electron_temperature * K_TO_eV) ** 2 + Tq**2)
+        Gamma_ee = self.Gamma_ee
         gammaT = self._gamma_T()
-        G_k = k**2 / (kF**2 / gammaT + k**2 / (1 - geeT))
+        z = ELECTRON_MASS * ELEMENTARY_CHARGE**3 * COULOMB_CONSTANT**2 / (Tee * DIRAC_CONSTANT**2)
+
+        def integrand(u):
+            x = np.tan(HALF_PI * u)
+            f = x * np.exp(-z * x**2.0) / (np.exp(PI / x) - 1.0)
+            return f * HALF_PI * (1.0 + x**2)
+
+        Csc = 1.0754
+        geeT = np.exp(Csc * Gamma_ee**1.5 / ((Csc / np.sqrt(3.0)) ** 4 + Gamma_ee**4) ** (1 / 4))
+        gbin = np.sqrt(2 * PI) * z**1.5 * integrate.quad(integrand, 0, 1)[0]
+
+        G_k = k**2 / (kF**2 / gammaT + k**2 / (1 - gbin * geeT))
         return G_k
 
     def _pade_interp_static(self, k, w):
@@ -449,364 +472,3 @@ class LFC:
             * np.log(np.abs((2 * kF + k) / (2 * kF - k)))
         )
         return G_k
-
-
-def test():
-    import matplotlib.pyplot as plt
-
-    ks = np.linspace(0.01, 6, 100) / BOHR_RADIUS
-    rs = 2
-    theta = 1
-
-    rho, T = get_rho_T_from_rs_theta(rs=rs, theta=theta)
-    rho *= g_per_cm3_TO_kg_per_m3
-    T *= eV_TO_K
-
-    state = PlasmaState(
-        electron_temperature=T, ion_temperature=T, mass_density=rho, charge_state=2.0, atomic_mass=1, atomic_number=2
-    )
-
-    lfc_interp = np.zeros_like(ks)
-    lfc_ui = np.zeros_like(ks)
-    lfc_gv = np.zeros_like(ks)
-    lfc_dornheim = np.zeros_like(ks)
-    lfc_farid = np.zeros_like(ks)
-
-    for i in range(0, len(ks)):
-        k = ks[i]
-        models = ModelOptions()
-        kernel = LFC(models=models, state=state)
-        lfc_interp[i] = kernel.calculate_lfc(k=k, w=0.0, model="PADE_INTERP")
-        lfc_ui[i] = kernel.calculate_lfc(k=k, w=0.0, model="UI")
-        lfc_gv[i] = kernel.calculate_lfc(k=k, w=0.0, model="GV")
-        lfc_dornheim[i] = kernel.calculate_lfc(k=k, w=0.0, model="DORNHEIM_ESA")
-        lfc_farid[i] = kernel.calculate_lfc(k=k, w=0.0, model="FARID")
-
-    kF = state.fermi_wave_number(state.free_electron_number_density)
-    plt.figure()
-    plt.plot(ks / kF, lfc_interp, label="Interp")
-    plt.plot(ks / kF, lfc_ui, label="UI")
-    plt.plot(ks / kF, lfc_gv, label="GV")
-    plt.plot(ks / kF, lfc_farid, label="Farid")
-    plt.plot(ks / kF, lfc_dornheim, label="ESA")
-    plt.xlabel(r"$k/k_F$")  # [$a_B^{-1}$]")
-    plt.ylabel(r"$G_{ee}(k)$")
-    plt.legend()
-    plt.show()
-
-
-def test_gregori_2007():
-    import matplotlib.pyplot as plt
-
-    ne = 2.5e23  # cm^{-3}
-    rs = 1.86
-    T1 = 20  # eV
-    T2 = 4  # eV
-
-    rho, _ = get_rho_T_from_rs_theta(rs=rs, theta=1)
-
-    state1 = PlasmaState(
-        electron_temperature=T1 * eV_TO_K,
-        mass_density=rho * g_per_cm3_TO_kg_per_m3,
-        ion_temperature=T1 * eV_TO_K,
-        charge_state=1.0,
-        atomic_mass=1,
-        atomic_number=1,
-    )
-
-    print(f"ne = {state1.free_electron_number_density * per_m3_TO_per_cm3} 1/cc")
-    print(rf"$\theta$ = {state1.theta}")
-
-    state2 = PlasmaState(
-        electron_temperature=T2 * eV_TO_K,
-        mass_density=rho * g_per_cm3_TO_kg_per_m3,
-        ion_temperature=T2 * eV_TO_K,
-        charge_state=1.0,
-        atomic_mass=1,
-        atomic_number=1,
-    )
-
-    print(f"ne = {state2.free_electron_number_density * per_m3_TO_per_cm3} 1/cc")
-    print(f"$\\theta$ = {state2.theta}")
-
-    kernel1 = LFC(models=ModelOptions(), state=state1)
-    kernel2 = LFC(models=ModelOptions(), state=state2)
-
-    ks1 = np.linspace(0, 6, 500) * state1.fermi_wave_number(state1.free_electron_number_density)
-    ks2 = np.linspace(0, 6, 500) * state2.fermi_wave_number(state2.free_electron_number_density)
-    lfcs1 = np.zeros_like(ks1)
-    lfcs2 = np.zeros_like(ks2)
-
-    for i in range(0, len(ks1)):
-        lfcs1[i] = kernel1.calculate_lfc(k=ks1[i], w=0, model="PADE_INTERP")
-    for i in range(0, len(ks2)):
-        lfcs2[i] = kernel2.calculate_lfc(k=ks2[i], w=0, model="PADE_INTERP")
-
-    datT1 = np.genfromtxt(f"validation/lfc/Gregori_2007_Fig1a_rs_1.86_T_20eV.csv", delimiter=",")
-    datT2 = np.genfromtxt(f"validation/lfc/Gregori_2007_Fig1a_rs_1.86_T_4eV.csv", delimiter=",")
-
-    plt.figure()
-    plt.plot(
-        ks1 / state1.fermi_wave_number(state1.free_electron_number_density), lfcs1, label=f"T=20", ls="-.", c="navy"
-    )
-    plt.plot(datT1[:, 0], datT1[:, 1], label=f"Gregori et al., T=20", ls="solid", c="navy")
-    plt.plot(
-        ks2 / state2.fermi_wave_number(state2.free_electron_number_density), lfcs2, label=f"T=4", ls="-.", c="crimson"
-    )
-    plt.plot(datT2[:, 0], datT2[:, 1], label=f"Gregori et al., T=20", ls="solid", c="crimson")
-    plt.legend()
-    plt.show()
-    # plt.savefig(f"gregori_test.pdf", dpi=200)
-
-
-def test_fortmann_2010():
-    import matplotlib.pyplot as plt
-
-    ne = 2.5e23  # cm^{-3}
-    rs = 2
-    T = 10  #
-
-    rho, _ = get_rho_T_from_rs_theta(rs=rs, theta=1)
-
-    state = PlasmaState(
-        electron_temperature=T * eV_TO_K,
-        mass_density=rho * g_per_cm3_TO_kg_per_m3,
-        ion_temperature=T * eV_TO_K,
-        charge_state=1.0,
-        atomic_mass=1,
-        atomic_number=1,
-    )
-
-    kernel = LFC(models=ModelOptions(), state=state)
-
-    ks = np.linspace(0, 4, 100) * state.fermi_wave_number(state.free_electron_number_density)
-    lfcs_iu = np.zeros_like(ks)
-    lfcs_FARID = np.zeros_like(ks)
-
-    for i in range(0, len(ks)):
-        lfcs_iu[i] = kernel.calculate_lfc(k=ks[i], w=0, model="UI")
-        lfcs_FARID[i] = kernel.calculate_lfc(k=ks[i], w=0, model="FARID")
-
-    dat_iu = np.genfromtxt(f"validation/lfc/Fortmann_2010_Fig2_utsumi_ichimaru.csv", delimiter=",")
-    dat_farid = np.genfromtxt(f"validation/lfc/Fortmann_2010_Fig2_farid.csv", delimiter=",")
-
-    plt.figure()
-    plt.plot(ks / state.fermi_wave_number(state.free_electron_number_density), lfcs_iu, label=f"UI", ls="-.", c="navy")
-    plt.plot(dat_iu[:, 0], dat_iu[:, 1], label=f"Fortmann et al., UI", ls="solid", c="navy")
-    plt.plot(
-        ks / state.fermi_wave_number(state.free_electron_number_density),
-        lfcs_FARID,
-        label=f"FARID",
-        ls="-.",
-        c="crimson",
-    )
-    plt.plot(dat_farid[:, 0], dat_farid[:, 1], label=f"Fortmann et al., Farid", ls="solid", c="crimson")
-    plt.legend()
-    plt.show()
-    # plt.savefig(f"fortmann_test.pdf", dpi=200)
-
-
-def test_farid():
-    import matplotlib.pyplot as plt
-
-    rss = np.array([1, 2, 5, 10, 15])
-
-    colors = ["navy", "crimson", "magenta", "dodgerblue", "limegreen"]
-
-    plt.figure()
-
-    for rs, c in zip(rss, colors):
-        rho, T = get_rho_T_from_rs_theta(rs=rs, theta=1)
-        state = PlasmaState(
-            electron_temperature=T * eV_TO_K,
-            mass_density=rho * g_per_cm3_TO_kg_per_m3,
-            ion_temperature=T * eV_TO_K,
-            charge_state=1.0,
-            atomic_mass=1,
-            atomic_number=1,
-        )
-        kF = state.fermi_wave_number(state.free_electron_number_density)
-        ks = np.linspace(0, 5, 500) * kF
-        lfcs = np.zeros_like(ks)
-        lfcs_iu = np.zeros_like(ks)
-
-        kernel = LFC(models=ModelOptions(), state=state)
-
-        for i in range(0, len(ks)):
-            lfcs[i] = kernel.calculate_lfc(k=ks[i], w=0, model="FARID")
-            lfcs_iu[i] = kernel.calculate_lfc(k=ks[i], w=0, model="UI")
-
-        fn = f"validation/lfc/validation_data/Farid_et_al_Geek0_rs={rs:.0f}.csv"
-        dat = np.genfromtxt(fn, delimiter=",")
-        plt.plot(ks / kF, lfcs, label=f"rs={rs}", ls="-.", c=c)
-        plt.plot(ks / kF, lfcs_iu, label=f"UI: rs={rs}", ls=":", c=c)
-        plt.plot(dat[:, 0], dat[:, 1], label=f"Farid et al., rs={rs}", ls="solid", c=c)
-
-    plt.legend()
-    plt.ylabel(r"$G_{ee}(k)$")
-    plt.xlabel(r"$k/k_F$")
-    plt.show()
-
-
-def test_dornheim_2021():
-    import matplotlib.pyplot as plt
-
-    rs = 2
-    theta1 = 1
-    theta2 = 4
-
-    rho1, T1 = get_rho_T_from_rs_theta(rs=rs, theta=theta1)
-    rho2, T2 = get_rho_T_from_rs_theta(rs=rs, theta=theta2)
-
-    state1 = PlasmaState(
-        electron_temperature=T1 * eV_TO_K,
-        mass_density=rho1 * g_per_cm3_TO_kg_per_m3,
-        ion_temperature=T1 * eV_TO_K,
-        charge_state=1.0,
-        atomic_mass=1,
-        atomic_number=1,
-    )
-    kernel1 = LFC(models=ModelOptions(), state=state1)
-
-    state2 = PlasmaState(
-        electron_temperature=T2 * eV_TO_K,
-        mass_density=rho2 * g_per_cm3_TO_kg_per_m3,
-        ion_temperature=T2 * eV_TO_K,
-        charge_state=1.0,
-        atomic_mass=1,
-        atomic_number=1,
-    )
-    kernel2 = LFC(models=ModelOptions(), state=state2)
-
-    ks = np.linspace(0, 7, 100) * state1.fermi_wave_number(state1.free_electron_number_density)
-    lfc_theta1 = np.zeros_like(ks)
-    lfc_theta2 = np.zeros_like(ks)
-
-    for i in range(0, len(ks)):
-        lfc_theta1[i] = kernel1.calculate_lfc(k=ks[i], w=0, model="DORNHEIM_ESA")
-        lfc_theta2[i] = kernel2.calculate_lfc(k=ks[i], w=0, model="DORNHEIM_ESA")
-
-    if rs == 2:
-        fn = f"validation/lfc/Dornheim_2021_Fig7b"
-        dat_theta1 = np.genfromtxt(fn + f"_theta_{theta1:.0f}.csv", delimiter=",")
-        dat_theta2 = np.genfromtxt(fn + f"_theta_{theta2:.0f}.csv", delimiter=",")
-    elif rs == 5:
-        fn = f"validation/lfc/validation_data/Dornheim_et_al_Geek0_rs=5"
-        dat_theta1 = np.genfromtxt(fn + f"_Theta={theta1:.0f}.csv", delimiter=",")
-        dat_theta2 = np.genfromtxt(fn + f"_Theta={theta2:.0f}.csv", delimiter=",")
-
-    plt.figure()
-    plt.plot(
-        ks / state1.fermi_wave_number(state1.free_electron_number_density), lfc_theta1, label=rf"$\theta$={theta1}"
-    )
-    plt.plot(
-        ks / state2.fermi_wave_number(state2.free_electron_number_density), lfc_theta2, label=rf"$\theta$={theta2}"
-    )
-    plt.plot(dat_theta1[:, 0], dat_theta1[:, 1], label=f"Dornheim et al., theta={theta1}")
-    plt.plot(dat_theta2[:, 0], dat_theta2[:, 1], label=f"Dornheim et al., theta={theta2}")
-    plt.title(rf"$r_s$={rs}")
-    plt.ylabel(r"$G_{ee}(k)$")
-    plt.xlabel(r"$k/k_F$")
-    plt.legend()
-    plt.show()
-    # plt.savefig(f"dornheim_test.pdf", dpi=200)
-
-
-def test_ui():
-    import matplotlib.pyplot as plt
-
-    rss = np.array([1, 4, 10])
-
-    colors = ["navy", "crimson", "magenta", "dodgerblue", "limegreen"]
-
-    plt.figure()
-
-    for rs, c in zip(rss, colors):
-        rho, T = get_rho_T_from_rs_theta(rs=rs, theta=1)
-        state = PlasmaState(
-            electron_temperature=T * eV_TO_K,
-            mass_density=rho * g_per_cm3_TO_kg_per_m3,
-            ion_temperature=T * eV_TO_K,
-            charge_state=1.0,
-            atomic_mass=1,
-            atomic_number=1,
-        )
-        kF = state.fermi_wave_number(state.free_electron_number_density)
-        ks = np.linspace(0, 5, 500) * kF
-        # lfcs = np.zeros_like(ks)
-        lfcs_iu = np.zeros_like(ks)
-
-        kernel = LFC(models=ModelOptions(), state=state)
-
-        for i in range(0, len(ks)):
-            # lfcs[i] = kernel.calculate_lfc(k=ks[i], w=0, model="FARID")
-            lfcs_iu[i] = kernel.calculate_lfc(k=ks[i], w=0, model="UI")
-
-        fn = f"validation/lfc/validation_data/Utsumi_Ichimaru_Geek0_rs={rs:.0f}.csv"
-        dat = np.genfromtxt(fn, delimiter=",")
-        # plt.plot(ks / kF, lfcs, label=f"rs={rs}", ls="-.", c=c)
-        plt.plot(ks / kF, lfcs_iu, label=f"UI: rs={rs}", ls=":", c=c)
-        plt.plot(dat[:, 0], dat[:, 1], label=f"Ichimaru et al., rs={rs}", ls="solid", c=c)
-
-    plt.legend()
-    plt.xlim(0, 5)
-    plt.ylabel(r"$G_{ee}(k)$")
-    plt.xlabel(r"$k/k_F$")
-    plt.show()
-    # plt.savefig(f"ui_test.pdf", dpi=200)
-
-
-def test_gv():
-    import matplotlib.pyplot as plt
-
-    # rs1 = 2
-    # rs2 = 3
-    theta = 1
-    rss = np.array([2, 3])
-
-    colors = ["navy", "crimson", "magenta", "dodgerblue", "limegreen"]
-
-    plt.figure()
-
-    for rs, c in zip(rss, colors):
-        rho, T = get_rho_T_from_rs_theta(rs=rs, theta=1)
-        state = PlasmaState(
-            electron_temperature=T * eV_TO_K,
-            mass_density=rho * g_per_cm3_TO_kg_per_m3,
-            ion_temperature=T * eV_TO_K,
-            charge_state=1.0,
-            atomic_mass=1,
-            atomic_number=1,
-        )
-        kF = state.fermi_wave_number(state.free_electron_number_density)
-        ks = np.linspace(0, 5, 500) * kF
-        # lfcs = np.zeros_like(ks)
-        lfcs_iu = np.zeros_like(ks)
-
-        kernel = LFC(models=ModelOptions(), state=state)
-
-        for i in range(0, len(ks)):
-            # lfcs[i] = kernel.calculate_lfc(k=ks[i], w=0, model="FARID")
-            lfcs_iu[i] = kernel.calculate_lfc(k=ks[i], w=0, model="GV")
-
-        fn = f"/home/bellen85/code/dev/xdave/mcss_tests/mcss_outputs_lfc/lfc=gv_rs={rs:.0f}_theta=1.csv"
-        dat = np.genfromtxt(fn, delimiter=",", skip_header=1)
-        # plt.plot(ks / kF, lfcs, label=f"rs={rs}", ls="-.", c=c)
-        plt.plot(ks / kF, lfcs_iu, label=f"GV: rs={rs}", ls=":", c=c)
-        plt.plot(dat[:, 0], dat[:, -1], label=f"MCSS, rs={rs}", ls="solid", c=c)
-
-    plt.legend()
-    plt.xlim(0, 5)
-    plt.ylabel(r"$G_{ee}(k)$")
-    plt.xlabel(r"$k/k_F$")
-    plt.show()
-
-
-if __name__ == "__main__":
-    # test()
-    test_gv()
-    test_gregori_2007()
-    test_fortmann_2010()
-    test_dornheim_2021()
-    test_farid()
-    test_ui()
