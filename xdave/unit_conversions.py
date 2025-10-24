@@ -37,7 +37,10 @@ J_TO_erg = 10000000
 erg_TO_J = 1 / J_TO_eV
 erg_TO_eV = 624150647996.32
 eV_TO_erg = 1 / erg_TO_eV
-
+Ryd_TO_eV = 13.605693122990  # eV
+eV_TO_Ryd = 1 / Ryd_TO_eV
+Ryd_TO_J = Ryd_TO_eV * eV_TO_J
+J_TO_Ryd = 1 / Ryd_TO_J
 
 ################
 # -- Length -- #

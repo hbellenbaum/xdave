@@ -25,7 +25,14 @@ class ScreeningCloud:
         # )
 
     def get_screening_cloud(
-        self, k, ion_core_radius, lfc=0.0, screening_model="FWS", ee_potential="COULOMB", ei_potential="COULOMB"
+        self,
+        k,
+        ion_core_radius,
+        lfc=0.0,
+        sec_power=2,
+        screening_model="FINITE_WAVELENGTH",
+        ee_potential="COULOMB",
+        ei_potential="COULOMB",
     ):
         screening_length = 0.0
         Zi = self.state.ion_charge
@@ -46,7 +53,9 @@ class ScreeningCloud:
         elif ei_potential == "YUKAWA":
             Uei = ei_yukawa_k(Qa=Zi, k=k, alpha=alpha)
         elif ei_potential == "HARD_CORE":
-            Uei = hard_core_k(Qa=-1, Qb=Zi, k=k, sigma_c=ion_core_radius)
+            Uei = hard_core_ei_k(Qa=-1, Qb=Zi, k=k, sigma_c=ion_core_radius)
+        elif ei_potential == "SOFT_CORE":
+            Uei = soft_core_ei_k(Qa=-1, Qb=Zi, k=k, rcore=ion_core_radius, n=sec_power)
         else:
             raise NotImplementedError(f"Cannot recognize ei-potential {ei_potential}.")
 
@@ -54,6 +63,8 @@ class ScreeningCloud:
             screening_length = self._debye_huckel_screening(k)
         elif screening_model == "FINITE_WAVELENGTH":
             screening_length = self._finite_wavelength_screening_short(k)
+        elif screening_model == "NONE":
+            screening_length = np.zeros_like(k)
         else:
             raise NotImplementedError(f" Model for the screening cloud: {screening_model} not recognised.")
 

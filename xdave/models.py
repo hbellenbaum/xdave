@@ -6,7 +6,7 @@ class ModelOptions:
         ii_potential="YUKAWA",
         ee_potential="YUKAWA",
         polarisation_model="DANDREA_FIT",
-        static_structure_factor_approximation="HNC",
+        sf_model="HNC",
         lfc_model="DORNHEIM_ESA",
         bf_model="SCHUMACHER",
         ipd_model="CROWLEY",
@@ -19,7 +19,7 @@ class ModelOptions:
         self.ei_potential = ei_potential
         self.screening_model = screening_model
         self.polarisation_model = polarisation_model
-        self.static_structure_factor_approximation = static_structure_factor_approximation
+        self.sf_model = sf_model
         self.lfc_model = lfc_model
         self.bf_model = bf_model
         self.ipd_model = ipd_model

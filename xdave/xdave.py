@@ -1,4 +1,4 @@
-from plasma_state import PlasmaState, get_rho_T_from_rs_theta, get_fractions_from_Z, get_fractions_from_Z_partial
+from plasma_state import PlasmaState, get_fractions_from_Z
 from models import ModelOptions
 from freefree_dsf import FreeFreeDSF
 from boundfree_dsf import BoundFreeDSF
@@ -79,18 +79,33 @@ class xDave:
 
         self.states, self.overlord_state = self.initialize()
 
-        self.ipd_eV = None
-        self.user_defined_lfc = None
-        self.ion_core_radius = None
-
         if user_defined_inputs is not None:
             keys = user_defined_inputs.keys()
-            if "ipd" in keys:
-                self.ipd_eV = user_defined_inputs["ipd"]
-            if "lfc" in keys:
-                self.user_defined_lfc = user_defined_inputs["lfc"]
-            if "ion_core_radius" in keys:
-                self.ion_core_radius = user_defined_inputs["ion_core_radius"]
+            self.ipd_eV = user_defined_inputs["ipd"] if "ipd" in keys else None
+            self.user_defined_lfc = user_defined_inputs["lfc"] if "lfc" in keys else None
+            self.ion_core_radius = user_defined_inputs["ion_core_radius"] if "ion_core_radius" in keys else None
+            self.csd_parameters = user_defined_inputs["csd_parameters"] if "csd_parameters" in keys else None
+            self.csd_core_charges = user_defined_inputs["csd_core_charges"] if "csd_core_charges" in keys else None
+            self.sec_core_power = user_defined_inputs["sec_core_power"] if "sec_core_power" in keys else None
+            self.srr_sigma_parameter = (
+                user_defined_inputs["srr_sigma_parameter"] if "srr_sigma_parameter" in keys else None
+            )
+
+        # Some asserts, make sure people are paying attention
+        if self.models.ii_potential == "SRR":
+            assert (
+                self.srr_sigma_parameter is not None and self.sec_core_power is not None
+            ), "You forget to set key parameters for the SSR ii potential."
+        if self.models.ii_potential == "CSD":
+            assert (
+                self.csd_parameters is not None and self.csd_core_charges is not None
+            ), "You forget to set key parameters for the CSD ii potential."
+        if self.models.sf_model == "MSA" or self.models.sf_model:
+            assert (
+                self.ion_core_radius is not None
+            ), "You forgot to set the ion core radius for the MSA static structure factor approximation."
+        if self.models.ii_potential == "SRR":
+            assert self.ion_core_radius is not None, "You forgot to set the ion core radius for the SRR potential."
 
     def initialize(self):
         """
@@ -238,10 +253,13 @@ class xDave:
             wr_kernel = OCPRayleighWeight(state=self.overlord_state, ion_core_radius=1.0 * BOHR_RADIUS)
             rayleigh_weight = wr_kernel.get_rayleigh_weight(
                 k=k_value,
-                sf_model=self.models.static_structure_factor_approximation,
+                lfc=lfc,
+                sf_model=self.models.sf_model,
                 ii_potential=self.models.ii_potential,
-                bridge_function=self.models.bridge_function,
-                screening="None",
+                ee_potential=self.models.ee_potential,
+                ei_potential=self.models.ei_potential,
+                screening_model=self.models.screening_model,
+                return_full=False,
             )
         else:
             wr_kernel = MCPRayleighWeight(
@@ -250,7 +268,7 @@ class xDave:
             rayleigh_weight = wr_kernel.get_rayleigh_weight(
                 k=k_value,
                 lfc=lfc,
-                sf_model=self.models.static_structure_factor_approximation,
+                sf_model=self.models.sf_model,
                 ii_potential=self.models.ii_potential,
                 ee_potential=self.models.ee_potential,
                 ei_potential=self.models.ei_potential,
@@ -291,10 +309,13 @@ class xDave:
             wr_kernel = OCPRayleighWeight(state=self.overlord_state, ion_core_radius=1.0 * BOHR_RADIUS)
             _, Sab, rayleigh_weight, qs, fs = wr_kernel.get_rayleigh_weight(
                 k=k_array,
-                sf_model=self.models.static_structure_factor_approximation,
+                lfc=lfc,
+                sf_model=self.models.sf_model,
                 ii_potential=self.models.ii_potential,
-                bridge_function=self.models.bridge_function,
-                screening="HARD_CORE",
+                ee_potential=self.models.ee_potential,
+                ei_potential=self.models.ei_potential,
+                screening_model=self.models.screening_model,
+                return_full=True,
             )
 
         else:
@@ -304,15 +325,106 @@ class xDave:
             _, Sab, rayleigh_weight, qs, fs = wr_kernel.get_rayleigh_weight(
                 k=k_array,
                 lfc=lfc,
-                sf_model=self.models.static_structure_factor_approximation,
+                sf_model=self.models.sf_model,
                 ii_potential=self.models.ii_potential,
                 ee_potential=self.models.ee_potential,
                 ei_potential=self.models.ei_potential,
                 screening_model=self.models.screening_model,
                 return_full=True,
             )
-        # k *= BOHR_RADIUS
         return k, Sab, rayleigh_weight, qs, fs
+
+    def run_inelastic(self, k, w):
+        k_value = k / BOHR_RADIUS
+        # w *= eV_TO_J
+        omega_array = w.copy() * eV_TO_J
+
+        lfc_kernel = LFC(state=self.overlord_state)
+        lfc = lfc_kernel.calculate_lfc(k=k_value, w=omega_array, model=self.models.lfc_model)
+        print(f"Calculated LFC={lfc}")
+
+        if self.ipd_eV is not None:
+            ipd = self.ipd_eV * eV_TO_J
+            print(f"Applying user-defined input IPD: {self.ipd_eV}")
+        else:
+            ipd = get_ipd(state=self.overlord_state, model=self.models.ipd_model, user_defined_ipd=self.ipd_eV)
+            print(f"Calculated IPD={ipd * J_TO_eV} eV")
+
+        ff = FreeFreeDSF(state=self.overlord_state)
+        ff_dsf = ff.get_dsf(k=k_value, w=omega_array, lfc=lfc, model=self.models.polarisation_model)
+        ff_tot = ff_dsf * self.overlord_state.charge_state
+
+        bf_tot = np.zeros_like(omega_array)
+        ff_i = np.zeros((len(self.states), len(omega_array)))
+        bf_i = np.zeros((len(self.states), len(omega_array)))
+
+        print(f"Mean charge state = {self.overlord_state.charge_state}.")
+
+        for i in range(0, len(self.states)):
+            state = self.states[i]
+            x = self.partial_densities[i]
+            print(f"\nRunning state {i} with Z={state.charge_state} and x={x}\n")
+            binding_energies = state.binding_energies * eV_TO_J
+
+            ff_i[i] = x * ff_dsf
+
+            Eb = binding_energies - ipd
+
+            if np.any(np.abs(ipd) > (np.abs(binding_energies[binding_energies < 0.0]))):
+                warnings.warn(
+                    f"IPD {ipd * J_TO_eV} is larger than the binding energy of state {i}: {binding_energies[binding_energies < 0.]* J_TO_eV}. Consider increasing your ionization degree. The bound-free feature is being set to zero."
+                )
+
+            bf = BoundFreeDSF(state=state)
+            bf_dsf = bf.get_dsf(
+                ZA=state.atomic_number, Zb=state.Zb, k=k_value, w=omega_array, Eb=Eb, model=self.models.bf_model
+            )
+            bf_tot += x * bf_dsf  # * state.charge_state  # / state.atomic_number
+            bf_i[i] = x * bf_dsf  # * state.charge_state  # / state.atomic_number
+
+        if self.enforce_fsum:
+            bf *= self._bf_norm(w=w, ff=ff, bf=bf, k=k)
+
+        dsf = ff_tot + bf_tot
+        return bf_tot / J_TO_eV, ff_tot / J_TO_eV, dsf / J_TO_eV, ff_i / J_TO_eV, bf_i / J_TO_eV
+
+    def run_elastic(self, k, w):
+        k_value = k / BOHR_RADIUS
+        # w *= eV_TO_J
+        omega_array = w.copy() * eV_TO_J
+
+        lfc_kernel = LFC(state=self.overlord_state)
+        lfc = lfc_kernel.calculate_lfc(k=k_value, w=omega_array, model=self.models.lfc_model)
+        print(f"Calculated LFC={lfc}")
+
+        # Calculate the Rayleigh weight
+        if self.ocp_flag:
+            wr_kernel = OCPRayleighWeight(state=self.overlord_state, ion_core_radius=1.0 * BOHR_RADIUS)
+            rayleigh_weight = wr_kernel.get_rayleigh_weight(
+                k=k_value,
+                lfc=lfc,
+                sf_model=self.models.sf_model,
+                ii_potential=self.models.ii_potential,
+                ee_potential=self.models.ee_potential,
+                ei_potential=self.models.ei_potential,
+                screening_model=self.models.screening_model,
+                return_full=False,
+            )
+        else:
+            wr_kernel = MCPRayleighWeight(
+                overlord_state=self.overlord_state, states=self.states, ion_core_radius=1.0 * BOHR_RADIUS
+            )
+            rayleigh_weight = wr_kernel.get_rayleigh_weight(
+                k=k_value,
+                lfc=lfc,
+                sf_model=self.models.sf_model,
+                ii_potential=self.models.ii_potential,
+                ee_potential=self.models.ee_potential,
+                ei_potential=self.models.ei_potential,
+                screening_model=self.models.screening_model,
+                return_full=False,
+            )
+        return rayleigh_weight
 
     def convolve_with_sif(self, bf, ff, WR, omega=None, sif=None, fwhm=10, type="GAUSSIAN"):
         if type == "GAUSSIAN":

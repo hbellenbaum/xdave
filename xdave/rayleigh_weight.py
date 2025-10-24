@@ -6,35 +6,45 @@ import numpy as np
 
 
 class OCPRayleighWeight:
-    def __init__(self, state, ion_core_radius):
+    def __init__(self, overlord_state, state, ion_core_radius):
+        self.overlord_state = overlord_state
         self.state = state
         self.ion_core_radius = ion_core_radius
 
-    def get_rayleigh_weight(self, k, sf_model, ii_potential, bridge_function, screening="NONE", return_full=False):
+    def get_rayleigh_weight(
+        self,
+        k,
+        sf_model,
+        ii_potential,
+        ee_potential,
+        ei_potential,
+        bridge_function,
+        lfc=0.0,
+        screening_model="NONE",
+        return_full=False,
+    ):
         sf = OCPStaticStructureFactor(state=self.state, ion_core_radius=self.ion_core_radius)
 
-        # TODO(Hannah): check this part, I'm really unsure about this...
-        if screening == "NONE":
-            Siik = sf.get_ii_static_structure_factor(
-                k=k,
-                sf_model=sf_model,
-                pseudo_potential=ii_potential,
-                bridge_function=bridge_function,
-                return_full=False,
-            )
-        else:
-            Siik = sf.get_screened_ii_static_structure_factor(
-                k=k,
-                sf_model=sf_model,
-                pseudo_potential=ii_potential,
-                bridge_function=bridge_function,
-                return_full=False,
-            )
+        Siik = sf.get_ii_static_structure_factor(
+            k=k, sf_model=sf_model, pseudo_potential=ii_potential, bridge_function=bridge_function, return_full=False
+        )
+
+        qs = ScreeningCloud(state=self.state, overlord_state=self.overlord_state).get_screening_cloud(
+            k=k,
+            ion_core_radius=self.ion_core_radius,
+            lfc=lfc,
+            screening_model=screening_model,
+            ee_potential=ee_potential,
+            ei_potential=ei_potential,
+        )
+        fs = PaulingShermanIonicFormFactor().calculate_form_factor(Z=self.state.atomic_number, Z_b=self.state.Zb, k=k)
+
+        rayleigh_weight = (fs + qs) * Siik
 
         if return_full:
-            return k, Siik, Siik, np.zeros_like(k), np.zeros_like(k)
+            return k, Siik, rayleigh_weight, qs, fs
         else:
-            return Siik
+            return rayleigh_weight
 
 
 class MCPRayleighWeight:
@@ -107,11 +117,3 @@ class MCPRayleighWeight:
             if return_full:
                 return k, Sab, rayleigh_weight, qs, fs
         return rayleigh_weight
-
-
-def test_mcp():
-    return
-
-
-if __name__ == "__main__":
-    test_mcp()
