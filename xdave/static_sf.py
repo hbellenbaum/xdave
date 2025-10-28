@@ -159,9 +159,38 @@ class OCPStaticStructureFactor:
     def _screening_correction(self, k, r):
         return
 
-    def _hnc_ii_pseudopotential(self, k, r, Q, alpha, model="YUKAWA"):
+    def _hnc_ii_pseudopotential(
+        self,
+        k,
+        r,
+        Q,
+        alpha,
+        ion_core_radius=None,
+        kappa_e=None,
+        csd_core_charges=None,
+        csd_parameters=None,
+        srr_core_power=None,
+        srr_sigma=None,
+        model="YUKAWA",
+    ):
         if model == "YUKAWA":
             return yukawa_r(Q, Q, r, alpha), yukawa_k(Q, Q, k, alpha)
+        elif model == "DEBYE_HUCKEL":
+            return debye_huckel_r(Q, Q, r, alpha, kappa_e), debye_huckel_k(Q, Q, k, alpha, kappa_e)
+        elif model == "DEUTSCH":
+            return deutsch_r(Q, Q, r, alpha), deutsch_k(Q, Q, k, alpha)
+        elif model == "KELBG":
+            return kelbg_r(Q, Q, r, alpha), kelbg_k(Q, Q, k, alpha)
+        elif model == "SRR":
+            return short_range_screening_r(
+                self.state.ion_temperature, srr_core_power, ion_core_radius, srr_sigma, kappa_e
+            ), np.zeros_like(k)
+        elif model == "CSD":
+            return charge_switching_debye_r(
+                Q, Q, r, csd_parameters[0], csd_parameters[1], csd_core_charges[0], csd_core_charges[1], kappa_e
+            ), charge_switching_debye_k(
+                Q, Q, k, csd_parameters[0], csd_parameters[1], csd_core_charges[0], csd_core_charges[1], kappa_e
+            )
         else:
             raise NotImplementedError(f"Pseudo-potential model {model} not recognized.")
 
@@ -241,11 +270,21 @@ class OCPStaticStructureFactor:
         ks = np.linspace(k0, kf, n)  # [1/m]
 
         Q = Zi  # [C]
+        kappa_e = self.state.screening_length(
+            ELECTRON_MASS,
+            1,
+            self.state.electron_temperature,
+            self.state.free_electron_number_density,
+        ).real
 
         # use thermodynamically normalized potential
-        Us_rs = beta * self._hnc_ii_pseudopotential(Q=Q, r=rs, alpha=alpha, k=ks, model=pseudo_potential)[0]  # [ ]
+        Us_rs = (
+            beta
+            * self._hnc_ii_pseudopotential(Q=Q, r=rs, alpha=alpha, k=ks, kappa_e=kappa_e, model=pseudo_potential)[0]
+        )  # [ ]
         Ul_ks = (
-            beta * self._hnc_ii_pseudopotential(Q=Q, r=rs, alpha=alpha, k=ks, model=pseudo_potential)[1]
+            beta
+            * self._hnc_ii_pseudopotential(Q=Q, r=rs, alpha=alpha, kappa_e=kappa_e, k=ks, model=pseudo_potential)[1]
         )  # [m^3] ???
 
         cs0_rs = -Us_rs  # [ ]
@@ -347,10 +386,21 @@ class OCPStaticStructureFactor:
 
         Q = Zi  # [C]
 
+        kappa_e = self.state.screening_length(
+            ELECTRON_MASS,
+            1,
+            self.state.electron_temperature,
+            self.state.free_electron_number_density,
+        ).real
+
         # # use thermodynamically normalized potential
-        Us_rs = beta * self._hnc_ii_pseudopotential(Q=Q, r=rs, alpha=alpha, k=ks, model=pseudo_potential)[0]  # [ ]
+        Us_rs = (
+            beta
+            * self._hnc_ii_pseudopotential(Q=Q, r=rs, alpha=alpha, k=ks, kappa_e=kappa_e, model=pseudo_potential)[0]
+        )  # [ ]
         Ul_ks = (
-            beta * self._hnc_ii_pseudopotential(Q=Q, r=rs, alpha=alpha, k=ks, model=pseudo_potential)[1]
+            beta
+            * self._hnc_ii_pseudopotential(Q=Q, r=rs, alpha=alpha, k=ks, kappa_e=kappa_e, model=pseudo_potential)[1]
         )  # [m^3] ???
 
         cs0_rs = -Us_rs  # [ ]
@@ -470,7 +520,7 @@ class MCPStaticStructureFactor:
         self.mix_fraction = mix_fraction
         self.delta = delta
 
-    def get_ab_static_structure_factor(self, k, sf_model="HNC", pseudo_potential="YUKAWA", return_full=False):
+    def get_ab_static_structure_factor(self, k, sf_model="HNC", pseudo_potential="DEBYE_HUCKEL", return_full=False):
         if sf_model == "MSA":
             raise NotImplementedError("The MSA has not been implemented for multi-component systems")
         elif sf_model == "SVT":
@@ -543,8 +593,10 @@ class MCPStaticStructureFactor:
             1,
             self.overlord_state.electron_temperature,
             self.overlord_state.free_electron_number_density,
-        )
-
+        ).real
+        # kappa_e = self.overlord_state.debye_screening_length(
+        #     1, self.overlord_state.free_electron_number_density, self.overlord_state.electron_temperature
+        # )
         # Set up grid
         r0 = 1.0e-3 * BOHR_RADIUS  # [m]
         rf = 1.0e2 * BOHR_RADIUS  # [m]
@@ -611,6 +663,22 @@ class MCPStaticStructureFactor:
             h_ks = np.moveaxis(h_ks, 0, -1)
             # Setting the first element to -1.0, this is wrong, but works for now
             h_ks = np.insert(h_ks, 0, -1.0, axis=-1)
+
+            # Dc = D @ c_ks
+            # M = I[..., None] - Dc
+            # M = np.moveaxis(M, -1, 0)
+            # conds = np.linalg.cond(M)
+
+            # good_idx = np.where(conds < 1.0e12)[0]
+            # bad_idx = np.where(conds >= 1.0e12)[0]
+            # h_ks = np.empty_like(c_ks)
+            # if len(good_idx) > 0:
+            #     M_good = M[good_idx]
+            #     c_good = c_ks[..., good_idx].transpose(2, 0, 1)
+            #     h_good = np.linalg.solve(M_good.transpose(0, 2, 1), c_good.transpose(0, 2, 1)).transpose(0, 2, 1)
+            #     h_ks[..., good_idx] = h_good.transpose(1, 2, 0)
+            # for ik in bad_idx:
+            #     h_ks[..., ik] = c_ks[..., ik] @ np.linalg.pinv(M[ik])
 
             # indirect correlation function
             Ns_ks = h_ks - cs_ks

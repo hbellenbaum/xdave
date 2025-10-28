@@ -9,8 +9,8 @@ from ipd import get_ipd
 from utils import (
     calculate_q,
     laplace,
-    get_atomic_mass_for_element,
-    get_binding_energies_from_elements,
+    get_atomic_data_for_all_elements,
+    get_binding_energies_from_element,
     calculate_angle,
     get_mcss_wr_from_status_file,
     load_mcss_result,
@@ -70,14 +70,14 @@ class xDave:
                 f"You have set non-equilibrium conditions. The models implemented currently do not allow this and will give non-sensical results. Sorry :/"
             )
         self.partial_densities = partial_densities
-        self.elements = elements
+        # self.elements = elements
         self.charge_states = charge_states
         self.models = models
 
         self.enforce_fsum = enforce_fsum
         self.tau_array = np.linspace(0, 1 / (electron_temperature), 1000)
 
-        self.states, self.overlord_state = self.initialize()
+        self.states, self.overlord_state = self.get_mean_and_all_states(elements)
 
         if user_defined_inputs is not None:
             keys = user_defined_inputs.keys()
@@ -90,6 +90,14 @@ class xDave:
             self.srr_sigma_parameter = (
                 user_defined_inputs["srr_sigma_parameter"] if "srr_sigma_parameter" in keys else None
             )
+        else:
+            self.ipd_eV = None
+            self.user_defined_lfc = None
+            self.ion_core_radius = None
+            self.csd_parameters = None
+            self.csd_core_charges = None
+            self.sec_core_power = None
+            self.srr_sigma_parameter = None
 
         # Some asserts, make sure people are paying attention
         if self.models.ii_potential == "SRR":
@@ -100,14 +108,14 @@ class xDave:
             assert (
                 self.csd_parameters is not None and self.csd_core_charges is not None
             ), "You forget to set key parameters for the CSD ii potential."
-        if self.models.sf_model == "MSA" or self.models.sf_model:
+        if self.models.sf_model == "MSA":
             assert (
                 self.ion_core_radius is not None
             ), "You forgot to set the ion core radius for the MSA static structure factor approximation."
         if self.models.ii_potential == "SRR":
             assert self.ion_core_radius is not None, "You forgot to set the ion core radius for the SRR potential."
 
-    def initialize(self):
+    def get_mean_and_all_states(self, elements):
         """
         Initialize an xDave object.
         This will define a mean plasma state and individual states describing each species.
@@ -120,32 +128,19 @@ class xDave:
         states = []
         Z_mean = 0.0
         AN_mean = 0.0
-        ANs = []
-        atomic_masses = []
         amu_mean = 0.0
 
-        # TODO(Hannah): clean this up, two for loops seems unnecessary
-        for i in range(0, self.number_of_states):
-            element = self.elements[i]
-            amu, AN = get_atomic_mass_for_element(element)
-            atomic_masses.append(amu * ATOMIC_MASS_UNIT)
-            ANs.append(AN)
-            x = self.partial_densities[i]
-            Z = self.charge_states[i]
-            assert Z <= AN, f"Ionization degree for state {i} is larger than the atomic number {AN}. Check your setup."
-            binding_energies = get_binding_energies_from_elements(AN)
-
-            Z_mean += x * Z
-            AN_mean += x * AN
-            amu_mean += x * amu
+        atomic_masses, atomic_numbers = get_atomic_data_for_all_elements(elements)
 
         sum_term = np.sum(self.partial_densities * atomic_masses)
         for i in range(0, self.number_of_states):
             x = self.partial_densities[i]
             Z = self.charge_states[i]
             ni = x * self.mass_density / sum_term
-            AN = ANs[i]
+            AN = atomic_numbers[i]
             amu = atomic_masses[i] / ATOMIC_MASS_UNIT  # this is also dumb!
+            amu_mean += x * amu
+            binding_energies = get_binding_energies_from_element(AN)
             state = PlasmaState(
                 electron_temperature=self.electron_temperature,
                 ion_temperature=self.ion_temperature,
@@ -167,7 +162,7 @@ class xDave:
             atomic_number=AN_mean,
             binding_energies=np.array([]),
         )
-        self.ocp_flag = (len(np.unique(ANs)) < len(states)) and len(states) <= 2
+        self.ocp_flag = (len(np.unique(atomic_numbers)) < len(states)) and len(states) <= 2
         return np.array(states), overlord_state
 
     def _bf_norm(self, w, ff, bf, k):

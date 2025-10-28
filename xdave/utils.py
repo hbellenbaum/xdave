@@ -1,4 +1,4 @@
-from constants import DIRAC_CONSTANT, SPEED_OF_LIGHT, BOHR_RADIUS, PI
+from constants import DIRAC_CONSTANT, SPEED_OF_LIGHT, BOHR_RADIUS, PI, ATOMIC_MASS_UNIT
 from unit_conversions import eV_TO_J
 
 # from mendeleev import element
@@ -207,6 +207,24 @@ def laplace(tau, E, wff, wbf):
     return tau, F_tot_inel, F_wff, F_wbf
 
 
+def get_atomic_data_for_all_elements(elements):
+
+    nstates = len(elements)
+    # assert len(states) == len(
+    #     elements
+    # ), f"Trying to set up {len(states)} states with {len(elements)} elements. Try to be consistent."
+
+    atomic_masses = np.zeros_like(elements, dtype=float)
+    atomic_numbers = np.zeros_like(elements, dtype=float)
+    for i in range(0, nstates):
+        element = elements[i]
+        amu, AN = get_atomic_mass_for_element(element)
+        atomic_masses[i] = amu * ATOMIC_MASS_UNIT
+        atomic_numbers[i] = AN
+
+    return atomic_masses, atomic_numbers
+
+
 def get_atomic_mass_for_element(e):
     ANs, elements, amus, _ = np.genfromtxt(
         "/home/bellen85/code/dev/xdave/xdave/data/atomic_data.csv",
@@ -225,7 +243,7 @@ def get_atomic_mass_for_element(e):
     # return element(str(e)).atomic_weight, element(str(e)).atomic_number
 
 
-def get_binding_energies_from_elements(AN):
+def get_binding_energies_from_element(AN):
     # TODO(Hannah): this is a temporary fix until I get the file structure sorted out
     dat_file = os.path.dirname(__file__) + f"/data/binding_energies_xrdb.csv"
     df = pd.read_csv(dat_file)

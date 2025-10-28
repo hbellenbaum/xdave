@@ -79,22 +79,28 @@ class LFC:
         """
         Eqn. (4) - (7) Gregori et al., High Energy Density Phys. 3 (2007)
         """
-        xi = (
-            ELECTRON_MASS
-            * ELEMENTARY_CHARGE**4
-            / ((4 * PI * VACUUM_PERMITTIVITY) ** 2 * BOLTZMANN_CONSTANT * Te * DIRAC_CONSTANT**2)
-        )
+        TF = self.state.fermi_temperature(mass=ELECTRON_MASS, number_density=self.state.free_electron_number_density)
+        Tq = TF * K_TO_eV / (1.32510 - 1.779 * np.sqrt(self.rs))
+        Tee = np.sqrt((self.state.electron_temperature * K_TO_eV) ** 2 + Tq**2)
         Gamma_ee = self.Gamma_ee
-        C_sc = 1.0754
-        H0 = C_sc * Gamma_ee ** (3 / 2) / (Gamma_ee**4 + (C_sc / SQRT_THREE)) ** 0.25
 
-        def integral(u):
-            X = np.tan(u * PI / 2)
-            dXdu = PI / 2 * 1 / (np.cos(PI * u / 2)) ** 2
-            return dXdu * (X * np.exp(-xi * X**2)) / (np.expm1(PI / X)) if X > 0 else 0.0
+        z = ELECTRON_MASS * ELEMENTARY_CHARGE**3 * COULOMB_CONSTANT**2 / (Tee * DIRAC_CONSTANT**2)
 
-        gbin = np.sqrt(2 * PI) * xi ** (3 / 2) * integrate.quad(integral, 0, 1, limit=200)[0]
-        geeT = gbin * np.exp(H0)
+        def integrand(u):
+            x = np.tan(HALF_PI * u)
+
+            # get asymptotic limits to avoid overflow
+            f1 = x * np.exp(-z * x**2 - PI / x)
+            f2 = np.exp(np.log(x) - z * x**2 - PI / x - np.log1p(-np.exp(-PI / x)))
+
+            f = np.where(x < 1e-3, f1, f2)
+            return f * HALF_PI * (1 + x**2)
+
+        Csc = 1.0754
+        geeT_part = np.exp(Csc * Gamma_ee**1.5 / ((Csc / np.sqrt(3.0)) ** 4 + Gamma_ee**4) ** (1 / 4))
+        gbin = np.sqrt(2 * PI) * z**1.5 * integrate.quad(integrand, 0, 1, points=[0])[0]
+
+        geeT = gbin * geeT_part
         return geeT
 
     def _gamma_T(self):
@@ -354,21 +360,15 @@ class LFC:
         B = 9 / 16 * gamma0 - 3 / 64 * (1 - gee0) - 16 / 15 * A
         C = -3 / 4 * gamma0 + 9 / 16 * (1 - gee0) - 16 / 5 * A
 
-        if np.isclose(Q, 2.0, rtol=1.0e-4):
-            G_k = A * Q**4 + B * Q**2 + C
-        else:
-            # G_k = (
-            #     A * Q**4
-            #     + B * Q**2
-            #     + C
-            #     + (A * Q**4 + (B + 8 * A / 3) * Q**2 - C) * (4 - Q**2) / (4 * Q) * np.log(np.abs((2 + Q) / (2 - Q)))
-            # )
-            G_k = (
-                A * Q**4
-                + B * Q**2
-                + C
-                + (A * Q**4 + (B + 8 * A / 3) * Q**2 - C) * ((4 - Q**2) / (4 * Q)) * np.log(abs((2 + Q) / (2 - Q)))
-            )
+        tol = 1e-4
+        G_k = np.where(
+            np.abs(Q - 2.0) < tol,
+            A * 2**4 + B * 2**2 + C,  # stable limit
+            A * Q**4
+            + B * Q**2
+            + C
+            + (A * Q**4 + (B + 8 * A / 3) * Q**2 - C) * ((4 - Q**2) / (4 * Q)) * np.log(np.abs((2 + Q) / (2 - Q))),
+        )
 
         return G_k
 
@@ -377,24 +377,12 @@ class LFC:
         D.J.W. Geldart, S.H. Vosko, Can. J. Phys. 44 (1966), DOI: 10.1139/p64-183
         Details in Gregori et al., High Energy Density Phys. 3 (2007)
         """
-        TF = self.state.fermi_temperature(mass=ELECTRON_MASS, number_density=self.state.free_electron_number_density)
         kF = self.state.fermi_wave_number(self.state.free_electron_number_density)
-        Tq = TF * K_TO_eV / (1.32510 - 1.779 * np.sqrt(self.rs))
-        Tee = np.sqrt((self.state.electron_temperature * K_TO_eV) ** 2 + Tq**2)
         Gamma_ee = self.Gamma_ee
         gammaT = self._gamma_T()
-        z = ELECTRON_MASS * ELEMENTARY_CHARGE**3 * COULOMB_CONSTANT**2 / (Tee * DIRAC_CONSTANT**2)
+        geeT = self.geeT
 
-        def integrand(u):
-            x = np.tan(HALF_PI * u)
-            f = x * np.exp(-z * x**2.0) / (np.exp(PI / x) - 1.0)
-            return f * HALF_PI * (1.0 + x**2)
-
-        Csc = 1.0754
-        geeT = np.exp(Csc * Gamma_ee**1.5 / ((Csc / np.sqrt(3.0)) ** 4 + Gamma_ee**4) ** (1 / 4))
-        gbin = np.sqrt(2 * PI) * z**1.5 * integrate.quad(integrand, 0, 1)[0]
-
-        G_k = k**2 / (kF**2 / gammaT + k**2 / (1 - gbin * geeT))
+        G_k = k**2 / (kF**2 / gammaT + k**2 / (1 - geeT))
         return G_k
 
     def _pade_interp_static(self, k, w):

@@ -2,22 +2,13 @@ from constants import *
 from unit_conversions import *
 from maths import log1pexp
 from scipy import integrate
-from plasma_state import PlasmaState, get_rho_T_from_rs_theta
-from models import ModelOptions
+from plasma_state import PlasmaState
 
 from plasmapy.formulary.mathematics import Fermi_integral as fdi
 
 import numpy as np
 
 import warnings
-
-
-def effective_coulomb_potential(ionisation, wave_number):
-    r"""
-    Effective Coulomb potential
-    """
-    V_aa = -4 * PI * ionisation * ELEMENTARY_CHARGE_SQR * UNIT_COULOMB_POTENTIAL / (wave_number * wave_number)
-    return V_aa
 
 
 class FreeFreeDSF:
@@ -199,10 +190,6 @@ class FreeFreeDSF:
         alpha = mu / EF
 
         def g_ancarni(lambda_val):
-            # if lambda_val < 0.0:
-            #     return -g_t(-lambda_val)
-            # else:
-            #     return g_t(lambda_val)
             return np.where(lambda_val < 0.0, -g_t(-lambda_val), g_t(lambda_val))
 
         def g_t(lambda_val, eps=1.0e-9):

@@ -21,17 +21,29 @@ import os
 
 def test():
 
-    ks = np.linspace(0.01, 6, 100) / BOHR_RADIUS
+    ks = np.linspace(0.01, 10, 500) / BOHR_RADIUS
     rs = 2
     theta = 1
 
     rho, T = get_rho_T_from_rs_theta(rs=rs, theta=theta)
-    rho *= g_per_cm3_TO_kg_per_m3
-    T *= eV_TO_K
+    # rho *= g_per_cm3_TO_kg_per_m3
+    # T *= eV_TO_K
 
-    state = PlasmaState(
-        electron_temperature=T, ion_temperature=T, mass_density=rho, charge_state=2.0, atomic_mass=1, atomic_number=2
+    elements = np.array(["C", "C"])
+    partial_densities = np.array([0, 1])
+    charge_states = np.array([2, 2])
+    models = ModelOptions()
+
+    xrts_code = xDave(
+        mass_density=rho,
+        electron_temperature=T,
+        ion_temperature=T,
+        elements=elements,
+        partial_densities=partial_densities,
+        charge_states=charge_states,
+        models=models,
     )
+    state = xrts_code.overlord_state
 
     lfc_interp = np.zeros_like(ks)
     lfc_ui = np.zeros_like(ks)
@@ -39,14 +51,13 @@ def test():
     lfc_dornheim = np.zeros_like(ks)
     lfc_farid = np.zeros_like(ks)
 
-    for i in range(0, len(ks)):
-        k = ks[i]
-        kernel = LFC(state=state)
-        lfc_interp[i] = kernel.calculate_lfc(k=k, w=0.0, model="PADE_INTERP")
-        lfc_ui[i] = kernel.calculate_lfc(k=k, w=0.0, model="UI")
-        lfc_gv[i] = kernel.calculate_lfc(k=k, w=0.0, model="GV")
-        lfc_dornheim[i] = kernel.calculate_lfc(k=k, w=0.0, model="DORNHEIM_ESA")
-        lfc_farid[i] = kernel.calculate_lfc(k=k, w=0.0, model="FARID")
+    # for i in range(0, len(ks)):
+    kernel = LFC(state=state)
+    lfc_interp = kernel.calculate_lfc(k=ks, w=0.0, model="PADE_INTERP")
+    lfc_ui = kernel.calculate_lfc(k=ks, w=0.0, model="UI")
+    lfc_gv = kernel.calculate_lfc(k=ks, w=0.0, model="GV")
+    lfc_dornheim = kernel.calculate_lfc(k=ks, w=0.0, model="DORNHEIM_ESA")
+    lfc_farid = kernel.calculate_lfc(k=ks, w=0.0, model="FARID")
 
     kF = state.fermi_wave_number(state.free_electron_number_density)
     plt.figure()
@@ -130,7 +141,7 @@ def test_ui_gv_mcss():
     plt.plot(ks1 * BOHR_RADIUS, lfcs1_ui, label="UI", c="purple", ls="-.")
     plt.plot(k_UI, lfc_UI, label="MCSS: UI", c="purple", ls="solid")
     plt.plot(k_GV, lfc_GV, label="MCSS: GV", c="crimson", ls="solid")
-    plt.plot(datT1[:, 0], datT1[:, 1], label=f"Gregori et al., T=20", ls="solid", c="navy")
+    # plt.plot(datT1[:, 0], datT1[:, 1], label=f"Gregori et al., T=20", ls="solid", c="navy")
     # plt.plot(k_interp, lfc_interp, label="MCSS: Interp", c="navy", ls="solid")
     plt.legend()
     plt.show()
@@ -145,28 +156,35 @@ def test_gregori_2007():
 
     rho, _ = get_rho_T_from_rs_theta(rs=rs, theta=1)
 
-    state1 = PlasmaState(
-        electron_temperature=T1 * eV_TO_K,
-        mass_density=rho * g_per_cm3_TO_kg_per_m3,
-        ion_temperature=T1 * eV_TO_K,
-        charge_state=1.0,
-        atomic_mass=1,
-        atomic_number=1,
-        binding_energies=None,
+    elements = np.array(["H"])
+    partial_densities = np.array([1])
+    charge_states = np.array([1])
+    models = ModelOptions()
+
+    xrts_code = xDave(
+        mass_density=rho,
+        electron_temperature=T1,
+        ion_temperature=T1,
+        elements=elements,
+        partial_densities=partial_densities,
+        charge_states=charge_states,
+        models=models,
     )
+    state1 = xrts_code.overlord_state
 
     print(f"ne = {state1.free_electron_number_density * per_m3_TO_per_cm3} 1/cc")
     print(rf"$\theta$ = {state1.theta}")
 
-    state2 = PlasmaState(
-        electron_temperature=T2 * eV_TO_K,
-        mass_density=rho * g_per_cm3_TO_kg_per_m3,
-        ion_temperature=T2 * eV_TO_K,
-        charge_state=1.0,
-        atomic_mass=1,
-        atomic_number=1,
-        binding_energies=None,
+    xrts_code = xDave(
+        mass_density=rho,
+        electron_temperature=T2,
+        ion_temperature=T2,
+        elements=elements,
+        partial_densities=partial_densities,
+        charge_states=charge_states,
+        models=models,
     )
+    state2 = xrts_code.overlord_state
 
     print(f"ne = {state2.free_electron_number_density * per_m3_TO_per_cm3} 1/cc")
     print(f"$\\theta$ = {state2.theta}")
@@ -413,15 +431,16 @@ def test_ui():
 
     for rs, c in zip(rss, colors):
         rho, T = get_rho_T_from_rs_theta(rs=rs, theta=1)
-        state = PlasmaState(
-            electron_temperature=T * eV_TO_K,
-            mass_density=rho * g_per_cm3_TO_kg_per_m3,
-            ion_temperature=T * eV_TO_K,
-            charge_state=1.0,
-            atomic_mass=1,
-            atomic_number=1,
-            binding_energies=None,
+        xrts_code = xDave(
+            mass_density=rho,
+            electron_temperature=T,
+            ion_temperature=T,
+            elements=np.array(["H"]),
+            partial_densities=np.array([1]),
+            charge_states=np.array([1]),
+            models=ModelOptions(),
         )
+        state = xrts_code.overlord_state
         kF = state.fermi_wave_number(state.free_electron_number_density)
         ks = np.linspace(0, 5, 500) * kF
         # lfcs = np.zeros_like(ks)
@@ -460,15 +479,16 @@ def test_gv():
 
     for rs, c in zip(rss, colors):
         rho, T = get_rho_T_from_rs_theta(rs=rs, theta=1)
-        state = PlasmaState(
-            electron_temperature=T * eV_TO_K,
-            mass_density=rho * g_per_cm3_TO_kg_per_m3,
-            ion_temperature=T * eV_TO_K,
-            charge_state=1.0,
-            atomic_mass=1,
-            atomic_number=1,
-            binding_energies=None,
+        xrts_code = xDave(
+            mass_density=rho,
+            electron_temperature=T,
+            ion_temperature=T,
+            elements=np.array(["H"]),
+            partial_densities=np.array([1]),
+            charge_states=np.array([1]),
+            models=ModelOptions(),
         )
+        state = xrts_code.overlord_state
         kF = state.fermi_wave_number(state.free_electron_number_density)
         ks = np.linspace(0, 5, 500) * kF
         # lfcs = np.zeros_like(ks)
@@ -494,11 +514,11 @@ def test_gv():
 
 
 if __name__ == "__main__":
-    # test()
+    test()
     # test_ui_gv_mcss()
     # test_gv()
     # test_gregori_2007()
-    test_fortmann_2010()
-    test_dornheim_2021()
-    test_farid()
+    # test_fortmann_2010()
+    # test_dornheim_2021()
+    # test_farid()
     # test_ui()
