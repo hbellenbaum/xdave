@@ -30,6 +30,14 @@ For now, the following python packages need to be installed outside of the stand
 
 A test suite is included which can be used for building examples.
 
+The ``examples`` folder contains a few more examples for a simple Be and CH test case.
+These give an overview of how the code can be used to derive dynamic structure factors and a spectrum for a given SIF.
+This also contains an interface to the x-ray tracing code HEART.
+Note that the script ``hydrogen_test.py`` currently will not run because the relevant PIMC files have not been added to the repo.
+The same goes for the comparison test cases against MCSS in the ``test`` folder.
+Sorry for the inconvenience :)
+
+
 ## Citation and Attribution
 
 TBA.

@@ -52,16 +52,19 @@ def be_example():
     ax = axes[0, 0]
     ax.set_title("Total DSF")
     ax.plot(w, dsf, label="Inel", ls="-.", c="magenta")
+    ax.set_xlabel(r"$\omega$ [eV]")
     ax.legend()
 
     ax = axes[0, 1]
     ax.set_title("FF DSF")
     ax.plot(w, ff_tot, label="FF", ls="--", c="orange")
+    ax.set_xlabel(r"$\omega$ [eV]")
     ax.legend()
 
     ax = axes[0, 2]
     ax.set_title("BF DSF")
     ax.plot(w, bf_tot, label="BF", ls="solid", c="dodgerblue")
+    ax.set_xlabel(r"$\omega$ [eV]")
     ax.legend()
 
     tau_array, F_tot_inel, F_wff, F_wbf = kernel.get_itcf(w=w, ff=ff_tot, bf=bf_tot)
@@ -69,18 +72,37 @@ def be_example():
     ax = axes[1, 0]
     ax.set_title("ITCF")
     ax.plot(tau_array, F_tot_inel, label="xDave inel", ls="dashed", c="magenta")
+    ax.set_xlabel(r"$\tau$ [1/eV]")
     ax.legend()
 
     ax = axes[1, 1]
     ax.set_title("FF ITCF")
     ax.plot(tau_array, F_wff, label="xDave ff", ls="dashed", c="dodgerblue")
+    ax.set_xlabel(r"$\tau$ [1/eV]")
     ax.legend()
 
     ax = axes[1, 2]
     ax.set_title("BF ITCF")
     ax.plot(tau_array, F_wbf, label="xDave bf", ls="dashed", c="orange")
+    ax.set_xlabel(r"$\tau$ [1/eV]")
     ax.legend()
     plt.tight_layout()
+    plt.show()
+
+    # this will convolve the dsf with a Gaussian sif of 10 eV fwhm
+    # if you want to use your own, you can add it as an input to the sif input option
+    # note that for now this will have to be centered around 0
+    inelastic, elastic, spectrum = kernel.convolve_with_sif(
+        bf=bf_tot, ff=ff_tot, WR=rayleigh_weight, omega=w, sif=None, fwhm=10, type="GAUSSIAN"
+    )
+
+    plt.figure()
+    plt.plot(w, inelastic, label="inel")
+    plt.plot(w, elastic, label="inel")
+    plt.plot(w, spectrum, label="inel")
+    plt.legend()
+    plt.xlabel(r"$\omega$ [eV]")
+    plt.xlabel("Intensity [a.u.]")
     plt.show()
 
     k = np.linspace(0.5, 10, 1000)
