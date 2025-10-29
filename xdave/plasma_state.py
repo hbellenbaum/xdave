@@ -7,6 +7,9 @@ import numpy as np
 from plasmapy.formulary.mathematics import Fermi_integral as fdi
 
 
+from dataclasses import dataclass
+
+
 def get_Z(Z):
     Z_min = np.floor(Z)
     Z_max = np.ceil(Z)
@@ -103,6 +106,7 @@ def get_rs_theta_from_rho_T_SI(rho, T, atomic_mass):
     return rs, theta
 
 
+# @dataclass(slots=True)
 class PlasmaState:
 
     def __init__(

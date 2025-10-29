@@ -221,7 +221,7 @@ def run_ch_ar_mode(T, rho, xH, ZH, ZC, angle, user_defined_ipd=0.0, user_defined
         min_wave_number=k_min,
         max_wave_number=k_max,
     )
-    k, WR, f1, f2, q1, q2, S11, S12, S22 = xrts_code_single_ar(params=params)
+    k, WR, f1, f2, q1, q2, S11, S12, S22, lfc = xrts_code_single_ar(params=params)
     return k, WR, f1, f2, q1, q2, S11, S12, S22
 
 

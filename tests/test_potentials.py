@@ -1,15 +1,10 @@
 import sys
 
-sys.path.insert(1, "/home/bellen85/code/dev/xdave/xdave")
+sys.path.insert(1, "./xdave")
 
 from unit_conversions import ang_TO_m, eV_TO_K, g_per_cm3_TO_kg_per_m3, amu_TO_kg
-from constants import BOLTZMANN_CONSTANT, VACUUM_PERMITTIVITY, BOHR_RADIUS, ELEMENTARY_CHARGE
-from plasma_state import PlasmaState
-from static_sf import OCPStaticStructureFactor, MCPStaticStructureFactor
-
+from constants import BOLTZMANN_CONSTANT, BOHR_RADIUS
 from potentials import *
-from xdave import xDave
-from models import ModelOptions
 
 import numpy as np
 import matplotlib.pyplot as plt
@@ -38,8 +33,6 @@ def test_ii_potentials():
     Ti = 1.75 * eV_TO_K
     rho = 6.26 * g_per_cm3_TO_kg_per_m3  # g/cc
 
-    # T = 1.0e5  # K
-    # ni = 1.23e23 * per_cm3_TO_per_m3  # cm^-3
     Zi = 3
     Zf = 3
     atomic_weight = 26.9815384 * amu_TO_kg
@@ -48,7 +41,6 @@ def test_ii_potentials():
 
     beta = 1 / (BOLTZMANN_CONSTANT * Ti)
 
-    # Rii = (3 / (4 * np.pi * ni)) ** (1 / 3)
     kappa_e = 1.24 / BOHR_RADIUS
     gamma_ii = 0.2 / BOHR_RADIUS
     ion_core_radius = 1 * ang_TO_m

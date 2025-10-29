@@ -1,7 +1,6 @@
 from constants import DIRAC_CONSTANT, SPEED_OF_LIGHT, BOHR_RADIUS, PI, ATOMIC_MASS_UNIT
 from unit_conversions import eV_TO_J
 
-# from mendeleev import element
 from scipy.fft import dst
 import pandas as pd
 import numpy as np
@@ -210,9 +209,6 @@ def laplace(tau, E, wff, wbf):
 def get_atomic_data_for_all_elements(elements):
 
     nstates = len(elements)
-    # assert len(states) == len(
-    #     elements
-    # ), f"Trying to set up {len(states)} states with {len(elements)} elements. Try to be consistent."
 
     atomic_masses = np.zeros_like(elements, dtype=float)
     atomic_numbers = np.zeros_like(elements, dtype=float)
@@ -226,8 +222,11 @@ def get_atomic_data_for_all_elements(elements):
 
 
 def get_atomic_mass_for_element(e):
+    """
+    Loading data from the x-ray Data Booklet
+    """
     ANs, elements, amus, _ = np.genfromtxt(
-        "/home/bellen85/code/dev/xdave/xdave/data/atomic_data.csv",
+        os.path.join(os.path.dirname(__file__), "data/atomic_data.csv"),
         delimiter=",",
         skip_header=1,
         dtype=None,
@@ -237,10 +236,6 @@ def get_atomic_mass_for_element(e):
     atomic_weight = amus[idx]
     atomic_number = ANs[idx]
     return atomic_weight, atomic_number
-
-    # y = element(int(AN))
-    # amu = y.atomic_weight
-    # return element(str(e)).atomic_weight, element(str(e)).atomic_number
 
 
 def get_binding_energies_from_element(AN):
@@ -290,7 +285,9 @@ def find_nearest(array, value):
         return array[idx], idx
 
 
-# Fourier transform stuff
+# ----------------------- #
+# Fourier transform stuff #
+# ----------------------- #
 
 
 def forward_transform_fft(yr, r, k, dr, dk):

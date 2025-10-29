@@ -1,6 +1,6 @@
 import sys
 
-sys.path.insert(1, "/home/bellen85/code/dev/xdave/xdave")
+sys.path.insert(1, "./xdave")
 
 from unit_conversions import (
     amu_TO_kg,
@@ -60,13 +60,9 @@ def test_ocp():
     Sii_xHNC = kernel.get_ii_static_structure_factor(k=k, sf_model="EXTENDED_HNC")
     Sii_MSA = kernel.get_ii_static_structure_factor(k=k, sf_model="MSA")
 
-    fn = os.path.join(
-        THIS_DIR, "comparison_data/static_sf/Wuensch_Thesis_Fig4-5/T_4eV_Gamma_12.3_HNC-OCP.csv"
-    )  # os.path.join(DATA_DIR, f"T_{T*K_TO_eV:.0f}eV_Gamma_{Gamma:.1f}_HNC-OCP.csv")
+    fn = os.path.join(THIS_DIR, "comparison_data/static_sf/Wuensch_Thesis_Fig4-5/T_4eV_Gamma_12.3_HNC-OCP.csv")
     dat1 = np.genfromtxt(fn, delimiter=",")
-    fn = os.path.join(
-        THIS_DIR, "comparison_data/static_sf/Wuensch_Thesis_Fig4-5/T_4eV_Gamma_12.3_MSA-OCP.csv"
-    )  # os.path.join(DATA_DIR, f"T_{T*K_TO_eV:.0f}eV_Gamma_{Gamma:.1f}_HNC-OCP.csv")
+    fn = os.path.join(THIS_DIR, "comparison_data/static_sf/Wuensch_Thesis_Fig4-5/T_4eV_Gamma_12.3_MSA-OCP.csv")
     dat11 = np.genfromtxt(fn, delimiter=",")
 
     T = 20 * eV_TO_K
@@ -97,7 +93,6 @@ def test_ocp():
 
     kernel = OCPStaticStructureFactor(state=state, ion_core_radius=sigma_c, max_iterations=5000, mix_fraction=0.9)
     Sii_HNC2 = kernel.get_ii_static_structure_factor(k=k, sf_model="HNC")
-    # Sii_xHNC2 = kernel.get_ii_static_structure_factor(k=k, sf_model="EXTENDED_HNC")
     Sii_MSA2 = kernel.get_ii_static_structure_factor(k=k, sf_model="MSA")
 
     fig, ax = plt.subplots(1, 1, figsize=(12, 8))
@@ -115,7 +110,6 @@ def test_ocp():
         marker="o",
     )
     ax.plot(k * BOHR_RADIUS, Sii_HNC2, label=f"HNC, Gamma={Gamma2:.1f}", c="navy", ls="-.")
-    # plt.plot(k * BOHR_RADIUS, Sii_xHNC2, label="xHNC", c="navy", ls=":")
     ax.plot(k * BOHR_RADIUS, Sii_MSA2, label=f"MSA, Gamma={Gamma2:.1f}", c="dodgerblue", ls="--")
     ax.scatter(
         dat2[:, 0] * BOHR_RADIUS / Rii2, dat2[:, 1], label=f"HNC - Wuensch, Gamma={Gamma2:.1f}", c="black", marker="x"
@@ -133,7 +127,6 @@ def test_ocp():
     ax.set_xlabel(r"$k$ [$a_B^{-1}$]")
     ax.set_ylabel(r"$S_{ii}(k)$")
     plt.show()
-    # fig.savefig(f"static_ii_sf_comparison.pdf", dpi=200)
 
 
 def test_mcp():
@@ -224,6 +217,7 @@ def test_wuensch_Fig616():
     # Comparison against Wuensch Thesis Fig. 6.16 (b)
     # Note that the difference at small k is likely due to the difference in inverse screening lengths used in the DH ii potential
     # THEMIS uses the Yukawa model with alpha = 1 / inverse_screening_length whereas I define alpha as 2/Rii
+    # Yukawa ii potential, FWS screening, DFT form factor
 
     nH = 5e22 * per_cm3_TO_per_m3
     nC = nH
@@ -232,7 +226,6 @@ def test_wuensch_Fig616():
     T = 8  # eV
     mC = 12.011 * amu_TO_kg
     mH = 1.008 * amu_TO_kg
-    # Yukawa ii potential, FWS screening, DFT form factor
     rho = nC * mC + nH * mH
     rho *= kg_per_m3_TO_g_per_cm3
     models = ModelOptions()
@@ -261,7 +254,6 @@ def test_wuensch_Fig616():
         delta=1.0e-12,
     )
     Sab = sf.get_ab_static_structure_factor(k=ks, sf_model="HNC", pseudo_potential="DEBYE_HUCKEL")
-    # print(Sab[0, 0, :])
 
     HH_dat = np.genfromtxt(
         os.path.join(THIS_DIR, "comparison_data/static_sf/Wuensch_Thesis_Fig6-16/Fig6-16b_HH.csv"), delimiter=","
@@ -281,8 +273,6 @@ def test_wuensch_Fig616():
     ax.scatter(CC_dat[:, 0] * per_A_TO_per_aB, CC_dat[:, 1], label="Wuensch: CC", c="red", marker="x")
     ax.plot(ks * BOHR_RADIUS, Sab[1, 1, :], label="CC", c="red", ls="-.")
     ax.legend()
-    # ax.set_xlim(-1, 12)
-    # ax.set_xlim(-1, 12)
     plt.show()
 
 
@@ -292,6 +282,8 @@ def test_wuensch_Fig617():
     # Tricky because of the input format I've chosen here,
     # getting to the same number densities while being forced to input a mass density
     # and not knowing the composition of CH and CH2 in Wuensch's work
+    # Yukawa ii potential, FWS screening, DFT form factor
+
     ni = 5.0e22 * per_cm3_TO_per_m3
     ZC = 2
     ZH = 1
@@ -301,21 +293,10 @@ def test_wuensch_Fig617():
 
     mC = 12.011 * amu_TO_kg
     mH = 1.008 * amu_TO_kg
-    mCH = mC + mH
-    mCH2 = mC + 2 * mH
-    # Yukawa ii potential, FWS screening, DFT form factor
-    # rho_C = ni * mC * kg_per_m3_TO_g_per_cm3
-    # rho_CH = ni * mCH * kg_per_m3_TO_g_per_cm3
-    # rho_CH2 = ni * mCH2 * kg_per_m3_TO_g_per_cm3
 
     rho_C = nC * mC * kg_per_m3_TO_g_per_cm3
     rho_CH = 1.2
     rho_CH2 = 0.97 * 0.3
-    # rho_C *= kg_per_m3_TO_g_per_cm3
-    # rho_CH = 0.1 * nC * mC + nH * mH
-    # rho_CH *= kg_per_m3_TO_g_per_cm3
-    # rho_CH2 = nC * mC + 2 * nH * mH
-    # rho_CH2 *= kg_per_m3_TO_g_per_cm3
 
     # set up kernel for CH case
     models = ModelOptions()
@@ -392,7 +373,6 @@ def test_wuensch_Fig617():
         delta=1.0e-10,
     )
     Sab_CH = sf_CH.get_ab_static_structure_factor(k=ks, sf_model="HNC", pseudo_potential="DEBYE_HUCKEL")
-    # Sab_CH_tot = partial_densities[0] * Sab_CH[0,0,:] + partial_densities[0] * Sab_CH[0,1,:] + partial_densities[2] * Sab_CH[1,1,:]
 
     mix_fraction = 0.99
 

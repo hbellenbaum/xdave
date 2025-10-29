@@ -254,7 +254,7 @@ class OCPStaticStructureFactor:
         Ti = self.state.ion_temperature
         Zi = self.state.ion_charge
         ni = self.state.ion_number_density
-        Rii = self.Rii  # self.state.mean_sphere_radius(number_density=ni)
+        Rii = self.Rii
         beta = 1 / (BOLTZMANN_CONSTANT * Ti)  # [1/J]
         n = self.n  # per themis [#]
 
@@ -365,10 +365,9 @@ class OCPStaticStructureFactor:
         return ks, rs, giir, hiir, Siik
 
     def xhnc_ocp_ii(self, k, pseudo_potential, bridge_function):
-        # Ti = self.overlord_state.ion_temperature
         Zi = self.state.ion_charge
         ni = self.state.ion_number_density
-        Rii = self.Rii  # self.overlord_state.mean_sphere_radius(number_density=ni)
+        Rii = self.Rii
         beta = self.beta  # 1 / (BOLTZMANN_CONSTANT * Ti)  # [1/J]
         n = self.n  # 8192  # per themis [#]
 
@@ -594,9 +593,6 @@ class MCPStaticStructureFactor:
             self.overlord_state.electron_temperature,
             self.overlord_state.free_electron_number_density,
         ).real
-        # kappa_e = self.overlord_state.debye_screening_length(
-        #     1, self.overlord_state.free_electron_number_density, self.overlord_state.electron_temperature
-        # )
         # Set up grid
         r0 = 1.0e-3 * BOHR_RADIUS  # [m]
         rf = 1.0e2 * BOHR_RADIUS  # [m]
@@ -663,22 +659,6 @@ class MCPStaticStructureFactor:
             h_ks = np.moveaxis(h_ks, 0, -1)
             # Setting the first element to -1.0, this is wrong, but works for now
             h_ks = np.insert(h_ks, 0, -1.0, axis=-1)
-
-            # Dc = D @ c_ks
-            # M = I[..., None] - Dc
-            # M = np.moveaxis(M, -1, 0)
-            # conds = np.linalg.cond(M)
-
-            # good_idx = np.where(conds < 1.0e12)[0]
-            # bad_idx = np.where(conds >= 1.0e12)[0]
-            # h_ks = np.empty_like(c_ks)
-            # if len(good_idx) > 0:
-            #     M_good = M[good_idx]
-            #     c_good = c_ks[..., good_idx].transpose(2, 0, 1)
-            #     h_good = np.linalg.solve(M_good.transpose(0, 2, 1), c_good.transpose(0, 2, 1)).transpose(0, 2, 1)
-            #     h_ks[..., good_idx] = h_good.transpose(1, 2, 0)
-            # for ik in bad_idx:
-            #     h_ks[..., ik] = c_ks[..., ik] @ np.linalg.pinv(M[ik])
 
             # indirect correlation function
             Ns_ks = h_ks - cs_ks

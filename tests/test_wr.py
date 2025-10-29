@@ -1,6 +1,6 @@
 import sys
 
-sys.path.insert(1, "/home/bellen85/code/dev/xdave/xdave")
+sys.path.insert(1, "./xdave")
 
 from unit_conversions import ang_TO_m, eV_TO_K, g_per_cm3_TO_kg_per_m3, per_aB_TO_per_A
 from constants import BOLTZMANN_CONSTANT, VACUUM_PERMITTIVITY, BOHR_RADIUS, ELEMENTARY_CHARGE

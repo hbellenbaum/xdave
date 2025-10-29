@@ -1,6 +1,6 @@
 import sys
 
-sys.path.insert(1, "/home/bellen85/code/dev/xdave/xdave")
+sys.path.insert(1, "./xdave")
 
 from plasma_state import PlasmaState
 from models import ModelOptions
@@ -141,17 +141,6 @@ def test_be_bf():
     pwffa = np.genfromtxt(f"validation/bf_dsf/mattern2013/Be_PWFFA.csv", delimiter=",")
     rsgf = np.genfromtxt(f"validation/bf_dsf/mattern2013/Be_RSGF.csv", delimiter=",")
     rsgf_core = np.genfromtxt(f"validation/bf_dsf/mattern2013/RSGF_Be_3.6_core.csv", delimiter=",")
-
-    # plt.figure()
-    # plt.scatter(exp_data[:, 0], exp_data[:, 1], label="Exp", c="k")
-    # plt.plot(hm_data[:, 0], hm_data[:, 1], label="HM", c="magenta")
-    # plt.plot(ia_data[:, 0], ia_data[:, 1], label="IA", c="navy")
-    # plt.plot(pwffa[:, 0], pwffa[:, 1], label="PWFFA", c="crimson")
-    # plt.plot(rsgf[:, 0], rsgf[:, 1], label="RSGF", c="orange", marker=".")
-    # plt.plot(rsgf_core[:, 0], rsgf_core[:, 1], label="RSGF - core", c="darkgreen", marker=".")
-    # plt.legend()
-    # plt.ylim(-0.05, 0.35)
-    # plt.show()
 
 
 if __name__ == "__main__":

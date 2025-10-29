@@ -1,7 +1,7 @@
 import sys
 
-sys.path.insert(1, "/home/bellen85/code/dev/xdave/xdave")
-sys.path.insert(1, "/home/bellen85/code/dev/xdave/mcss_tests")
+sys.path.insert(1, "./xdave")
+sys.path.insert(1, "./mcss_tests")
 
 from constants import BOHR_RADIUS
 from unit_conversions import g_per_cm3_TO_kg_per_m3, eV_TO_K, per_m3_TO_per_cm3
@@ -26,8 +26,6 @@ def test():
     theta = 1
 
     rho, T = get_rho_T_from_rs_theta(rs=rs, theta=theta)
-    # rho *= g_per_cm3_TO_kg_per_m3
-    # T *= eV_TO_K
 
     elements = np.array(["C", "C"])
     partial_densities = np.array([0, 1])
@@ -51,7 +49,6 @@ def test():
     lfc_dornheim = np.zeros_like(ks)
     lfc_farid = np.zeros_like(ks)
 
-    # for i in range(0, len(ks)):
     kernel = LFC(state=state)
     lfc_interp = kernel.calculate_lfc(k=ks, w=0.0, model="PADE_INTERP")
     lfc_ui = kernel.calculate_lfc(k=ks, w=0.0, model="UI")
@@ -66,7 +63,7 @@ def test():
     plt.plot(ks / kF, lfc_gv, label="GV")
     plt.plot(ks / kF, lfc_farid, label="Farid")
     plt.plot(ks / kF, lfc_dornheim, label="ESA")
-    plt.xlabel(r"$k/k_F$")  # [$a_B^{-1}$]")
+    plt.xlabel(r"$k/k_F$")
     plt.ylabel(r"$G_{ee}(k)$")
     plt.legend()
     plt.show()
@@ -121,9 +118,7 @@ def test_ui_gv_mcss():
     )
 
     kF1 = 1 / rs * (3 / 4 * np.pi) ** 3
-    ks1 = np.linspace(0, 20, 500) / BOHR_RADIUS  # state1.fermi_wave_number(state1.free_electron_number_density)
-    # ks1 = k_UI / BOHR_RADIUS
-    # ks2 = np.linspace(0, 20, 500) / BOHR_RADIUS  #  state2.fermi_wave_number(state2.free_electron_number_density)
+    ks1 = np.linspace(0, 20, 500) / BOHR_RADIUS
     lfcs1_interp = np.zeros_like(ks1)
     lfcs1_gv = np.zeros_like(ks1)
     lfcs1_ui = np.zeros_like(ks1)
@@ -141,8 +136,6 @@ def test_ui_gv_mcss():
     plt.plot(ks1 * BOHR_RADIUS, lfcs1_ui, label="UI", c="purple", ls="-.")
     plt.plot(k_UI, lfc_UI, label="MCSS: UI", c="purple", ls="solid")
     plt.plot(k_GV, lfc_GV, label="MCSS: GV", c="crimson", ls="solid")
-    # plt.plot(datT1[:, 0], datT1[:, 1], label=f"Gregori et al., T=20", ls="solid", c="navy")
-    # plt.plot(k_interp, lfc_interp, label="MCSS: Interp", c="navy", ls="solid")
     plt.legend()
     plt.show()
 
@@ -192,8 +185,8 @@ def test_gregori_2007():
     kernel1 = LFC(state=state1)
     kernel2 = LFC(state=state2)
 
-    ks1 = np.linspace(0, 20, 500) / BOHR_RADIUS  # state1.fermi_wave_number(state1.free_electron_number_density)
-    ks2 = np.linspace(0, 20, 500) / BOHR_RADIUS  #  state2.fermi_wave_number(state2.free_electron_number_density)
+    ks1 = np.linspace(0, 20, 500) / BOHR_RADIUS
+    ks2 = np.linspace(0, 20, 500) / BOHR_RADIUS
     lfcs1 = np.zeros_like(ks1)
     lfcs1_gv = np.zeros_like(ks1)
     lfcs1_ui = np.zeros_like(ks2)
@@ -237,13 +230,8 @@ def test_gregori_2007():
     # Note to self: I don't think the data in Gianluca's paper Fig. 1 (a) is actually plotted against k/kF
     # I think it's actually k in a_B^{-1}
     plt.plot(datT1[:, 0], datT1[:, 1], label=f"Gregori et al., T=20", ls="solid", c="navy")
-    # plt.plot(
-    #     ks2 / state2.fermi_wave_number(state2.free_electron_number_density), lfcs2, label=f"T=4", ls="-.", c="crimson"
-    # )
-    # plt.plot(datT2[:, 0], datT2[:, 1], label=f"Gregori et al., T=20", ls="solid", c="crimson")
     plt.legend()
     plt.show()
-    # plt.savefig(f"gregori_test.pdf", dpi=200)
 
 
 def test_fortmann_2010():
@@ -295,7 +283,6 @@ def test_fortmann_2010():
     plt.plot(dat_farid[:, 0], dat_farid[:, 1], label=f"Fortmann et al., Farid", ls="solid", c="crimson")
     plt.legend()
     plt.show()
-    # plt.savefig(f"fortmann_test.pdf", dpi=200)
 
 
 def test_farid():
@@ -374,7 +361,7 @@ def test_dornheim_2021():
     )
     kernel2 = LFC(state=state2)
 
-    ks = np.linspace(0, 100, 100) / BOHR_RADIUS  # state1.fermi_wave_number(state1.free_electron_number_density)
+    ks = np.linspace(0, 100, 100) / BOHR_RADIUS
     lfc_theta1 = np.zeros_like(ks)
     lfc_theta2 = np.zeros_like(ks)
 
@@ -387,7 +374,6 @@ def test_dornheim_2021():
         fn = os.path.join(THIS_DIR, f"comparison_data/lfc/Dornheim_2021_Fig7b")
         dat_theta1 = np.genfromtxt(fn + f"_theta_{theta1:.0f}.csv", delimiter=",")
         dat_theta2 = np.genfromtxt(fn + f"_theta_{theta2:.0f}.csv", delimiter=",")
-        # kF1 = 1 / rs * (3 / 4 * np.pi) ** 3
     elif rs == 5:
         fn = os.paht.join(THIS_DIR, f"comparison_data/lfc/Dornheim_et_al_Geek0_rs=5")
         dat_theta1 = np.genfromtxt(fn + f"_Theta={theta1:.0f}.csv", delimiter=",")
@@ -408,8 +394,6 @@ def test_dornheim_2021():
         label=rf"$\theta$={theta2}",
         marker="x",
     )
-    # plt.plot(ks, lfc_theta1, label=rf"$\theta$={theta1}")
-    # plt.plot(ks, lfc_theta2, label=rf"$\theta$={theta2}")
     plt.plot(dat_theta1[:, 0] * kF1, dat_theta1[:, 1], label=f"Dornheim et al., theta={theta1}")
     plt.plot(dat_theta2[:, 0] * kF1, dat_theta2[:, 1], label=f"Dornheim et al., theta={theta2}")
     plt.title(rf"$r_s$={rs}")
@@ -417,7 +401,6 @@ def test_dornheim_2021():
     plt.xlabel(r"$k$ [$a_B^{-1}$]")
     plt.legend()
     plt.show()
-    # plt.savefig(f"dornheim_test.pdf", dpi=200)
 
 
 def test_ui():
@@ -443,18 +426,15 @@ def test_ui():
         state = xrts_code.overlord_state
         kF = state.fermi_wave_number(state.free_electron_number_density)
         ks = np.linspace(0, 5, 500) * kF
-        # lfcs = np.zeros_like(ks)
         lfcs_iu = np.zeros_like(ks)
 
         kernel = LFC(state=state)
 
         for i in range(0, len(ks)):
-            # lfcs[i] = kernel.calculate_lfc(k=ks[i], w=0, model="FARID")
             lfcs_iu[i] = kernel.calculate_lfc(k=ks[i], w=0, model="UI")
 
         fn = os.path.join(THIS_DIR, f"comparison_data/lfc/Utsumi_Ichimaru_Geek0_rs={rs:.0f}.csv")
         dat = np.genfromtxt(fn, delimiter=",")
-        # plt.plot(ks / kF, lfcs, label=f"rs={rs}", ls="-.", c=c)
         plt.plot(ks / kF, lfcs_iu, label=f"UI: rs={rs}", ls=":", c=c)
         plt.plot(dat[:, 0], dat[:, 1], label=f"Ichimaru et al., rs={rs}", ls="solid", c=c)
 
@@ -463,13 +443,10 @@ def test_ui():
     plt.ylabel(r"$G_{ee}(k)$")
     plt.xlabel(r"$k/k_F$")
     plt.show()
-    # plt.savefig(f"ui_test.pdf", dpi=200)
 
 
 def test_gv():
 
-    # rs1 = 2
-    # rs2 = 3
     theta = 1
     rss = np.array([2, 3])
 
@@ -500,7 +477,7 @@ def test_gv():
             # lfcs[i] = kernel.calculate_lfc(k=ks[i], w=0, model="FARID")
             lfcs_iu[i] = kernel.calculate_lfc(k=ks[i], w=0, model="GV")
 
-        fn = f"/home/bellen85/code/dev/xdave/mcss_tests/mcss_outputs_lfc/lfc=gv_rs={rs:.0f}_theta=1.csv"
+        fn = os.path.join(os.path.dirname(__file__), f"./mcss_tests/mcss_outputs_lfc/lfc=gv_rs={rs:.0f}_theta=1.csv")
         dat = np.genfromtxt(fn, delimiter=",", skip_header=1)
         # plt.plot(ks / kF, lfcs, label=f"rs={rs}", ls="-.", c=c)
         plt.plot(ks / kF, lfcs_iu, label=f"GV: rs={rs}", ls=":", c=c)

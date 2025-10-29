@@ -136,8 +136,10 @@ class xDave:
         for i in range(0, self.number_of_states):
             x = self.partial_densities[i]
             Z = self.charge_states[i]
+            Z_mean += x * Z
             ni = x * self.mass_density / sum_term
             AN = atomic_numbers[i]
+            AN_mean += x * AN
             amu = atomic_masses[i] / ATOMIC_MASS_UNIT  # this is also dumb!
             amu_mean += x * amu
             binding_energies = get_binding_energies_from_element(AN)
@@ -165,6 +167,26 @@ class xDave:
         self.ocp_flag = (len(np.unique(atomic_numbers)) < len(states)) and len(states) <= 2
         return np.array(states), overlord_state
 
+    def run(self, w, k=None, angle=None, beam_energy=None, mode="DYNAMIC"):
+
+        self._print_logo()
+
+        if angle is None:
+            assert k is not None, f"You have to set either the angle or the scattering wave number."
+            angle = calculate_angle(q=k, energy=beam_energy)
+        elif k is None:
+            assert angle is not None, f"You have to set either the angle or the scattering wave number."
+            assert beam_energy is not None, f"If you set an angle, you also need to specify the beam energy."
+            k = calculate_q(angle=angle, energy=beam_energy)
+
+        k_SI = k / BOHR_RADIUS
+        w_SI = w * eV_TO_J
+
+        if mode == "DYNAMIC":
+            return self._run_dynamic_mode(k=k_SI, w=w_SI)
+        elif mode == "STATIC":
+            return self._run_static_mode(k=k_SI)
+
     def _bf_norm(self, w, ff, bf, k):
         """
         Calculate normalization on the BF factor to enforce the f-sum rule.
@@ -177,7 +199,7 @@ class xDave:
         A = -1 / dF_bf * (f_sum + dF_ff)
         return A
 
-    def run(self, k, w):
+    def _run_dynamic_mode(self, k, w):
         """
         Main run function. Internally, everything is run in SI units.
 
@@ -192,15 +214,9 @@ class xDave:
             array: Contributions to the ff DSF by each species in units of 1/eV (non-sensical, for completeness only)
             array: Contributions to the bf DSF by each species in units of 1/eV
         """
-        # k /= BOHR_RADIUS
-        k_value = k / BOHR_RADIUS
-        # w *= eV_TO_J
-        omega_array = w.copy() * eV_TO_J
-
-        self._print_logo()
 
         lfc_kernel = LFC(state=self.overlord_state)
-        lfc = lfc_kernel.calculate_lfc(k=k_value, w=omega_array, model=self.models.lfc_model)
+        lfc = lfc_kernel.calculate_lfc(k=k, w=w, model=self.models.lfc_model)
         print(f"Calculated LFC={lfc}")
 
         if self.ipd_eV is not None:
@@ -211,13 +227,13 @@ class xDave:
             print(f"Calculated IPD={ipd * J_TO_eV} eV")
 
         ff = FreeFreeDSF(state=self.overlord_state)
-        ff_dsf = ff.get_dsf(k=k_value, w=omega_array, lfc=lfc, model=self.models.polarisation_model)
+        ff_dsf = ff.get_dsf(k=k, w=w, lfc=lfc, model=self.models.polarisation_model)
         # the factor of Z/AN is needed to match MCSS results, I will need to figure out where it comes from
         ff_tot = ff_dsf * self.overlord_state.charge_state / self.overlord_state.atomic_number
 
-        bf_tot = np.zeros_like(omega_array)
-        ff_i = np.zeros((len(self.states), len(omega_array)))
-        bf_i = np.zeros((len(self.states), len(omega_array)))
+        bf_tot = np.zeros_like(w)
+        ff_i = np.zeros((len(self.states), len(w)))
+        bf_i = np.zeros((len(self.states), len(w)))
 
         print(f"Mean charge state = {self.overlord_state.charge_state}.")
 
@@ -237,23 +253,24 @@ class xDave:
                 )
 
             bf = BoundFreeDSF(state=state)
-            bf_dsf = bf.get_dsf(
-                ZA=state.atomic_number, Zb=state.Zb, k=k_value, w=omega_array, Eb=Eb, model=self.models.bf_model
-            )
-            bf_tot += x * bf_dsf  # * state.charge_state  # / state.atomic_number
-            bf_i[i] = x * bf_dsf  # * state.charge_state  # / state.atomic_number
+            bf_dsf = bf.get_dsf(ZA=state.atomic_number, Zb=state.Zb, k=k, w=w, Eb=Eb, model=self.models.bf_model)
+            bf_tot += x * bf_dsf
+            bf_i[i] = x * bf_dsf
 
         # Calculate the Rayleigh weight
         if self.ocp_flag:
-            wr_kernel = OCPRayleighWeight(state=self.overlord_state, ion_core_radius=1.0 * BOHR_RADIUS)
+            wr_kernel = OCPRayleighWeight(
+                overlord_state=self.overlord_state, state=self.states[0], ion_core_radius=1.0 * BOHR_RADIUS
+            )
             rayleigh_weight = wr_kernel.get_rayleigh_weight(
-                k=k_value,
+                k=k,
                 lfc=lfc,
                 sf_model=self.models.sf_model,
                 ii_potential=self.models.ii_potential,
                 ee_potential=self.models.ee_potential,
                 ei_potential=self.models.ei_potential,
                 screening_model=self.models.screening_model,
+                bridge_function=self.models.bridge_function,
                 return_full=False,
             )
         else:
@@ -261,7 +278,7 @@ class xDave:
                 overlord_state=self.overlord_state, states=self.states, ion_core_radius=1.0 * BOHR_RADIUS
             )
             rayleigh_weight = wr_kernel.get_rayleigh_weight(
-                k=k_value,
+                k=k,
                 lfc=lfc,
                 sf_model=self.models.sf_model,
                 ii_potential=self.models.ii_potential,
@@ -277,9 +294,11 @@ class xDave:
         # Divide by the atomic number to be consistent with the ff component
         bf_tot /= self.overlord_state.atomic_number
         dsf = ff_tot + bf_tot
+
+        # convert everything to cgs before returning results
         return bf_tot / J_TO_eV, ff_tot / J_TO_eV, dsf / J_TO_eV, rayleigh_weight, ff_i / J_TO_eV, bf_i / J_TO_eV
 
-    def run_static_mode(self, k):
+    def _run_static_mode(self, k):
         """
         Main run function. Internally, everything is run in SI units.
 
@@ -295,21 +314,23 @@ class xDave:
             array: array of the form factors for each species, non-dimensional
         """
 
-        k_array = k.copy() / BOHR_RADIUS
         lfc_kernel = LFC(state=self.overlord_state)
-        lfc = lfc_kernel.calculate_lfc(k=k_array, w=0, model=self.models.lfc_model)
-        print(f"Calculated LFC={lfc}")
+        lfc = lfc_kernel.calculate_lfc(k=k, w=0, model=self.models.lfc_model)
+        # print(f"Calculated LFC={lfc}")
 
         if self.ocp_flag:
-            wr_kernel = OCPRayleighWeight(state=self.overlord_state, ion_core_radius=1.0 * BOHR_RADIUS)
+            wr_kernel = OCPRayleighWeight(
+                overlord_state=self.overlord_state, state=self.states[0], ion_core_radius=1.0 * BOHR_RADIUS
+            )
             _, Sab, rayleigh_weight, qs, fs = wr_kernel.get_rayleigh_weight(
-                k=k_array,
+                k=k,
                 lfc=lfc,
                 sf_model=self.models.sf_model,
                 ii_potential=self.models.ii_potential,
                 ee_potential=self.models.ee_potential,
                 ei_potential=self.models.ei_potential,
                 screening_model=self.models.screening_model,
+                bridge_function=self.models.bridge_function,
                 return_full=True,
             )
 
@@ -318,7 +339,7 @@ class xDave:
                 overlord_state=self.overlord_state, states=self.states, ion_core_radius=1.0 * BOHR_RADIUS
             )
             _, Sab, rayleigh_weight, qs, fs = wr_kernel.get_rayleigh_weight(
-                k=k_array,
+                k=k,
                 lfc=lfc,
                 sf_model=self.models.sf_model,
                 ii_potential=self.models.ii_potential,
@@ -327,11 +348,12 @@ class xDave:
                 screening_model=self.models.screening_model,
                 return_full=True,
             )
-        return k, Sab, rayleigh_weight, qs, fs
+
+        # Return outputs in cgs
+        return k * BOHR_RADIUS, Sab, rayleigh_weight, qs, fs
 
     def run_inelastic(self, k, w):
         k_value = k / BOHR_RADIUS
-        # w *= eV_TO_J
         omega_array = w.copy() * eV_TO_J
 
         lfc_kernel = LFC(state=self.overlord_state)
@@ -374,8 +396,8 @@ class xDave:
             bf_dsf = bf.get_dsf(
                 ZA=state.atomic_number, Zb=state.Zb, k=k_value, w=omega_array, Eb=Eb, model=self.models.bf_model
             )
-            bf_tot += x * bf_dsf  # * state.charge_state  # / state.atomic_number
-            bf_i[i] = x * bf_dsf  # * state.charge_state  # / state.atomic_number
+            bf_tot += x * bf_dsf
+            bf_i[i] = x * bf_dsf
 
         if self.enforce_fsum:
             bf *= self._bf_norm(w=w, ff=ff, bf=bf, k=k)

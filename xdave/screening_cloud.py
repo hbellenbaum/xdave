@@ -18,11 +18,6 @@ class ScreeningCloud:
     def __init__(self, state: PlasmaState, overlord_state=PlasmaState):
         self.state = state
         self.overlord_state = overlord_state
-        # self.screening_model = models.screening_model
-        # self.ei_potential = models.ei_potential
-        # self.kappa_e = 1 / self.state.debye_screening_length(
-        #     ELEMENTARY_CHARGE, self.state.electron_number_density, self.state.electron_temperature
-        # )
 
     def get_screening_cloud(
         self,
@@ -37,8 +32,6 @@ class ScreeningCloud:
         screening_length = 0.0
         Zi = self.state.ion_charge
 
-        # Uee = coulomb_k(Qa=1, Qb=1, k=k)
-        # Uei = coulomb_k(Qa=1, Qb=self.state.ion_charge, k=k)
         alpha = 2 / self.state.mean_sphere_radius(number_density=self.state.ion_number_density)
 
         if ee_potential == "COULOMB":
@@ -76,7 +69,7 @@ class ScreeningCloud:
 
     def _debye_huckel_screening(self, k):
         """
-        Small wavenumber limit of the screening cloud
+        Small wavenumber limit of the screening cloud in the RPA
         """
         kappa_e = self.overlord_state.screening_length(
             mass=ELECTRON_MASS,
@@ -85,30 +78,14 @@ class ScreeningCloud:
             number_density=self.overlord_state.total_electron_number_density,
         )
         kappa_e = np.real(kappa_e)
-        print(f"Inverse screening length = {kappa_e}")
         screening_length = kappa_e**2
         return screening_length
 
-    def _finite_wavelength_screening_long(self, k, Uee, Uei):
-        # kappa_e = self.state.screening_length(
-        #     mass=ELECTRON_MASS,
-        #     charge=1,
-        #     temperature=self.state.electron_temperature,
-        #     number_density=self.state.total_electron_number_density,
-        # ).real
-        kappa_e = self.overlord_state.debye_screening_length(
-            1, self.overlord_state.free_electron_number_density, self.overlord_state.electron_temperature
-        )
-        lfc = 0.0
-        # TODO(Hannah): use a simplified form for the dandrea fit here, for now, this works though
-
-        RPA_pol = FreeFreeDSF(state=self.overlord_state).susceptibility_function(k=k, w=0, model="DANDREA_FIT")
-        # screening_length = kappa_e * np.sqrt(-Uee * RPA_pol.real)
-        screening_cloud = Uei * RPA_pol.real / (1 - (1 - lfc) * Uee * RPA_pol.real)
-        # screening_cloud = RPA_pol * Uei / (1 - Uee * RPA_pol)
-        return screening_cloud  # screening_length**2
-
     def _finite_wavelength_screening_short(self, k):
+        r"""
+        FWS screening uses the RPA at omega=0 to estimate electronic screening.
+        Here, the Dandrea fit is used for a quick evaluation.
+        """
 
         kF = self.overlord_state.fermi_wave_number(self.overlord_state.free_electron_number_density)
         EF = self.overlord_state.fermi_energy(
@@ -179,41 +156,4 @@ class ScreeningCloud:
             (1 + a2 * x**2 + a4 * x**4 + a6 * x**6 + a8 * x**8)
             / (1 + b2 * x**2 + b4 * x**4 + b6 * x**6 + b8 * x**8 + b10 * x**10)
         )
-        return screening_length**2
-
-
-def test():
-    T = 4 * eV_TO_K
-    Zi = 2
-    rho = 498.16  # kg/m^3
-    state = PlasmaState(
-        electron_temperature=T,
-        ion_temperature=T,
-        mass_density=rho,
-        charge_state=Zi,
-        atomic_mass=2,
-        atomic_number=2,
-        binding_energies=None,
-    )
-
-    k = np.linspace(1.0e-1 / BOHR_RADIUS, 10 / BOHR_RADIUS, 200)
-
-    sigma_c = 2.15 * BOHR_RADIUS
-
-    kernel = ScreeningCloud(state=state, overlord_state=state)
-    f_fws = kernel.get_screening_cloud(
-        k=k, ion_core_radius=sigma_c, screening_model="FINITE_WAVELENGTH", ei_potential="COULOMB"
-    )
-    f_dh = kernel.get_screening_cloud(
-        k=k, ion_core_radius=sigma_c, screening_model="DEBYE_HUCKEL", ei_potential="COULOMB"
-    )
-
-    plt.figure()
-    plt.plot(k * BOHR_RADIUS, f_fws, label="FWS")
-    plt.plot(k * BOHR_RADIUS, f_dh, label="DH")
-    plt.legend()
-    plt.show()
-
-
-if __name__ == "__main__":
-    test()
+        return np.real(screening_length) ** 2

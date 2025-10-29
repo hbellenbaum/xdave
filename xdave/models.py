@@ -1,28 +1,16 @@
+from dataclasses import dataclass
+
+
+@dataclass(slots=True)
 class ModelOptions:
 
-    def __init__(
-        self,
-        ei_potential="YUKAWA",
-        ii_potential="YUKAWA",
-        ee_potential="YUKAWA",
-        polarisation_model="DANDREA_FIT",
-        sf_model="HNC",
-        lfc_model="DORNHEIM_ESA",
-        bf_model="SCHUMACHER",
-        ipd_model="CROWLEY",
-        bridge_function="IYETOMI",
-        screening_model="FINITE_WAVELENGTH",
-        # wr_model,
-    ):
-        self.ii_potential = ii_potential
-        self.ee_potential = ee_potential
-        self.ei_potential = ei_potential
-        self.screening_model = screening_model
-        self.polarisation_model = polarisation_model
-        self.sf_model = sf_model
-        self.lfc_model = lfc_model
-        self.bf_model = bf_model
-        self.ipd_model = ipd_model
-        self.bridge_function = bridge_function
-        self.screening_model = screening_model
-        # self.wr_model = wr_model
+    ei_potential: str = "YUKAWA"
+    ii_potential: str = "YUKAWA"
+    ee_potential: str = "YUKAWA"
+    polarisation_model: str = "DANDREA_FIT"
+    sf_model: str = "HNC"
+    lfc_model: str = "DORNHEIM_ESA"
+    bf_model: str = "SCHUMACHER"
+    ipd_model: str = "CROWLEY"
+    bridge_function: str = "IYETOMI"
+    screening_model: str = "FINITE_WAVELENGTH"

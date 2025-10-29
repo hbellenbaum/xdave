@@ -6,7 +6,7 @@ For more information, see: https://gitlab.com/heart-ray-tracing/HEART
 
 import sys
 
-sys.path.insert(1, "/home/bellen85/code/dev/xdave/xdave")
+sys.path.insert(1, "./xdave")
 
 from HEART import Spectrometer
 from HEART.standards.standard_spectrometers import *
@@ -16,7 +16,6 @@ import matplotlib.pyplot as plt
 
 
 def create_xdave_spectrum(plot=False):
-    plt.style.use("~/Desktop/resources/plotting/poster.mplstyle")
 
     T = 155.5  # eV
     rho = 30.0  # g/cc
@@ -73,7 +72,7 @@ def test():
     ## everything is in keV or mm
     Eb = 8  # keV
 
-    output_dir = f"/home/bellen85/code/dev/xdave/heart_outputs"
+    output_dir = f"./heart_outputs"
     fname = "test_heart_output"
 
     energy, P_inel, P_el, intensity = create_xdave_spectrum(plot=True)
