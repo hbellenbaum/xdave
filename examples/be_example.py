@@ -8,6 +8,7 @@ from plasma_state import get_fractions_from_Z
 from xdave import *
 
 import matplotlib.pyplot as plt
+import time
 
 
 def be_example():
@@ -41,7 +42,7 @@ def be_example():
         user_defined_inputs=None,
     )
 
-    w = np.linspace(-400, 1000, 1000)
+    w = np.linspace(-1000, 1000, 10000)
     bf_tot, ff_tot, dsf, rayleigh_weight, ff_i, bf_i = kernel.run(w=w, angle=75, beam_energy=8.0e3, mode="DYNAMIC")
 
     # this will convolve the dsf with a Gaussian sif of 10 eV fwhm
@@ -50,6 +51,8 @@ def be_example():
     inelastic, elastic, spectrum = kernel.convolve_with_sif(
         bf=bf_tot, ff=ff_tot, WR=rayleigh_weight, omega=w, sif=None, fwhm=10, type="GAUSSIAN"
     )
+
+    tau_array, F_tot_inel, F_wff, F_wbf = kernel.get_itcf(w=w, ff=ff_tot, bf=bf_tot)
     # plot results
     fig, axes = plt.subplots(2, 3, figsize=(16, 16))
 
@@ -102,8 +105,11 @@ def be_example():
     plt.xlabel("Intensity [a.u.]")
     plt.show()
 
+    start_time = time.time()
     k = np.linspace(0.5, 10, 1000)
     k, Sab, rayleigh_weight, qs, fs = kernel.run(w=w, k=k, beam_energy=8.0e3, mode="STATIC")
+    end_time = time.time()
+    print(f"Run took {end_time - start_time} s")
 
     fig, axes = plt.subplots(1, 2)
     ax = axes[0]

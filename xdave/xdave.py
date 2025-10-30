@@ -173,6 +173,9 @@ class xDave:
 
         if angle is None:
             assert k is not None, f"You have to set either the angle or the scattering wave number."
+            if beam_energy is None:
+                beam_energy = 8.0e3
+                print(f"Assuming beam energy of 8 keV.")
             angle = calculate_angle(q=k, energy=beam_energy)
         elif k is None:
             assert angle is not None, f"You have to set either the angle or the scattering wave number."
@@ -457,7 +460,7 @@ class xDave:
         inelastic = fftconvolve(tot_dsf, sif, mode="same")  # + WR * sif
         elastic = WR * sif
         spectrum = inelastic + elastic
-        return inelastic, elastic, spectrum
+        return inelastic[::-1], elastic[::-1], spectrum[::-1]
 
     def get_itcf(self, w, ff, bf, tau=None):
         if tau is None:

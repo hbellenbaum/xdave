@@ -81,6 +81,7 @@ def compare_mcss_xdave_be():
     ax.legend()
 
     tau_array, F_tot_inel, F_wff, F_wbf = kernel.get_itcf(w=omega_array, ff=ff_tot, bf=bf_tot)
+
     tau_array, F_tot_inel_mcss, F_wff_mcss, F_wbf_mcss = kernel.get_itcf(w=En_mcss, ff=wff_mcss, bf=wbf_mcss)
 
     ax = axes[1, 0]
@@ -179,7 +180,7 @@ def compare_mcss_xdave_c():
     ax.plot(tau_array, F_tot_inel, label="xDave inel", ls="dashed", c="magenta")
     ax.plot(tau_array, F_tot_inel_mcss / mcss_norm, label="MCSS inel", ls="dotted", c="purple")
     ax.axhline(WR, label=f"WR", c="navy", ls="-.")
-    ax.axhline(WR_mcss / mcss_norm, label=f"MCSS: WR", c="dodgerblue", ls=":")
+    ax.axhline(WR_mcss, label=f"MCSS: WR", c="dodgerblue", ls=":")
     ax.legend()
 
     ax = axes[1, 1]
@@ -421,7 +422,7 @@ def compare_mcss_xdave_ch_static():
 
 
 if __name__ == "__main__":
-    compare_mcss_xdave_be()
-    compare_mcss_xdave_ch()
+    # compare_mcss_xdave_be()
+    # compare_mcss_xdave_ch()
     compare_mcss_xdave_c()
     compare_mcss_xdave_ch_static()
