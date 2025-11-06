@@ -2,7 +2,6 @@ from models import ModelOptions
 from plasma_state import PlasmaState
 from constants import ELEMENTARY_CHARGE, BOHR_RADIUS
 from potentials import *
-from freefree_dsf import FreeFreeDSF
 
 from unit_conversions import *
 from constants import PI_SQR, SQRT_HALF_PI, SQRT_PI
@@ -15,7 +14,7 @@ from plasmapy.formulary.mathematics import Fermi_integral as fdi
 
 class ScreeningCloud:
 
-    def __init__(self, state: PlasmaState, overlord_state=PlasmaState):
+    def __init__(self, state: PlasmaState, overlord_state: PlasmaState):
         self.state = state
         self.overlord_state = overlord_state
 
