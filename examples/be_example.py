@@ -48,8 +48,8 @@ def be_example():
     # this will convolve the dsf with a Gaussian sif of 10 eV fwhm
     # if you want to use your own, you can add it as an input to the sif input option
     # note that for now this will have to be centered around 0
-    inelastic, elastic, spectrum = kernel.convolve_with_sif(
-        bf=bf_tot, ff=ff_tot, WR=rayleigh_weight, omega=w, sif=None, fwhm=10, type="GAUSSIAN"
+    spec_energy, inelastic, elastic, spectrum = kernel.convolve_with_sif(
+        omega=w, dsf=(bf_tot + ff_tot), Wr=rayleigh_weight, beam_energy=9.0e3, type="GAUSSIAN", fwhm=10
     )
 
     tau_array, F_tot_inel, F_wff, F_wbf = kernel.get_itcf(w=w, ff=ff_tot, bf=bf_tot)
@@ -97,9 +97,7 @@ def be_example():
     plt.show()
 
     plt.figure()
-    plt.plot(w, inelastic, label="inel")
-    plt.plot(w, elastic, label="inel")
-    plt.plot(w, spectrum, label="inel")
+    plt.plot(spec_energy, spectrum, label="inel")
     plt.legend()
     plt.xlabel(r"$\omega$ [eV]")
     plt.xlabel("Intensity [a.u.]")
@@ -107,19 +105,23 @@ def be_example():
 
     start_time = time.time()
     k = np.linspace(0.5, 10, 1000)
-    k, Sab, rayleigh_weight, qs, fs = kernel.run(w=w, k=k, beam_energy=8.0e3, mode="STATIC")
+    k, Sab, _, Wr, qs, fs, lfc = kernel.run(w=w, k=k, beam_energy=8.0e3, mode="STATIC")
+    data = dict({"k": k, "Sab": Sab, "Wr": Wr, "qs": qs, "fs": fs, "lfc": lfc})
+    kernel.save_result(fname="be_test_static", dirname=os.path.dirname(__file__), data=data, run_mode="STATIC")
     end_time = time.time()
     print(f"Run took {end_time - start_time} s")
 
     fig, axes = plt.subplots(1, 2)
     ax = axes[0]
-    ax.plot(k, rayleigh_weight, c="navy", label="WR")
+    ax.plot(k, Wr, c="navy", label="WR")
     ax.set_xlabel(r"$k$ [$a_B^{-1}$]")
     ax.set_ylabel(r"$W_R$ [#]")
     ax.legend()
 
     ax = axes[1]
-    ax.plot(k, Sab, label=r"$S_{ii}(k)$")
+    ax.plot(k, Sab[0, 0, :], label=r"$S_{11}(k)$")
+    ax.plot(k, Sab[0, 1, :], label=r"$S_{12}(k)$")
+    ax.plot(k, Sab[1, 1, :], label=r"$S_{22}(k)$")
     ax.set_xlabel(r"$k$ [$a_B^{-1}$]")
     ax.set_ylabel(r"$S_{ii}(k)$ [#]")
     ax.legend()

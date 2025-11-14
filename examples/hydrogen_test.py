@@ -27,8 +27,8 @@ def compare_hydrogen_against_pimc():
     Z_mean = 0.51
     ipd_best_fit = -3.43  # eV
     rho, T = get_rho_T_from_rs_theta(rs=rs, theta=theta, atomic_mass=atomic_mass)
-    rho *= g_per_cm3_TO_kg_per_m3
-    T *= eV_TO_K
+    # rho *= g_per_cm3_TO_kg_per_m3
+    # T *= eV_TO_K
 
     N = 14
     pimc_data_dir = f"/home/bellen85/code/dev/itcf_fitting/data/N{N}_rs{rs}_theta{theta:.0f}"
@@ -54,7 +54,7 @@ def compare_hydrogen_against_pimc():
         atomic_number=1,
     )
 
-    omega_array = np.linspace(-200, 200, 1000) * eV_TO_J
+    omega_array = np.linspace(-200, 200, 1000)
 
     models = ModelOptions(
         polarisation_model="NUMERICAL", bf_model="SCHUMACHER", lfc_model="DORNHEIM_ESA", ipd_model="NONE"
@@ -70,40 +70,40 @@ def compare_hydrogen_against_pimc():
         models=models,
         states=np.array([state_H0, state_H1]),
         fractions=xs,
-        binding_energies=np.array([-13.6]) * eV_TO_J,
+        binding_energies=np.array([-13.6]),
         rayleigh_weight=WR,
         sif=np.zeros_like(omega_array),
         ipd=ipd_best_fit,
     )
 
     q = q_value
-    k = q / BOHR_RADIUS
+    k = q  # / BOHR_RADIUS
 
     bf_tot, ff_tot, dsf, Wr = xdave.run(k=k, w=omega_array)
-    tau_array, F_tot_inel, F_wff, F_wbf = xdave.get_itcf(
-        tau=tau_array, w=omega_array * J_TO_eV, ff=ff_tot / J_TO_eV, bf=bf_tot / J_TO_eV
-    )
+    tau_array, F_tot_inel, F_wff, F_wbf = xdave.get_itcf(tau=tau_array, w=omega_array, ff=ff_tot, bf=bf_tot)
 
     fig, axes = plt.subplots(1, 3, figsize=(14, 10))
 
     ax = axes[0]
-    ax.plot(omega_array * J_TO_eV, bf_tot / J_TO_eV, label="BF")
-    ax.plot(omega_array * J_TO_eV, ff_tot / J_TO_eV, label="FF")
-    ax.plot(omega_array * J_TO_eV, dsf / J_TO_eV, label="Tot")
+    ax.plot(omega_array, bf_tot, label="BF")
+    ax.plot(omega_array, ff_tot, label="FF")
+    ax.plot(omega_array, dsf, label="Tot")
     ax.legend()
     ax.set_xlabel(r"$\omega$ [eV]")
     ax.set_ylabel(r"DSF [1/eV]")
 
-    sif = stats.norm.pdf(omega_array, 0, 2 * eV_TO_J)
-    sif /= np.max(sif)
-    WR *= J_TO_eV
+    # sif = stats.norm.pdf(omega_array, 0, 2 * eV_TO_J)
+    # sif /= np.max(sif)
+    # WR *= J_TO_eV
 
-    inelastic, elastic, spectrum = xdave.convolve_with_sif(sif=sif, bf=bf_tot, ff=ff_tot, WR=WR)
+    spectrum_energy, inelastic, elastic, spectrum = xdave.convolve_with_sif(
+        omega=omega_array, dsf=(bf_tot + ff_tot), Wr=Wr, beam_energy=9.0e3, type="GAUSSIAN", fwhm=10
+    )
 
     ax = axes[1]
-    ax.plot(omega_array * J_TO_eV, inelastic / np.max(spectrum), label="inel", ls="-.")
-    ax.plot(omega_array * J_TO_eV, elastic / np.max(spectrum), label="el", ls="-.")
-    ax.plot(omega_array * J_TO_eV, spectrum / np.max(spectrum), label="tot", ls="-.")
+    ax.plot(spectrum_energy, inelastic / np.max(spectrum), label="inel", ls="-.")
+    ax.plot(spectrum_energy, elastic / np.max(spectrum), label="el", ls="-.")
+    ax.plot(spectrum_energy, spectrum / np.max(spectrum), label="tot", ls="-.")
     ax.legend()
     ax.set_xlabel(r"$\omega$ [eV]")
     ax.set_ylabel(r"Intensity []")

@@ -91,7 +91,7 @@ def test_mermin_ff():
     atomic_number = 1.0
     lfc = 0.0
 
-    omega_array = np.linspace(-100, 100, 100) * eV_TO_J
+    omega_array = np.linspace(-100, 150, 5000) * eV_TO_J
     state = PlasmaState(
         electron_temperature=Te,
         ion_temperature=Te,
@@ -135,12 +135,10 @@ def test_mermin_ff():
         axes[2].plot(u_mermin, dielectric_mermin.imag, label=f"Im[Mermin]: q={q}", c="navy", ls=":")
         axes[2].plot(u_mermin, dielectric_rpa.imag, label=f"Im[RPA]: q={q}", c="navy", ls="--")
 
-    print(u_mermin)
-
     axes[0].set_xlabel(r"$\omega$ [eV]")
     axes[0].set_ylabel(r"DSF [1/eV]")
     axes[0].legend()
-    axes[0].set_ylim(-0.005, 0.02)
+    # axes[0].set_ylim(-0.005, 0.02)
     axes[1].set_xlabel(r"$\omega$ [eV]")
     axes[1].set_ylabel(r"$\epsilon$")
     axes[1].legend()

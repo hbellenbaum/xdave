@@ -1,5 +1,7 @@
 from numpy import exp, log1p
 
+# NOTE(HB): These are not used here.
+
 
 def is_iterable(test_variable):
     r"""

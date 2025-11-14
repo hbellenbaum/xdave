@@ -13,6 +13,13 @@ from plasmapy.formulary.mathematics import Fermi_integral as fdi
 
 
 class ScreeningCloud:
+    """
+    Class to describe the electronic screening around the ions.
+
+    Attributes:
+        state (PlasmaState): container for all plasma parameters
+        overlord_state (PlasmaState): mean plasma state to describe average plasma parameters
+    """
 
     def __init__(self, state: PlasmaState, overlord_state: PlasmaState):
         self.state = state
@@ -21,35 +28,46 @@ class ScreeningCloud:
     def get_screening_cloud(
         self,
         k,
-        ion_core_radius,
         lfc=0.0,
-        sec_power=2,
         screening_model="FINITE_WAVELENGTH",
         ee_potential="COULOMB",
         ei_potential="COULOMB",
     ):
+        """
+        Main run function to obtain the screening cloud.
+
+        Parameters:
+            k (float/array): wave number in units of 1/m
+            lfc (float/array): local field correction, dimensionless
+            screening_model (str): option to control the screening model
+            ee_potential(str): option to control the electron-electron potential model
+            ei_potential (str): option to control the electron-ion potential model
+
+        Returns:
+            float/array: screening cloud depending on the k-input type
+        """
         screening_length = 0.0
         Zi = self.state.ion_charge
 
         alpha = 2 / self.state.mean_sphere_radius(number_density=self.state.ion_number_density)
 
         if ee_potential == "COULOMB":
-            Uee = coulomb_k(Qa=-1, Qb=-1, k=k)
+            Uee = coulomb_k(Qa=1, Qb=1, k=k)
         elif ee_potential == "YUKAWA":
-            Uee = yukawa_k(Qa=-1, Qb=-1, k=k, alpha=alpha)
+            Uee = yukawa_k(Qa=1, Qb=1, k=k, alpha=alpha)
         else:
-            raise NotImplementedError(f"Cannot recognize ee-potential {ee_potential}.")
+            raise NotImplementedError(f"Cannot recognize ee-potential {ee_potential} in the screening cloud.")
 
         if ei_potential == "COULOMB":
             Uei = ei_coulomb_k(Qa=Zi, k=k)
         elif ei_potential == "YUKAWA":
             Uei = ei_yukawa_k(Qa=Zi, k=k, alpha=alpha)
         elif ei_potential == "HARD_CORE":
-            Uei = hard_core_ei_k(Qa=-1, Qb=Zi, k=k, sigma_c=ion_core_radius)
+            Uei = hard_core_ei_k(Qa=-1, Qb=Zi, k=k, sigma_c=self.state.ion_core_radius)
         elif ei_potential == "SOFT_CORE":
-            Uei = soft_core_ei_k(Qa=-1, Qb=Zi, k=k, rcore=ion_core_radius, n=sec_power)
+            Uei = soft_core_ei_k(Qa=-1, Qb=Zi, k=k, rcore=self.state.ion_core_radius, n=self.state.sec_power)
         else:
-            raise NotImplementedError(f"Cannot recognize ei-potential {ei_potential}.")
+            raise NotImplementedError(f"Cannot recognize ei-potential {ei_potential} in the screening cloud.")
 
         if screening_model == "DEBYE_HUCKEL":
             screening_length = self._debye_huckel_screening(k)
@@ -60,15 +78,20 @@ class ScreeningCloud:
         else:
             raise NotImplementedError(f" Model for the screening cloud: {screening_model} not recognised.")
 
-        G = lfc
         ratio = Uei / Uee
-        screening_cloud = -ratio * screening_length / (k**2 + (1 - G) * screening_length)
+        screening_cloud = -ratio * screening_length / (k**2 + (1 - lfc) * screening_length)
 
         return screening_cloud
 
     def _debye_huckel_screening(self, k):
         """
         Small wavenumber limit of the screening cloud in the RPA
+
+        Parameters:
+            k (float/array): wave number in units of 1/m
+
+        Returns:
+            float/array: screening length depending on the k-input type
         """
         kappa_e = self.overlord_state.screening_length(
             mass=ELECTRON_MASS,
@@ -84,16 +107,28 @@ class ScreeningCloud:
         r"""
         FWS screening uses the RPA at omega=0 to estimate electronic screening.
         Here, the Dandrea fit is used for a quick evaluation.
+
+        Parameters:
+            k (float/array): wave number in units of 1/m
+
+        Returns:
+            float/array: screening length depending on the k-input type
         """
 
         kF = self.overlord_state.fermi_wave_number(self.overlord_state.free_electron_number_density)
         EF = self.overlord_state.fermi_energy(
             mass=ELECTRON_MASS, number_density=self.overlord_state.free_electron_number_density
         )
+        # kappa_e = self.overlord_state.screening_length(
+        #     ELECTRON_MASS,
+        #     1,
+        #     self.overlord_state.electron_temperature,
+        #     self.overlord_state.free_electron_number_density,
+        # )
         kappa_e = self.overlord_state.debye_screening_length(
             1, self.overlord_state.free_electron_number_density, self.overlord_state.electron_temperature
         )
-        theta = ELEMENTARY_CHARGE * self.state.electron_temperature / EF
+        theta = ELEMENTARY_CHARGE * self.overlord_state.electron_temperature / EF
         sqrt_theta = np.sqrt(theta)
         x = 0.5 * k / kF
         eta = self.overlord_state.chemical_potential_ichimaru(

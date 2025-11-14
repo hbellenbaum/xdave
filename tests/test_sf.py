@@ -36,6 +36,8 @@ def test_ocp():
     T = 4 * eV_TO_K
     Zi = 2
     rho = 498.16  # kg/m^3
+
+    sigma_c = 2.15 * BOHR_RADIUS
     state = PlasmaState(
         electron_temperature=T,
         ion_temperature=T,
@@ -44,6 +46,7 @@ def test_ocp():
         atomic_mass=2,
         atomic_number=2,
         binding_energies=None,
+        ion_core_radius=sigma_c,
     )
     ni = rho / (2 * amu_TO_kg)
     Rii = (3 / (4 * np.pi * ni)) ** (1 / 3)
@@ -52,10 +55,8 @@ def test_ocp():
     Gamma = Zi**2 * ELEMENTARY_CHARGE**2 * beta / (4 * np.pi * VACUUM_PERMITTIVITY * Rii)
     print(f"Gamma1 = {Gamma}")
 
-    sigma_c = 2.15 * BOHR_RADIUS
-
     k = np.linspace(1.0e-1 / BOHR_RADIUS, 10 / BOHR_RADIUS, 200)
-    kernel = OCPStaticStructureFactor(state=state, ion_core_radius=sigma_c, max_iterations=1000)
+    kernel = OCPStaticStructureFactor(state=state, max_iterations=1000)
     Sii_HNC = kernel.get_ii_static_structure_factor(k=k, sf_model="HNC")
     Sii_xHNC = kernel.get_ii_static_structure_factor(k=k, sf_model="EXTENDED_HNC")
     Sii_MSA = kernel.get_ii_static_structure_factor(k=k, sf_model="MSA")
@@ -76,6 +77,7 @@ def test_ocp():
         atomic_mass=2,
         atomic_number=2,
         binding_energies=None,
+        ion_core_radius=sigma_c,
     )
     ni = rho / (2 * amu_TO_kg)
     Rii = (3 / (4 * np.pi * ni)) ** (1 / 3)
@@ -90,10 +92,20 @@ def test_ocp():
     dat22 = np.genfromtxt(fn, delimiter=",")
 
     sigma_c = 1.5 * BOHR_RADIUS
+    state2 = PlasmaState(
+        electron_temperature=T,
+        ion_temperature=T,
+        mass_density=rho,
+        charge_state=Zi,
+        atomic_mass=2,
+        atomic_number=2,
+        binding_energies=None,
+        ion_core_radius=sigma_c,
+    )
 
-    kernel = OCPStaticStructureFactor(state=state, ion_core_radius=sigma_c, max_iterations=5000, mix_fraction=0.9)
-    Sii_HNC2 = kernel.get_ii_static_structure_factor(k=k, sf_model="HNC")
-    Sii_MSA2 = kernel.get_ii_static_structure_factor(k=k, sf_model="MSA")
+    kernel2 = OCPStaticStructureFactor(state=state2, max_iterations=5000, mix_fraction=0.9)
+    Sii_HNC2 = kernel2.get_ii_static_structure_factor(k=k, sf_model="HNC")
+    Sii_MSA2 = kernel2.get_ii_static_structure_factor(k=k, sf_model="MSA")
 
     fig, ax = plt.subplots(1, 1, figsize=(12, 8))
     ax.plot(k * BOHR_RADIUS, Sii_MSA, label=f"MSA, Gamma={Gamma:.1f}", c="orange", ls="--")
@@ -418,7 +430,7 @@ def test_wuensch_Fig617():
 
 
 if __name__ == "__main__":
-    # test_ocp()
+    test_ocp()
     # test_mcp()
-    test_wuensch_Fig616()
+    # test_wuensch_Fig616()
     # test_wuensch_Fig617()

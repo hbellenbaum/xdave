@@ -14,11 +14,30 @@ import numpy as np
 
 
 class CollisionFrequency:
+    """
+    Class containing the collision frequency in the Born approximation.
+
+    Attributes:
+        state (PlasmaState): object containing all plasma state variables
+    """
 
     def __init__(self, state: PlasmaState):
         self.state = state
 
     def get(self, k, w, lfc, model="BORN"):
+        """
+        Main function to call the collision frequency.
+
+        Parameters:
+            k (float): wave number in units of 1/m
+            w (array): energy grid in units of 1/J
+            lfc (float): local field correction, dimensionless
+            model (str): controls the model used for calculating the collision frequency, default is BORN
+
+        Returns:
+            array: calculated electron-ion collisoin frequency in units of J [????]
+        """
+        # TODO(HB): check the units here
         if model == "BORN":
             return self.born_ei_collision_frequency(k, w, lfc)
         elif model == "ZIMAN":
@@ -27,6 +46,13 @@ class CollisionFrequency:
             raise NotImplementedError(f"Model {model} not recognized.")
 
     def ziman_ei_collision_frequency(self):
+        """
+        Calculate the Ziman collision frequency.
+        For details see Eqn. (12) in Fortmann et al., Phys. Rev. E 81 (2010).
+
+        Returns:
+            array: collision frequency in units of J
+        """
         rs = self.state.rs
         EF = self.state.fermi_energy(self.state.free_electron_number_density, ELECTRON_MASS)
         a = 0.11523
@@ -35,6 +61,17 @@ class CollisionFrequency:
         return collision_frequency
 
     def born_ei_collision_frequency(self, k, w, lfc):
+        """
+        Calculate the Born collision frequency based on Appendix B in Sch\"orner et al., Phys Rev. E 107 (2023).
+
+        Parameters:
+            k (float): wave number in units of 1/m
+            w (array): energy grid in units of 1/J
+            lfc (float): local field correction, dimensionless
+
+        Returns:
+            array: collision frequency in units of J
+        """
 
         ne = self.state.free_electron_number_density
         mi = self.state.atomic_mass

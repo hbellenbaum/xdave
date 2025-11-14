@@ -6,6 +6,8 @@ import numpy as np
 # from fermi_integrals import
 from plasmapy.formulary.mathematics import Fermi_integral as fdi
 
+from scipy.integrate import quad
+from scipy.optimize import root_scalar
 
 from dataclasses import dataclass
 
@@ -120,6 +122,11 @@ class PlasmaState:
         binding_energies: np.array,
         electron_number_density: float = None,
         ion_number_density: float = None,
+        ion_core_radius: float = BOHR_RADIUS,
+        sec_power: float = 2.0,
+        csd_core_charge: float = None,
+        csd_parameter: float = None,
+        srr_sigma: float = None,
     ) -> None:
         # TODO(Hannah): also add option to initialize using rs and theta
 
@@ -161,7 +168,13 @@ class PlasmaState:
             rho=self.mass_density, T=self.electron_temperature, atomic_mass=self.atomic_mass
         )
         self.Zb = atomic_number - charge_state
-        # self.initiliase()
+
+        # some potential parameters that need to be set, these are not physical parameters but instead need to be user inputs
+        self.ion_core_radius = ion_core_radius
+        self.sec_power = sec_power
+        self.csd_core_charge = csd_core_charge
+        self.csd_parameter = csd_parameter
+        self.srr_sigma = srr_sigma
 
     def initiliase(self):
         self.kF = self.fermi_wave_number(number_density=self.total_electron_number_density)
@@ -170,6 +183,9 @@ class PlasmaState:
             temperature=self.electron_temperature,
             number_density=self.total_electron_number_density,
             mass=self.atomic_mass,
+        )
+        self.kappae = self.screening_length(
+            ELECTRON_MASS, 1, self.electron_temperature, self.free_electron_number_density
         )
         self.omegaF = self.fermi_frequency(self.total_electron_number_density, self.atomic_mass)
         self.initiliased = True
@@ -230,8 +246,6 @@ class PlasmaState:
         return SQRT_TWO_PI * DIRAC_CONSTANT / np.sqrt(mass * BOLTZMANN_CONSTANT * temperature)
 
     def chemical_potential(self, temperature, number_density, mass):
-        from scipy.integrate import quad
-        from scipy.optimize import minimize, root_scalar
 
         def f(mu_tilde, T_tilde):
             integrand = lambda x: x**0.5 / (np.exp((x - mu_tilde) / T_tilde) + 1)

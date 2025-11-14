@@ -15,19 +15,47 @@ import warnings
 
 
 class FreeFreeDSF:
+    """
+    Class containing the free-free dynamic structure factor calculations.
+
+    Attributes:
+        state (PlasmaState): object containing all plasma state variables
+
+    """
 
     def __init__(self, state: PlasmaState) -> None:
         self.state = state
 
     def get_dsf(self, k, w, lfc, model="NUMERICAL_RPA"):
+        """
+        Main function to call the dynamic structure factor for a given model.
+        This internally calculates the electron susceptibility and applies a local field correction.
 
+        Parameters:
+            k (float): wave number in units of 1/m
+            w (array): energy grid in units of 1/J
+            lfc (float): local field correction, dimensionless
+            model (str): controls the model used for calculating the dsf, default is NUMERICAL_RPA
+
+        Returns:
+            array: calculated free-free dsf in units of 1/J
+        """
+
+        # NOTE(HB): not sure I need this anymore since I'm controlling this from the main kernel
         if self.state.free_electron_number_density == 0.0:
             return 0.0
 
+        # Call the susceptibility function for a given model
         chi0 = self.susceptibility_function(k=k, w=w, model=model)
+
+        # coulomb potential for the electron-electron interactions
         Vee = 4 * np.pi * COULOMB_CONSTANT * ELEMENTARY_CHARGE**2 / k**2
+
+        # calculate corrected suscepibility
         chilfc = chi0 / (1 - Vee * (1 - lfc) * chi0)
         im_suspectibility = np.imag(chilfc)
+
+        # DSF calculation
         S_EG_LFC = (
             -(1)
             / (PI * self.state.free_electron_number_density)
@@ -39,6 +67,18 @@ class FreeFreeDSF:
         return S_EG_LFC
 
     def dielectric_function(self, k, w, model):
+        """
+        Calculate the free electron dielectric function for a given model.
+
+        Parameters:
+            k (float): wave number in units of 1/m
+            w (array): energy grid in units of 1/J
+            lfc (float): local field correction, dimensionless
+            model (str): controls the model used for calculating the dsf
+
+        Returns:
+            array: calculated free electron dielectric, non-dimensional
+        """
         potential_func = 4 * np.pi * COULOMB_CONSTANT * ELEMENTARY_CHARGE**2 / k**2
         if model == "LINDHARD":
             pol_func = self.lindhard_pol_func_dc(k=k, w=w)
@@ -49,14 +89,29 @@ class FreeFreeDSF:
         elif model == "NUMERICAL":
             dielectric_func = self.rpa_numerical_dielectric_func(k=k, w=w)
         elif model == "MERMIN":
+            warnings.warn(
+                f"Model {model} for the free-free component not yet working properly and should not be used."
+            )
             dielectric_func = self.mermin_dielectric_function(k=k, w=w)
         else:
             dielectric_func = self.rpa_numerical_dielectric_func(k=k, w=w)
-            warnings.warn(f"Model {model} not recognized. Overwriting using NUMERICAL.")
+            warnings.warn(f"Model {model} for the free-free component not recognized. Overwriting using NUMERICAL.")
 
         return dielectric_func
 
     def susceptibility_function(self, k, w, model):
+        """
+        Calculate the free electron susceptibility (polarisation) function for a given model.
+
+        Parameters:
+            k (float): wave number in units of 1/m
+            w (array): energy grid in units of 1/J
+            lfc (float): local field correction, dimensionless
+            model (str): controls the model used for calculating the dsf
+
+        Returns:
+            array: calculated free electron susceptibility, non-dimensional
+        """
         if model == "LINDHARD":
             warnings.warn(f"Lindhard model currently not working. Try something else.")
             susceptibility_func = self.lindhard_pol_func_dc(k=k, w=w)
@@ -74,13 +129,22 @@ class FreeFreeDSF:
             potential_func = 4 * np.pi * COULOMB_CONSTANT * ELEMENTARY_CHARGE**2 / k**2
             dielectric_func = self.rpa_numerical_dielectric_func(k=k, w=w)
             susceptibility_func = (1 - dielectric_func) / potential_func
-            warnings.warn(f"Model {model} not recognized. Overwriting using NUMERICAL.")
+            warnings.warn(f"Model {model} for the free-free component not recognized. Overwriting using NUMERICAL.")
 
         return susceptibility_func
 
     def lindhard_pol_func(self, k, w):
         """
+        Lindhard model for the susceptibility function, analytic limit for the fully degenerate plasma.
         Note to self: the definition of the plasma frequency has changed, I will need to check this.
+
+        Parameters:
+            k (float): wave number in units of 1/m
+            w (array): energy grid in units of 1/J
+
+        Returns:
+            array: susceptibility function, non-dimensional
+
         """
         EF = self.state.fermi_energy(self.state.free_electron_number_density, ELECTRON_MASS)
         kF = self.state.fermi_wave_number(self.state.free_electron_number_density)
@@ -129,13 +193,34 @@ class FreeFreeDSF:
         return pol_func
 
     def rpa_numerical_dielectric_func(self, k, w):
-        ## taken from Eqn. (5.5) in K. W\"unsch PhD Thesis (2011)
+        """
+        Numerically solving the dielectric function in RPA by separating real and imaginary components.
+        Based on Eqn. (5.5) in K. W\"unsch PhD Thesis (2011)
+
+        Parameters:
+            k (float): wave number in units of 1/m
+            w (array): energy grid in units of 1/J
+
+        Returns:
+            array: dielectric function, non-dimensional
+        """
         im_part = self._im_dielectric_rpa(k, w)  # [#]
         real_part = self._real_dielectric_rpa(k, w)
         dielectric_function = real_part + 1.0j * im_part
         return dielectric_function
 
     def _im_dielectric_rpa(self, k, w):
+        """
+        Imaginary part of the RPA dielectric function.
+        Based on Arista and Brandt, Phys. Rev. A 29 (1984)
+
+        Parameters:
+            k (float): wave number in units of 1/m
+            w (array): energy grid in units of 1/J
+
+        Returns:
+            array: imaginary part of the dielectric function, non-dimensional
+        """
 
         kF = self.state.fermi_wave_number(self.state.free_electron_number_density)  # 1/m
         EF = self.state.fermi_energy(self.state.free_electron_number_density, ELECTRON_MASS)  # J
@@ -178,7 +263,18 @@ class FreeFreeDSF:
         return im_part
 
     def _real_dielectric_rpa(self, k, w):
-        # Note to self: all of this currently assumes k is a single value, not an array
+        """
+        Real part of the RPA dielectric function.
+        Based on Arista and Brandt, Phys. Rev. A 29 (1984).
+        The numerical integration is done using some mathematical tricks described in Ancarani and Jouin, Eur. Phys. J. Plus 131 (2016)
+
+        Parameters:
+            k (float): wave number in units of 1/m
+            w (array): energy grid in units of 1/J
+
+        Returns:
+            array: real part of the dielectric function, non-dimensional
+        """
 
         w_freq = w / DIRAC_CONSTANT
 
@@ -246,6 +342,16 @@ class FreeFreeDSF:
         return real_part
 
     def dandrea_fit(self, k, omega):
+        """
+        Fit to the electron-electron polarisation function based on: Dandrea et al., Phys. Rev. B 34 (1986)
+
+        Parameters:
+            k (float): wave number in units of 1/m
+            w (array): energy grid in units of 1/J
+
+        Returns:
+            array: polarisation function, non-dimensional
+        """
         _cJ = [+3.2488e03, -6.9147e02, -3.2027e06, -4.5356e03, -4.6240e05]
         _cK = [-4.8780e00, +4.7325e02, -2.3375e03, +3.4831e02, +1.5173e03]
         _c2 = [-2.2800e-01, +4.2220e-01, -6.4660e-01, +7.0572e-01, +5.8820e00]
@@ -342,237 +448,206 @@ class FreeFreeDSF:
 
         exp_arg_p = eta - (w + q) ** 2
         exp_arg_m = eta - (w - q) ** 2
-        Im_X_kw = SQRT_PI * (log1pexp(exp_arg_p) - log1pexp(exp_arg_m))
+        imag_part = SQRT_PI * (log1pexp(exp_arg_p) - log1pexp(exp_arg_m))
         delta_F = phi_function(w0 + q0) - phi_function(w0 - q0)
-        Re_X_kw = -2.0 * F_m0p5 * delta_F / sqrt_Theta_e
-        Pi_aa_0_MB = self.state.free_electron_number_density / (BOLTZMANN_CONSTANT * self.state.electron_temperature)
-        pol_func = Pi_aa_0_MB * (Re_X_kw + 1.0j * Im_X_kw) / (4.0 * F_p0p5 * q)
+        real_part = -2.0 * F_m0p5 * delta_F / sqrt_Theta_e
+        prefactor = self.state.free_electron_number_density / (BOLTZMANN_CONSTANT * self.state.electron_temperature)
+        pol_func = prefactor * (real_part + 1.0j * imag_part) / (4.0 * F_p0p5 * q)
 
         return pol_func
 
     def _real_dielectric_mermin(self, k, w, mu1, mu2):
-        # Note to self: all of this currently assumes k is a single value, not an array
+        # TODO(Hannah): get this working
+        Te = self.state.electron_temperature
+        ne = self.state.free_electron_number_density
+        EF = self.state.fermi_energy(ne, ELECTRON_MASS)
+        be = 1 / (ELEMENTARY_CHARGE * Te)
+        pe = np.sqrt(ELECTRON_MASS * ELEMENTARY_CHARGE * Te)
+        De = ne * (TWO_PI * DIRAC_CONSTANT**2 / (ELECTRON_MASS * ELEMENTARY_CHARGE * Te)) ** 1.5
+        xe = ELECTRON_MASS * (w / k) / (np.sqrt(2) * pe)
+        Ke = DIRAC_CONSTANT * (k / 2) / (np.sqrt(2) * pe)
+        Reze = ELECTRON_MASS * mu1 / (np.sqrt(2) * k * pe)
+        Imze = ELECTRON_MASS * mu2 / (np.sqrt(2) * k * pe)
+        alpha = self.state.chemical_potential_ichimaru(Te, ne, ELECTRON_MASS)  # / EF
 
-        w_freq = w / DIRAC_CONSTANT
+        def integrand(u):
+            x = np.tan(HALF_PI * u)
+            xbar = xe - Imze
+            log_term = (1 + np.exp(alpha - (x + Ke) ** 2)) / (1 + np.exp(alpha - (x - Ke) ** 2))
+            f = (x - xbar) / ((x - xbar) ** 2 + Reze**2) + (x + xbar) / ((x + xbar) ** 2 + Reze**2) * np.log(log_term)
+            return f * HALF_PI * (1 + x**2)
 
-        kF = self.state.fermi_wave_number(self.state.free_electron_number_density)  # 1/m
-        EF = self.state.fermi_energy(self.state.free_electron_number_density, ELECTRON_MASS)  # J
-        TF = self.state.fermi_temperature(ELECTRON_MASS, self.state.free_electron_number_density)  # K
-        vF = DIRAC_CONSTANT * kF / ELECTRON_MASS  # m/s
-        omega_p = self.state.plasma_frequency(-1, self.state.free_electron_number_density, ELECTRON_MASS)
+        real_part = integrate.quad_vec(integrand, 0, 1)[0]
 
-        u = w_freq / (vF * k)  # [#]
-        kappa = k / (2 * kF)  # [#]
+        return real_part * 2 * ne * be / (2 * SQRT_PI * Ke * De)
 
-        t = self.state.electron_temperature * BOLTZMANN_CONSTANT / EF  # [#]
-        t = self.state.electron_temperature / TF  # [#]
+        # w_freq = w / DIRAC_CONSTANT
 
-        theta = t  # []
-        mu = self.state.chemical_potential_ichimaru(
-            self.state.electron_temperature, self.state.free_electron_number_density, ELECTRON_MASS
-        )  # [J]
-        alpha = mu / EF
+        # kF = self.state.fermi_wave_number(self.state.free_electron_number_density)  # 1/m
+        # EF = self.state.fermi_energy(self.state.free_electron_number_density, ELECTRON_MASS)  # J
+        # TF = self.state.fermi_temperature(ELECTRON_MASS, self.state.free_electron_number_density)  # K
+        # vF = DIRAC_CONSTANT * kF / ELECTRON_MASS  # m/s
+        # omega_p = self.state.plasma_frequency(-1, self.state.free_electron_number_density, ELECTRON_MASS)
+        # beta = 1 / (BOLTZMANN_CONSTANT * self.state.electron_temperature)
+        # mu = self.state.chemical_potential_ichimaru(
+        #     self.state.electron_temperature, self.state.free_electron_number_density, ELECTRON_MASS
+        # )  # Joule
 
-        def g_ancarni(lambda_val):
-            return np.where(lambda_val < 0.0, -g_t(-lambda_val), g_t(lambda_val))
+        # u = w_freq / (vF * k)  # [#]
+        # kappa = k / (2 * kF)  # [#]
 
-        def g_t(lambda_val, eps=1.0e-6):
+        # D = EF * beta  # dimensionless
+        # alpha = mu / EF
+        # t = self.state.electron_temperature / TF  # [#]
 
-            A = lambda_val**2 / t
-            B = alpha / t
+        # def g_ancarni(lambda_val):
+        #     return np.where(lambda_val < 0.0, -g_t(-lambda_val), g_t(lambda_val))
 
-            def f_prime(X):
-                """
-                Eqn. (10) in Ancarani et al., Eur. Phys. J. Plus 131 (2016)
-                """
-                y = A * X**2 - B
-                s = np.empty_like(y)
+        # def g_t(lambda_val, eps=1.0e-9):
 
-                pos_mask = y >= 0.0
-                neg_mask = ~pos_mask
+        #     A = lambda_val**2 / t
+        #     B = alpha / t
 
-                # y >= 0 branch
-                exp_neg = np.exp(-y[pos_mask])
-                s[pos_mask] = 1.0 / (1.0 + exp_neg)
+        #     def f_prime(X):
+        #         y = A * X**2 - B
+        #         s = np.empty_like(y)
 
-                # y < 0 branch
-                exp_pos = np.exp(y[neg_mask])
-                s[neg_mask] = exp_pos / (1.0 + exp_pos)
+        #         pos_mask = y >= 0.0
+        #         neg_mask = ~pos_mask
 
-                return -2.0 * A * X * (s * (1.0 - s))
+        #         # y >= 0 branch
+        #         exp_neg = np.exp(-y[pos_mask])
+        #         s[pos_mask] = 1.0 / (1.0 + exp_neg)
 
-            def integrand_u(u):
-                """
-                Eqn. (9) in Ancarani et al., Eur. Phys. J. Plus 131 (2016)
-                """
-                X = np.tan(np.pi * u / 2)
-                log_term = np.log(abs((X + 1) / (X - 1)))
-                bracket_term = -X + 0.5 * (1 - X**2) * log_term
-                dX_du = (np.pi / 2) * (1 / np.cos(np.pi * u / 2) ** 2)
-                return f_prime(X) * bracket_term * dX_du
+        #         # y < 0 branch
+        #         exp_pos = np.exp(y[neg_mask])
+        #         s[neg_mask] = exp_pos / (1.0 + exp_pos)
 
-            # integrate over
-            # res1, _ = integrate.quad_vec(integrand_u, 0, 0.5 - eps, limit=500, epsrel=1.0e-1)
-            # res2, _ = integrate.quad_vec(integrand_u, 0.5 + eps, 1, limit=500, epsrel=1.0e-1)
-            res, _ = integrate.quad_vec(integrand_u, 0, 1, limit=200, epsrel=1.0e-2)
+        #         return -2.0 * A * X * (s * (1.0 - s))
 
-            return (lambda_val**2) * res  # (res1 + res2)
+        #     def integrand_u(u):
+        #         X = np.tan(np.pi * u / 2)
+        #         log_term = np.log(abs((X + 1) / (X - 1)))
+        #         bracket_term = -X + 0.5 * (1 - X**2) * log_term
+        #         dX_du = (np.pi / 2) * (1 / np.cos(np.pi * u / 2) ** 2)
+        #         return f_prime(X) * bracket_term * dX_du
 
-        chi02 = 1 / (PI * kF * BOHR_RADIUS)  # [#]
+        #     res1, _ = integrate.quad_vec(integrand_u, 0, 0.5 - eps, limit=300, points=[0.1, 0.2, 0.3, 0.4])
+        #     res2, _ = integrate.quad_vec(integrand_u, 0.5 + eps, 1, limit=300, points=[0.6, 0.7, 0.8, 0.9])
 
-        # Get asymptotic limits from Arista et al., Phys. Rev. A 29 (1984)
+        #     return (lambda_val**2) * (res1 + res2)
 
-        # w_small = w[(w > -1 * eV_TO_J) & (w < 1 * eV_TO_J)]
-        # u_small = u[(w > -1 * eV_TO_J) & (w < 1 * eV_TO_J)]
-        def H1(d):
-            def integrand(u):
-                y = np.tan(HALF_PI * u)
-                return HALF_PI * (1 + y**2) * f_hat(y, d, mu)
+        # chi02 = 1 / (PI * kF * BOHR_RADIUS)  # [#]
+        # lambda_neg = u - kappa  # [#]
+        # lambda_pos = u + kappa  # [#]
+        # g_t_pos = g_ancarni(lambda_pos)
+        # g_t_neg = g_ancarni(lambda_neg)
+        # real_part = 1.0e0 + chi02 / (4 * kappa**3) * (g_t_pos - g_t_neg)
 
-            return integrate.quad(integrand, 0, 1)[0]
-
-        def f_hat(y, D, eta):
-            return 1.0 / (1.0 + np.exp(D * y**2 - eta))
-
-        def H2(d):
-            f0 = f_hat(0, d, alpha)
-
-            def integrand(u):
-                y = np.tan(HALF_PI * u)
-                return HALF_PI * (1 + y**2) * (f0 - f_hat(y, d, mu)) / y**2
-
-            return integrate.quad(integrand, 0, 1)[0]
-
-        # real_part = np.zeros_like(w)
-        # is_z_small = kappa < 5.0e-1
-        # is_z_large = kappa > 1.0e1
-        # cond1 = (w_freq < 1.0e-1 * vF * k) & (w_freq >= 0.0)
-        # print(f"Condition 1: {w[cond1] * J_TO_eV}")
-        # print(f"Condition 2: {k < 1.e-1 * 2 * kF}")
-
-        # cond3 = w_freq > 1.0e1 * vF * k
-        # print(f"Condition 3: {w[cond3] * J_TO_eV}")
-        # cond4 = w_freq > 1.0e1 * vF * k**2 / (2 * kF)
-        # print(f"Condition 4: {w[cond4] * J_TO_eV}")
-
-        # cond5 = (w_freq < 1.0e-1 * vF * k**2 / (2 * kF)) & (w_freq >= 0)
-        # print(f"Condition 5: {w[cond5] * J_TO_eV}")
-        # print(f"Condition 6: {k > 1.e1 * 2 * kF}")
-
-        # D = 1 / t
-        # if is_z_small:
-        #     cond = (u < 1.0e-1) & (u >= 0.0)
-        #     idx1 = np.where((u < 1.0e-1) & (u >= 0.0))
-        #     # idx1_neg = np.where((u > -1.0e-1) & u <= 0.0)
-        #     u_small = u[idx1]
-        #     real_limit1 = 1 - chi02 / 3 * H2(D) + chi02 / kappa**2 * (H1(D) - u_small**2 * H2(D))
-        #     real_part[idx1] = 1 - chi02 / 3 * H2(D) + chi02 / kappa**2 * (H1(D) - u[idx1] ** 2 * H2(D))
-        #     # real_part[idx1_neg] = real_part[idx1][::-1]
-
-        # if is_z_small:
-        #     idx2 = np.where(u > 2.0e0)
-        #     u_large = u[idx2]
-        #     w_freq_large = w_freq[idx2]
-        #     real_limit2 = (
-        #         1
-        #         - omega_p**2
-        #         / w_freq_large**2
-        #         * (
-        #             1
-        #             + kappa**2 / u_large**2
-        #             + 3 * fdi(1.5, mu) / gamma(2.5) / (2 * u_large**2 * D**2.5)
-        #             + 3 * fdi(2.5, mu) / gamma(3.5) / (2 * u_large**4 * D**3.5)
-        #         ).real
-        #     )
-        #     real_part[idx2] = real_limit2
-
-        # if is_z_large:
-        #     Ek = DIRAC_CONSTANT**2 * k**2 / (2 * ELECTRON_MASS)
-        #     u_small = u[(u < 1.0e-2) & (u > -1.0e-2)]
-        #     real_limit3 = 1 + (DIRAC_CONSTANT * omega_p / Ek) ** 2 * (
-        #         1
-        #         + u**2 / kappa**2
-        #         + 0.5 * fdi(1.5, alpha) / gamma(2.5) / (kappa**2 * D**2.5)
-        #         + 3 / 10 * fdi(2.5, alpha) / gamma(3.5) / (kappa**4 * D**3.5)
-        #     )
-
-        # u_new = np.delete(u, idx1)
-        # u_new = np.delete(u_new, idx2)
-        lambda_neg = u - kappa  # [#]
-        lambda_pos = u + kappa  # [#]
-        # lambda_neg = u_new - kappa  # [#]
-        # lambda_pos = u_new + kappa  # [#]
-        g_t_pos = g_ancarni(lambda_pos)
-        g_t_neg = g_ancarni(lambda_neg)
-        real_part = 1.0e0 + chi02 / (4 * kappa**3) * (g_t_pos - g_t_neg)
-
-        # import matplotlib.pyplot as plt
-
-        # plt.figure()
-        # plt.plot(w[idx1], real_limit1, label="small")
-        # plt.plot(w[idx2], real_limit2, label="large")
-        # plt.plot(w, real_part, label="full")
-        # plt.legend()
-        # plt.xlabel(r"§\omega§ [J]")
-        # plt.xlabel(r"re[§\epsilon§]")
-        # plt.show()
-
-        return real_part
+        # return real_part
 
     def _im_dielectric_mermin(self, k, w, mu1, mu2):
-        kF = self.state.fermi_wave_number(self.state.free_electron_number_density)  # 1/m
-        EF = self.state.fermi_energy(self.state.free_electron_number_density, ELECTRON_MASS)  # J
-        vF = DIRAC_CONSTANT * kF / ELECTRON_MASS  # m/s
-        u = w / (k * vF * DIRAC_CONSTANT)  # dimensionless
-        z = k / (2 * kF)  # dimensionless
+        # TODO(HB): get this working
+        Te = self.state.electron_temperature
+        ne = self.state.free_electron_number_density
+        EF = self.state.fermi_energy(ne, ELECTRON_MASS)
+        be = 1 / (ELEMENTARY_CHARGE * Te)
+        pe = np.sqrt(ELECTRON_MASS * ELEMENTARY_CHARGE * Te)
+        De = ne * (TWO_PI * DIRAC_CONSTANT**2 / (ELECTRON_MASS * ELEMENTARY_CHARGE * Te)) ** 1.5
+        xe = ELECTRON_MASS * (w / k) / (np.sqrt(2) * pe)
+        Ke = DIRAC_CONSTANT * (k / 2) / (np.sqrt(2) * pe)
+        Reze = ELECTRON_MASS * mu1 / (np.sqrt(2) * k * pe)
+        Imze = ELECTRON_MASS * mu2 / (np.sqrt(2) * k * pe)
+        alpha = self.state.chemical_potential_ichimaru(Te, ne, ELECTRON_MASS)  # / EF
 
-        beta = 1 / (BOLTZMANN_CONSTANT * self.state.electron_temperature)
-        mu = self.state.chemical_potential_ichimaru(
-            self.state.electron_temperature, self.state.free_electron_number_density, ELECTRON_MASS
-        )  # Joule
+        def integrand(u):
+            x = np.tan(HALF_PI * u)
+            xbar = xe - Imze
+            log_term = (1 + np.exp(alpha - (x + Ke) ** 2)) / (1 + np.exp(alpha - (x - Ke) ** 2))
+            f = 1 / ((x - xbar) ** 2 + Reze**2) - 1 / ((x + xbar) ** 2 + Reze**2) * Reze * np.log(log_term)
+            return f * HALF_PI * (1 + x**2)
 
-        D = EF * beta  # dimensionless
-        eta = mu * beta  # dimensionless
-        chi02 = 1 / (PI * kF * BOHR_RADIUS)  # dimensionless
-        theta = 1 / D
+        imag_part = integrate.quad_vec(integrand, 0, 1)[0]
+        return imag_part * 2 * ne * be / (2 * SQRT_PI * Ke * De)
 
-        if z < 1.0e-2:
-            prefactor = (
-                2
-                * ELECTRON_MASS**2
-                * ELEMENTARY_CHARGE**2
-                / VACUUM_PERMITTIVITY
-                * DIRAC_CONSTANT
-                * w
-                / (DIRAC_CONSTANT * k) ** 3
-            )
-            exp_term = EF / (BOLTZMANN_CONSTANT * self.state.electron_temperature) * u**2 - eta**2
-            im_part = prefactor / (1 + np.exp(exp_term))
+        # kF = self.state.fermi_wave_number(self.state.free_electron_number_density)  # 1/m
+        # EF = self.state.fermi_energy(self.state.free_electron_number_density, ELECTRON_MASS)  # J
+        # vF = DIRAC_CONSTANT * kF / ELECTRON_MASS  # m/s
+        # u = w / (k * vF * DIRAC_CONSTANT)  # dimensionless
+        # z = k / (2 * kF)  # dimensionless
 
-        else:
-            xpos = (u + z) ** 2  # Dimensionless
-            xneg = (u - z) ** 2  # Dimensionless
+        # beta = 1 / (BOLTZMANN_CONSTANT * self.state.electron_temperature)
+        # mu = self.state.chemical_potential_ichimaru(
+        #     self.state.electron_temperature, self.state.free_electron_number_density, ELECTRON_MASS
+        # )  # Joule
+        # alpha = mu / EF
 
-            exp_neg = np.exp(eta - D * xneg)
-            exp_pos = np.exp(eta - D * xpos)
+        # D = EF * beta  # dimensionless
+        # eta = mu * beta  # dimensionless
+        # chi02 = 1 / (PI * kF * BOHR_RADIUS)  # dimensionless
+        # theta = 1 / D
 
-            log_term = (1 + exp_neg) / (1 + exp_pos)  # [#]
-            im_part = 1 * PI * chi02 / (8 * z**3) * theta * np.log(log_term)  # [#]
-        return im_part
+        # # def integrand(u):
+        # #     y = np.tan(HALF_PI * u)
+        # #     dydy = HALF_PI * (1 + y**2)
+        # #     fy = 1 / (np.exp(D * y**2 - alpha) + 1)
+        # #     tan_funcs =
+        # #     return tan_funcs * y / fy * dydy
+
+        # if z < 1.0e-2:
+        #     prefactor = (
+        #         2
+        #         * ELECTRON_MASS**2
+        #         * ELEMENTARY_CHARGE**2
+        #         / VACUUM_PERMITTIVITY
+        #         * DIRAC_CONSTANT
+        #         * w
+        #         / (DIRAC_CONSTANT * k) ** 3
+        #     )
+        #     exp_term = EF / (BOLTZMANN_CONSTANT * self.state.electron_temperature) * u**2 - eta**2
+        #     im_part = prefactor / (1 + np.exp(exp_term))
+
+        # else:
+        #     xpos = (u + z) ** 2  # Dimensionless
+        #     xneg = (u - z) ** 2  # Dimensionless
+
+        #     exp_neg = np.exp(eta - D * xneg)
+        #     exp_pos = np.exp(eta - D * xpos)
+
+        #     log_term = (1 + exp_neg) / (1 + exp_pos)  # [#]
+        #     idx = np.where(np.abs(log_term.imag) < 1.0e-2)
+        #     im_part = 1 * PI * chi02 / (8 * z**3) * theta * np.log(log_term)  # [#]
+        # return im_part
 
     def mermin_dielectric_function(
         self, k, w, lfc=0, collision_frequency_model="BORN", input_collision_frequency=None
     ):
+        """
+        Mermin dielectric function using the relaxed time approximation.
+
+        Parameters:
+            k (float): wave number in units of 1/m
+            w (array): energy grid in units of 1/J
+            lfc (float): local field correction, non-dimensional
+            collision_frequency_model (str): model option for the collision frequency
+            input_collision_frequency (float): user-defined static collision frequency in 1/s
+
+        Returns:
+            array: polarisation, non-dimensional
+        """
         omega_p = (
             self.state.plasma_frequency(-1, self.state.free_electron_number_density, ELECTRON_MASS) * DIRAC_CONSTANT
         )
-        mu_ei = 0.5 * omega_p * (1.0 + 1.0j)
-        print(f"Plasma frequency = {omega_p * J_TO_eV} eV")
-        print(f"Running with collision frequency: {mu_ei * J_TO_eV} eV")
-        real_part = self._real_dielectric_mermin(k=k, w=w + 1.0j * mu_ei, mu1=np.real(mu_ei), mu2=np.imag(mu_ei))
-        imag_part = self._im_dielectric_mermin(k=k, w=w + 1.0j * mu_ei, mu1=np.real(mu_ei), mu2=np.imag(mu_ei))
-        dielectric_function = real_part + 1.0j * imag_part
-        # dielectric_function = self.dielectric_function(k=k, w=w + 1.0j * mu_ei, model="NUMERICAL")
+        mu_ei = np.array([0.5 * omega_p * (1.0 + 1.0j)])
+        Vee = 4 * np.pi * COULOMB_CONSTANT * ELEMENTARY_CHARGE**2 / k**2
+        # print(f"Plasma frequency = {omega_p * J_TO_eV} eV")
+        # print(f"Running with collision frequency: {mu_ei * J_TO_eV} eV")
+        # real_part = self._real_dielectric_mermin(k=k, w=w + mu_ei, mu1=np.real(mu_ei), mu2=np.imag(mu_ei))
+        # imag_part = self._im_dielectric_mermin(k=k, w=w + mu_ei, mu1=np.real(mu_ei), mu2=np.imag(mu_ei))
+        # dielectric_function = 1 - Vee * (real_part + 1.0j * imag_part)
+
+        # TODO(Hannah): replace this with the actual numerical integration
+        dielectric_function = self.dielectric_function(k=k, w=w + 1.0j * mu_ei, model="DANDREA_FIT")
         dielectric_rpa0 = self.dielectric_function(k=k, w=0, model="DANDREA_FIT")
         mermin_dielectric = 1 + (1 + 1.0j * mu_ei / w) * (dielectric_function - 1) / (
             1 + 1.0j * mu_ei / w * (dielectric_function - 1) / (dielectric_rpa0 - 1)

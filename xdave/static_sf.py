@@ -59,11 +59,20 @@ def get_sigmac(ni, Zi, Ti):
 
 
 class OCPStaticStructureFactor:
+    """
+    Class for the one-component static structure factor.
+
+    Attributes:
+        state (PlasmaState): container holding all plasma parameters
+        max_iterations (int): maximum number of iterations in the HNC solver
+        mix_fraction (float): number between 0 and 1, values closer to 1 mean less of the new iterated solution in the HNC solver is included
+        delta (float): tolerance to check convergence of the HNC result
+        n (int): number of points in the HNC grid
+    """
 
     def __init__(
         self,
         state: PlasmaState,
-        ion_core_radius=None,
         max_iterations=5000,
         mix_fraction=0.8,
         delta=1.0e-8,
@@ -76,19 +85,37 @@ class OCPStaticStructureFactor:
         self.Rii = self.state.mean_sphere_radius(number_density=self.state.ion_number_density)  # [m]
         self.alpha = 2 / self.Rii  # [1/m]
         self.max_iterations = max_iterations
+
+        assert 0 < mix_fraction < 1, f"Mix fraction has to be larger than 0 and smaller than 1."
         self.mix_fraction = mix_fraction
         self.delta = delta
 
-        if ion_core_radius is None:
+        self.success = False
+
+        if self.state.ion_core_radius is None:
             self.ion_core_radius = get_sigmac(
                 ni=state.ion_number_density, Zi=state.ion_charge, Ti=state.ion_temperature
             )
+            self.state.ion_core_radius = self.ion_core_radius
         else:
-            self.ion_core_radius = ion_core_radius
+            self.ion_core_radius = self.state.ion_core_radius
 
     def get_ii_static_structure_factor(
         self, k, sf_model="HNC", pseudo_potential="YUKAWA", bridge_function="IYETOMI", return_full=False
     ):
+        """
+        Main run function to obtain the ion-ion static structure factor depending on the model inputs.
+
+        Parameters:
+            k (float/array): wave number in units of 1/m
+            sf_model (str): model for the static structure factor
+            pseudo_potential (str): ion-ion potential for the hnc solver
+            brige_function (str): model used for the bridge function, only applies to the xHNC model
+            return_full (bool): if true, will return all outputs including pair correlation function, does not work for MSA
+
+        Returns:
+            float/ array: will return full array of static structure factors or single value depending on the k-input type
+        """
         if sf_model == "MSA":
             warnings.warn(f"Use {sf_model} your own risk. It is dogshit.")
             if return_full:
@@ -99,12 +126,15 @@ class OCPStaticStructureFactor:
         elif sf_model == "EXTENDED_HNC":
             ks, rs, giir, hiir, Siik = self.xhnc_ocp_ii(k, pseudo_potential, bridge_function)
         elif sf_model == "MODIFIED_HNC":
-            warnings.warn(f"Model {sf_model} currently under construction. Please come back later.")
+            warnings.warn(
+                f"Model {sf_model} for the ion-ion static structure factor currently under construction. Please come back later."
+            )
         else:
             raise NotImplementedError(
-                f"Model {sf_model} for the static structure factor not yet implemented. Try MSA :)"
+                f"Model {sf_model} for the ion-ion static structure factor is not known. Try HNC."
             )
 
+        # interpolate static structure factor to output k grid
         interp_sf = interp1d(ks, Siik, fill_value="extrapolate")
         Siik_new = interp_sf(k)
         if return_full:
@@ -128,7 +158,19 @@ class OCPStaticStructureFactor:
         return_full=False,
     ):
         """
-        Following Gregori et al., HEDP 3 (2007): Eq. (32 - 34)
+        Following Gregori et al., HEDP 3 (2007): Eq. (32 - 34), this returns a screened OCP static structure factor.
+
+        Parameters:
+            k (float/array): wave number in units of 1/m
+            sf_model (str): model for the static structure factor
+            pseudo_potential (str): ion-ion potential for the hnc solver
+            brige_function (str): model used for the bridge function, only applies to the xHNC model
+            screening_model (str): left-over option, not applied here and should be ignored
+            return_full (bool): if true, will return all outputs including pair correlation function, does not work here
+
+        Returns:
+            float/ array: will return full array of static structure factors or single value depending on the k-input type
+
         """
         Sii = self.get_ii_static_structure_factor(
             k=k,
@@ -156,9 +198,6 @@ class OCPStaticStructureFactor:
         Sii_screened = Sii / (1 + screening_correction * Sii)
         return Sii_screened
 
-    def _screening_correction(self, k, r):
-        return
-
     def _hnc_ii_pseudopotential(
         self,
         k,
@@ -173,6 +212,26 @@ class OCPStaticStructureFactor:
         srr_sigma=None,
         model="YUKAWA",
     ):
+        """
+        Function to return the ion-ion pseudo-potential used in the HNC solver in both r and k space.
+
+        Parameters:
+            k (array): k grid in units of 1/m
+            r (array): r grid in units of m
+            Q (float): ion charge state
+            alpha (float): screening constant used in the Yukawa and Debye-Huckel models
+            ion_core_radius (float): effective ion radius used in SRR model
+            kappa_e (float): inverse screening length
+            csd_core_charges (array): charge states used in the CSD model
+            csd_parameters (array): scale length used to control switch in CSD model
+            srr_core_power (float): exponent in the SRR model
+            srr_sigma (float): amptitude scaling factor in the SRR model
+            model (str): option to control the potential applied
+
+        Returns:
+            array: pseudo-potential in r-space
+            array: pseudo-potential in k-space
+        """
         if model == "YUKAWA":
             return yukawa_r(Q, Q, r, alpha), yukawa_k(Q, Q, k, alpha)
         elif model == "DEBYE_HUCKEL":
@@ -182,6 +241,7 @@ class OCPStaticStructureFactor:
         elif model == "KELBG":
             return kelbg_r(Q, Q, r, alpha), kelbg_k(Q, Q, k, alpha)
         elif model == "SRR":
+            warnings.warn(f"Model {model} should not be used.")
             return short_range_screening_r(
                 self.state.ion_temperature, srr_core_power, ion_core_radius, srr_sigma, kappa_e
             ), np.zeros_like(k)
@@ -192,9 +252,21 @@ class OCPStaticStructureFactor:
                 Q, Q, k, csd_parameters[0], csd_parameters[1], csd_core_charges[0], csd_core_charges[1], kappa_e
             )
         else:
-            raise NotImplementedError(f"Pseudo-potential model {model} not recognized.")
+            raise NotImplementedError(f"Pseudo-potential model {model} in the HNC solver not recognized.")
 
     def _hnc_bridge_function(self, rs, Rii, Gamma, model="IYETOMI"):
+        """
+        Returns the bridge function used in the xHNC solver.
+
+        Parameters:
+            rs (array): r-grid in units of m
+            Rii (float): ion core radius in units of m
+            Gamma (float): coupling strength, non-dimensional
+            model (str): option to choose the bridge function model, currently the only option is IYETOMI
+
+        Returns:
+            array: values for the bridge function in r-space
+        """
         if Gamma < 5:
             print(
                 f"Don`t be a dumb-dumb. You cannot apply bridge functions for weakly coupled plasmas. Reverting back to B = 0."
@@ -206,11 +278,19 @@ class OCPStaticStructureFactor:
             raise NotImplementedError(f"Bridge function {model} not recognized.")
 
     def mean_spherical_approximation_ocp_ii(self, k):
+        """
+        Analytic model for the static structure factor as described in Gregori et al., HEDP 3 (2007).
+
+        Parameters:
+            k (float/array): wave number in units of 1/m
+
+        Returns:
+            array/float: ion-ion static structure factors depending on the k-input
+        """
         ni = self.state.ion_number_density
         Zi = self.state.ion_charge
         Ti = self.state.ion_temperature
-        # TODO(Hannah): move the ion diameter to the plasma state
-        sigma_c = self.ion_core_radius
+        sigma_c = self.state.ion_core_radius
 
         eta = PI / 6 * ni * sigma_c**3
         gamma = Zi**2 * ELEMENTARY_CHARGE**2 / (4 * PI * VACUUM_PERMITTIVITY * sigma_c * BOLTZMANN_CONSTANT * Ti)
@@ -248,9 +328,24 @@ class OCPStaticStructureFactor:
             )
         )
         S_ii_ocp = 1 / (1 - Cii)
+        self.success = True
         return S_ii_ocp
 
     def hnc_ocp_ii(self, k, pseudo_potential):
+        """
+        HNC solver to obtain ion-ion static structure factors from the HNC closure to the Orstein-Zernike equation.
+
+        Parameters:
+            k (float/array): wave number in units of 1/m, not actually used here as the grid is determined internally
+            pseudo_potential (str): option to choose the ion-ion potential
+
+        Returns:
+            array: k-grid used in the solver in units of 1/m
+            array: r-grid used in the solver in units of m
+            array: pair correlation function, non-dimensional
+            array: total correlation function, non-dimensional
+            array: ion-ion static structure factors, non-dimensional
+        """
         Ti = self.state.ion_temperature
         Zi = self.state.ion_charge
         ni = self.state.ion_number_density
@@ -278,14 +373,21 @@ class OCPStaticStructureFactor:
         ).real
 
         # use thermodynamically normalized potential
-        Us_rs = (
-            beta
-            * self._hnc_ii_pseudopotential(Q=Q, r=rs, alpha=alpha, k=ks, kappa_e=kappa_e, model=pseudo_potential)[0]
-        )  # [ ]
-        Ul_ks = (
-            beta
-            * self._hnc_ii_pseudopotential(Q=Q, r=rs, alpha=alpha, kappa_e=kappa_e, k=ks, model=pseudo_potential)[1]
-        )  # [m^3] ???
+        Us = self._hnc_ii_pseudopotential(
+            Q=Q,
+            r=rs,
+            alpha=alpha,
+            k=ks,
+            kappa_e=kappa_e,
+            ion_core_radius=self.state.ion_core_radius,
+            srr_core_power=self.state.sec_power,
+            srr_sigma=self.state.srr_sigma,
+            csd_core_charges=[self.state.csd_core_charge, self.state.csd_core_charge],
+            csd_parameters=[self.state.csd_parameter, self.state.csd_parameter],
+            model=pseudo_potential,
+        )
+        Us_rs = beta * Us[0]  # [ ]
+        Ul_ks = beta * Us[1]  # [m^3] ???
 
         cs0_rs = -Us_rs  # [ ]
         Ns0_rs = np.zeros_like(cs0_rs)  # [ ]
@@ -327,12 +429,13 @@ class OCPStaticStructureFactor:
             g_rs_new = np.exp(Ns_rs - Us_rs)
 
             if np.any(g_rs_new) == np.nan:
-                print(f"Careful, we have naan")
+                print(f"Careful, we have naan in the HNC solver. Try increasing the mix fraction.")
 
             # check convergence
             converged = np.sum((g_rs_prev - g_rs_new) ** 2) < delta
             if converged:
-                print(f"Converged after {i} iterations.")
+                self.success = True
+                print(f"HNC solver converged after {i} iterations.")
                 break
 
             # save variables for next iteration
@@ -342,7 +445,10 @@ class OCPStaticStructureFactor:
 
             i += 1
         else:
-            print(f"Exited after {max_iterations} iterations without convergence.")
+            print(
+                f"Exited the HNC solver after {max_iterations} iterations without convergence. Try increasing the max iterations."
+            )
+            self.success = False
 
         giir = g_rs_new
 
@@ -365,6 +471,22 @@ class OCPStaticStructureFactor:
         return ks, rs, giir, hiir, Siik
 
     def xhnc_ocp_ii(self, k, pseudo_potential, bridge_function):
+        """
+        Extended HNC solver to obtain ion-ion static structure factors from the HNC closure to the Orstein-Zernike equation
+        including bridge functions.
+
+        Parameters:
+            k (float/array): wave number in units of 1/m, not actually used here as the grid is determined internally
+            pseudo_potential (str): option to choose the ion-ion potential
+            bridge_function (str): option to choose the bridge function
+
+        Returns:
+            array: k-grid used in the solver in units of 1/m
+            array: r-grid used in the solver in units of m
+            array: pair correlation function, non-dimensional
+            array: total correlation function, non-dimensional
+            array: ion-ion static structure factors, non-dimensional
+        """
         Zi = self.state.ion_charge
         ni = self.state.ion_number_density
         Rii = self.Rii
@@ -393,14 +515,21 @@ class OCPStaticStructureFactor:
         ).real
 
         # # use thermodynamically normalized potential
-        Us_rs = (
-            beta
-            * self._hnc_ii_pseudopotential(Q=Q, r=rs, alpha=alpha, k=ks, kappa_e=kappa_e, model=pseudo_potential)[0]
-        )  # [ ]
-        Ul_ks = (
-            beta
-            * self._hnc_ii_pseudopotential(Q=Q, r=rs, alpha=alpha, k=ks, kappa_e=kappa_e, model=pseudo_potential)[1]
-        )  # [m^3] ???
+        Us = self._hnc_ii_pseudopotential(
+            Q=Q,
+            r=rs,
+            alpha=alpha,
+            k=ks,
+            kappa_e=kappa_e,
+            ion_core_radius=self.state.ion_core_radius,
+            srr_core_power=self.state.sec_power,
+            srr_sigma=self.state.srr_sigma,
+            csd_core_charges=[self.state.csd_core_charge, self.state.csd_core_charge],
+            csd_parameters=[self.state.csd_parameter, self.state.csd_parameter],
+            model=pseudo_potential,
+        )
+        Us_rs = beta * Us[0]  # [ ]
+        Ul_ks = beta * Us[1]  # [m^3] ???
 
         cs0_rs = -Us_rs  # [ ]
         Ns0_rs = np.zeros_like(cs0_rs)  # should be [ ]
@@ -443,12 +572,13 @@ class OCPStaticStructureFactor:
             g_rs_new = np.exp(Ns_rs - Us_rs + Biir)
 
             if np.any(g_rs_new) == np.nan:
-                print(f"Careful, we have naan.")
+                print(f"Careful, we have naan in the HNC solver. Try increasing the mix fraction.")
 
             # check convergence
             converged = np.sum((g_rs_prev - g_rs_new) ** 2) < delta
             if converged:
-                print(f"Converged after {i} iterations.")
+                self.success = True
+                print(f"HNC solver converged after {i} iterations.")
                 break
 
             # save variables for next iteration
@@ -458,7 +588,10 @@ class OCPStaticStructureFactor:
 
             i += 1
         else:
-            print(f"Exited after {max_iterations} iterations without convergence.")
+            self.success = False
+            print(
+                f"HNC solver exited after {max_iterations} iterations without convergence. Increase the max iterations."
+            )
 
         giir = g_rs_new
 
@@ -487,6 +620,17 @@ class OCPStaticStructureFactor:
 
 
 class MCPStaticStructureFactor:
+    """
+    Class containing the multi-component static structure factor calculations.
+
+    Attributes:
+        overlord_state (PlasmaState): mean plasma state
+        state (PlasmaState): container holding all plasma parameters
+        max_iterations (int): maximum number of iterations in the HNC solver
+        mix_fraction (float): number between 0 and 1, values closer to 1 mean less of the new iterated solution in the HNC solver is included
+        delta (float): tolerance to check convergence of the HNC result
+        n (int): number of points in the HNC grid
+    """
 
     def __init__(
         self,
@@ -497,6 +641,7 @@ class MCPStaticStructureFactor:
         delta=1.0e-6,
         n=8192,
     ):
+
         self.overlord_state = overlord_state
         self.beta = 1 / (BOLTZMANN_CONSTANT * overlord_state.ion_temperature)  # [1/J]
         self.n = n  # per themis [#]
@@ -518,8 +663,24 @@ class MCPStaticStructureFactor:
         self.max_iterations = max_iterations
         self.mix_fraction = mix_fraction
         self.delta = delta
+        self.states = states
+        self.success = False
 
     def get_ab_static_structure_factor(self, k, sf_model="HNC", pseudo_potential="DEBYE_HUCKEL", return_full=False):
+        """
+         Main run function to obtain the multi-component ion-ion static structure factor depending on the model inputs.
+
+        Parameters:
+            k (float/array): wave number in units of 1/m
+            sf_model (str): model for the static structure factor
+            pseudo_potential (str): ion-ion potential for the hnc solver
+            brige_function (str): model used for the bridge function, only applies to the xHNC model
+            return_full (bool): if true, will return all outputs including pair correlation function, does not work for MSA
+
+        Returns:
+            float/ array: will return full array of static structure factors or single value depending on the k-input type
+        """
+        # I think the HNC mix fraction et al., variables should be inputs here
         if sf_model == "MSA":
             raise NotImplementedError("The MSA has not been implemented for multi-component systems")
         elif sf_model == "SVT":
@@ -527,7 +688,9 @@ class MCPStaticStructureFactor:
         elif sf_model == "HNC":
             ks, rs, giir, hiir, Sabs = self.hnc_ab_ss(k, pseudo_potential)
         else:
-            raise NotImplementedError(f"Model {sf_model} not recognized. Try HNC.")
+            raise NotImplementedError(
+                f"Model {sf_model} for the multi-species ion-ion static structure factor not recognized. Try HNC."
+            )
 
         # consider switching out the interpolation with something like np.interpolate which is meant to be faster
         interp_sf = interp1d(ks, Sabs, axis=-1, kind="linear")
@@ -557,7 +720,29 @@ class MCPStaticStructureFactor:
         srr_sigma=None,
         model="YUKAWA",
     ):
-        if model == "YUKAWA":
+        """
+        Function to return the ion-ion pseudo-potential used in the HNC solver in both r and k space.
+
+        Parameters:
+            k (array): k grid in units of 1/m
+            r (array): r grid in units of m
+            Q (float): ion charge state
+            alpha (float): screening constant used in the Yukawa and Debye-Huckel models
+            ion_core_radius (float): effective ion radius used in SRR model
+            kappa_e (float): inverse screening length
+            csd_core_charges (array): charge states used in the CSD model
+            csd_parameters (array): scale length used to control switch in CSD model
+            srr_core_power (float): exponent in the SRR model
+            srr_sigma (float): amptitude scaling factor in the SRR model
+            model (str): option to control the potential applied
+
+        Returns:
+            array: pseudo-potential in r-space
+            array: pseudo-potential in k-space
+        """
+        if model == "COULOMB":
+            return coulomb_r(Qa, Qb, r), coulomb_k(Qa, Qb, k)
+        elif model == "YUKAWA":
             return yukawa_r(Qa, Qb, r, alpha), yukawa_k(Qa, Qb, k, alpha)
         elif model == "DEBYE_HUCKEL":
             return debye_huckel_r(Qa, Qb, r, alpha, kappa_e), debye_huckel_k(Qa, Qb, k, alpha, kappa_e)
@@ -566,6 +751,7 @@ class MCPStaticStructureFactor:
         elif model == "KELBG":
             return kelbg_r(Qa, Qb, r, alpha), kelbg_k(Qa, Qb, k, alpha)
         elif model == "SRR":
+            warnings.warn(f"Model {model} should not be used.")
             return short_range_screening_r(
                 self.overlord_state.ion_temperature, srr_core_power, ion_core_radius, srr_sigma, kappa_e
             ), np.zeros_like(k)
@@ -576,9 +762,23 @@ class MCPStaticStructureFactor:
                 Qa, Qb, k, csd_parameters[0], csd_parameters[1], csd_core_charges[0], csd_core_charges[1], kappa_e
             )
         else:
-            raise NotImplementedError(f"Pseudo-potential model {model} not recognized.")
+            raise NotImplementedError(f"Pseudo-potential model {model} in the HNC solver not recognized.")
 
     def hnc_ab_ss(self, k, pseudo_potential):
+        """
+        HNC solver for a multi-component system to obtain ion-ion static structure factors from the HNC closure to the Orstein-Zernike equation.
+
+        Parameters:
+            k (float/array): wave number in units of 1/m, not actually used here as the grid is determined internally
+            pseudo_potential (str): option to choose the ion-ion potential
+
+        Returns:
+            array: k-grid used in the solver in units of 1/m
+            array: r-grid used in the solver in units of m
+            array: pair correlation function, non-dimensional
+            array: total correlation function, non-dimensional
+            array: ion-ion static structure factors, non-dimensional
+        """
         beta = self.beta  # [1/J]
         n = self.n  # 8192  # per themis [#]
 
@@ -611,11 +811,21 @@ class MCPStaticStructureFactor:
         Ul_ks = np.zeros((b, a, n))
 
         # populate potentials: dimensionless
-        # will need to add all the other variables here as well
         for n1 in range(b):
             for n2 in range(a):
                 Uab = self._hnc_pseudopotential(
-                    k=ks, Qa=Qs[n2], Qb=Qs[n1], r=rs, alpha=alpha, kappa_e=kappa_e, model=pseudo_potential
+                    k=ks,
+                    Qa=Qs[n2],
+                    Qb=Qs[n1],
+                    r=rs,
+                    alpha=alpha,
+                    kappa_e=kappa_e,
+                    ion_core_radius=self.states[n1].ion_core_radius,
+                    srr_core_power=self.overlord_state.sec_power,
+                    srr_sigma=self.overlord_state.srr_sigma,
+                    csd_core_charges=[self.states[n1].csd_core_charge, self.states[n2].csd_core_charge],
+                    csd_parameters=[self.states[n1].csd_parameter, self.states[n2].csd_parameter],
+                    model=pseudo_potential,
                 )
                 Us_rs[n1, n2, :] = beta * Uab[0]
                 Ul_ks[n1, n2, :] = beta * Uab[1]
@@ -670,12 +880,14 @@ class MCPStaticStructureFactor:
             g_rs_new = np.exp(Ns_rs - Us_rs)
 
             if np.any(np.isnan(g_rs_new)) or np.any(np.isnan(c_ks)) or np.any(np.isnan(cs_rs)):
+                self.success = False
                 print(f"\nCareful, we have naan at i={i}! Exciting.\n")
                 break
 
             converged = np.sum((g_rs_prev - g_rs_new) ** 2) < delta
             if converged:
-                print(f"Converged after {i} iterations.")
+                self.success = True
+                print(f"HNC solver converged after {i} iterations.")
                 break
 
             # save variables for next iteration
@@ -685,6 +897,7 @@ class MCPStaticStructureFactor:
 
             i += 1
         else:
+            self.success = False
             print(f"Exited after {max_iterations} iterations without convergence.")
 
         giir = g_rs_new

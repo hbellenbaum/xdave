@@ -78,6 +78,11 @@ def calculate_angle(q, energy):
     # convert angle from radians to degrees
     angle *= 180 / np.pi
 
+    # if np.isnan(angle):
+    #     print(
+    #         f"Attempted to calculate an angle, but either the wave number is too large or the beam energy is too small."
+    #     )
+
     return angle
 
 
@@ -355,6 +360,71 @@ def inverse_transform_fftn(yk, k, norm):
     return yr
 
 
+def spectral_convolution(spec_ene, omega, dsf, source_ene, source, Wr):
+    """
+    Tom's convolution :) I take no credit
+    """
+    spectrum = np.zeros_like(spec_ene)
+    source /= np.sum(source)  # Normalise for convolution
+
+    for ii, Ei in enumerate(source_ene):
+        Bi = source[ii]
+        momentum = (1.0 - omega / Ei) ** 2
+        spectrum += np.interp(x=spec_ene, xp=Ei - omega, fp=dsf * momentum) * Bi
+
+    # Now need to interpolate source on to the spectrum grid
+    new_source = np.interp(x=spec_ene, xp=source_ene, fp=source)
+    new_source /= np.sum(new_source)  # need to normalise
+
+    # Apply Wr
+    spectrum += new_source * Wr / (spec_ene[1] - spec_ene[0])
+
+    return spectrum
+
+
+def print_error_message():
+    print(f"You done messed up!")
+    error_msg = r"""                          
+                         #####.                                     
+                           #*****#.                                  
+                           #********#.                               
+                          -***********#.                             
+                         #**************#.                           
+                        .***************###                          
+                        #**************#####.                        
+                        +************#######%                        
+                       ##**********##########.                       
+                    #***********#############                        
+                  #**********###############%-.                      
+                 #********#################******#.                  
+                ##***##################%#*********##                 
+               .####################%#***********####                
+                #####----*######%##*********----#####+               
+                %#-::::::::-##***********-:::..:::-##                
+              ..#::...+@....:***********::...%#...::%                
+           .#***::..@@@@@@...:*********:...@@@@@@...:***#.           
+          #*****:..+@@@@@@@...:****###+:..@@@@@@@@..:****##.         
+         #******:..@@@@@@@@...:#######:...@@@@@@@@...+***###.        
+        .#******:..=@@@@@@@...:#######*...@@@@@@@@..:**######        
+        ###*****:...@@@@@@...:######%#*:...@@@@@@...:########        
+        -########:.....:....:##%##******:..........:#########        
+         #########+:..  ...:*************:.......::##########        
+          =%%%####***=:::******************#-::-###########*##.      
+    .#**********************************#################******##    
+  .#******************++=====================++########********####  
+ :#*******************=-:::::::::::::::::::::-#######********####### 
+.##*********************-:.................:*#####*********##########
+###########################-:..........::######**********###########%
+###########################################************#############%
+.######################################*************################.
+ .################################****************################%. 
+   -%#########################****************##################%#   
+      ..%%%####%%%%+..  .. ....-+########################%%%%.  
+    """
+    print(error_msg)
+
+
 if __name__ == "__main__":
-    amu = get_atomic_mass_for_element(e="He")
-    print(amu)
+    # amu = get_atomic_mass_for_element(e="He")
+    # print(amu)
+    print_error_message()

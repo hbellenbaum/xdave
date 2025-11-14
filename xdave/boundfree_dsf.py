@@ -11,7 +11,13 @@ import numpy as np
 
 class BoundFreeDSF:
     """
-    Currently only doing basic Impulse Approximation :)
+    Class containing the bound-free dynamic structure factor calculations.
+    As there is only one option each for the form factor and the screening constant calculations, these are hard-coded.
+
+    Attributes:
+        state (PlasmaState): object containing all plasma state variables
+        ff_model (PaulingShermanIonicFormFactor): ionic form factor class
+        screening_constants (ScreeningConstants): screening constant class
     """
 
     def __init__(self, state: PlasmaState) -> None:
@@ -22,14 +28,18 @@ class BoundFreeDSF:
 
     def get_dsf(self, ZA, Zb, k, w, Eb, model="SCHUMACHER"):
         """
-        Inputs:
-            - ZA: Net charge state
-            - Zb: Number of bound electrons
-            - k: wave number
-            - w: frequency
-            - Eb: binding energy (array)
-            - bf_model: str
-            - ipd_model: str
+        Main function to call the dynamic structure factor for a given model.
+
+        Parameters:
+            ZA (float): Net charge state
+            Zb (float): Number of bound electrons
+            k (float): wave number in units of 1/m
+            w (array): energy grid in units of 1/J
+            Eb (array): binding energies for the different shells in units of J
+            bf_model (str): controls the model used for calculating the dsf, default is SCHUMACHER
+
+        Returns:
+            array: bound-free dsf in units of 1/J
         """
 
         # Load correct bf model
@@ -40,7 +50,7 @@ class BoundFreeDSF:
         elif model == "TRUNCATED_IA":
             Sce = self.truncated_IA(ZA, Zb, k, w, Eb)
         else:
-            raise NotImplementedError(f"Model {model} not recognised. Try SCHUMACHER :)")
+            raise NotImplementedError(f"Model {model} for the bound-free component not recognised. Try SCHUMACHER :)")
         return Sce / DIRAC_CONSTANT
 
     def _shell_amplitude(self, Znl, n, l):
@@ -54,19 +64,16 @@ class BoundFreeDSF:
 
     def schuhmacher_ia(self, ZA, Zb, k, w, Eb):
         """
-        Bound-free DSF from Schumacher, Smend and Borchert, J. Phys. B 8, 1428 (1975)
-        Parameters
-        ----------
-        ZA: Net charge state
-        Zb: Number of bound electrons
-        Te: electronic temperature in K
-        k: Wave vector in m^-1
-        w: Frequency in hz
-        EB: electronic binding energy in Joule
+        Bound-free DSF from Schumacher, Smend and Borchert, J. Phys. B 8, 1428 (1975).
 
-        Returns
-        -------
-        Sce: dynamic structure factor
+        Parameters:
+            ZA (float): Net charge state
+            Zb (float): Number of bound electrons
+            k (float): wave number in units of 1/m
+            w (array): energy grid in units of 1/J
+            Eb (array): binding energies for the different shells in units of J
+        Returns:
+            array: bound-free dsf in units of 1/J
         """
 
         Sce = 0.0
@@ -241,18 +248,16 @@ class BoundFreeDSF:
     def schumacher_ia_correction(self, ZA, Zb, k, w, Eb):
         """
         First order correction to the bound-free Schumacher Impulse Approximation based on
-        Holm and Ribberfors, Phys. Rev. A 40 (1989)
-        ----------
-        ZA: Net charge state
-        Zb: Number of bound electrons
-        Te: electronic temperature in K
-        k: Wave vector in m^-1
-        w: Frequency in hz
-        EB: electronic binding energy in Joule
+        Holm and Ribberfors, Phys. Rev. A 40 (1989).
 
-        Returns
-        -------
-        Sce: dynamic structure factor
+        Parameters:
+            ZA (float): Net charge state
+            Zb (float): Number of bound electrons
+            k (float): wave number in units of 1/m
+            w (array): energy grid in units of 1/J
+            Eb (array): binding energies for the different shells in units of J
+        Returns:
+            array: bound-free dsf in units of 1/J
         """
 
         Sce = 0.0
@@ -374,6 +379,18 @@ class BoundFreeDSF:
         return Sce
 
     def truncated_IA(self, ZA, Zb, k, w, Eb):
+        """
+        Correction applied to the Impulse Approximation based on Mattern and Seidler, Phys. Plasmas 20 (2013)
+
+        Parameters:
+            ZA (float): Net charge state
+            Zb (float): Number of bound electrons
+            k (float): wave number in units of 1/m
+            w (array): energy grid in units of 1/J
+            Eb (array): binding energies for the different shells in units of J
+        Returns:
+            array: bound-free dsf in units of 1/J
+        """
         Sce = self.schuhmacher_ia(ZA, Zb, k, w, Eb)
         beta = 1 / (BOLTZMANN_CONSTANT * self.state.electron_temperature)
         exp_term = np.exp(beta * (w - Eb)) + 1

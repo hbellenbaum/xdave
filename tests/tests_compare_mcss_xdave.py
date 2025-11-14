@@ -338,9 +338,9 @@ def compare_mcss_xdave_ch_static():
     xC = 1 - xH
     # q = 4.0
     angle = 75  # degrees
-    beam_energy = 20.0e3  # eV
+    beam_energy = 9.0e3  # eV
     q = calculate_q(angle=angle, energy=beam_energy)
-    print(f"Running at q={q:.3f}")
+    # print(f"Running at q={q:.3f}")
 
     k_mcss, WR_mcss, f1_mcss, f2_mcss, q1_mcss, q2_mcss, S11_mcss, S12_mcss, S22_mcss = run_ch_ar_mode(
         T=T, rho=rho, xH=xH, ZH=ZH, ZC=ZC, angle=angle, user_defined_ipd=0.0, user_defined_lfc=0.0, plot=False
@@ -375,7 +375,8 @@ def compare_mcss_xdave_ch_static():
     mcss_norm = kernel.overlord_state.atomic_number
 
     k = np.linspace(0.1, 15, 10000)
-    k, Sab, WR, qs, fs = kernel.run(k=k, w=0.0, mode="STATIC")
+    k, Sab, _, WR, qs, fs = kernel.run(k=k, w=0.0, mode="STATIC")
+    print(qs[0])
 
     # plot result
     fig, axes = plt.subplots(2, 2, figsize=(16, 16))
@@ -424,5 +425,5 @@ def compare_mcss_xdave_ch_static():
 if __name__ == "__main__":
     # compare_mcss_xdave_be()
     # compare_mcss_xdave_ch()
-    compare_mcss_xdave_c()
+    # compare_mcss_xdave_c()
     compare_mcss_xdave_ch_static()

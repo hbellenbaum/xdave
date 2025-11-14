@@ -93,14 +93,19 @@ def ch_example():
     # this will convolve the dsf with a Gaussian sif of 10 eV fwhm
     # if you want to use your own, you can add it as an input to the sif input option
     # note that for now this will have to be centered around 0
-    inelastic, elastic, spectrum = kernel.convolve_with_sif(
-        bf=bf_tot, ff=ff_tot, WR=rayleigh_weight, omega=w, sif=None, fwhm=10, type="GAUSSIAN"
+    spec_energy, inelastic, elastic, spectrum = kernel.convolve_with_sif(
+        omega=w,
+        dsf=(bf_tot + ff_tot),
+        Wr=rayleigh_weight,
+        beam_energy=9.0e3,
+        type="GAUSSIAN",
+        fwhm=10,
     )
 
     plt.figure()
-    plt.plot(w, inelastic, label="inel")
-    plt.plot(w, elastic, label="inel")
-    plt.plot(w, spectrum, label="inel")
+    # plt.plot(w, inelastic, label="inel")
+    # plt.plot(w, elastic, label="inel")
+    plt.plot(spec_energy, spectrum, label="inel")
     plt.legend()
     plt.xlabel(r"$\omega$ [eV]")
     plt.xlabel("Intensity [a.u.]")
@@ -108,7 +113,7 @@ def ch_example():
 
     start_time = time.time()
     k = np.linspace(0.5, 10, 1000)
-    k, Sab, rayleigh_weight, qs, fs = kernel.run(w=w, k=k, beam_energy=8.0e3, mode="STATIC")
+    k, Sab, _, rayleigh_weight, qs, fs, lfc = kernel.run(w=w, k=k, beam_energy=8.0e3, mode="STATIC")
     end_time = time.time()
     print(f"Run took {end_time - start_time} s")
 
@@ -133,7 +138,7 @@ def ch_example():
 def cho_example():
     T = 50  # eV
     rho = 2 * 1.845  # two times solid density [g/cc]
-    Z_C = 2.5
+    Z_C = 2.0
     Z_O = 3
 
     xH = 0.2
@@ -215,7 +220,7 @@ def cho_example():
     # this will convolve the dsf with a Gaussian sif of 10 eV fwhm
     # if you want to use your own, you can add it as an input to the sif input option
     # note that for now this will have to be centered around 0
-    inelastic, elastic, spectrum = kernel.convolve_with_sif(
+    inelastic, inelastic, elastic, spectrum = kernel.convolve_with_sif(
         bf=bf_tot, ff=ff_tot, WR=rayleigh_weight, omega=w, sif=None, fwhm=10, type="GAUSSIAN"
     )
 
@@ -231,7 +236,7 @@ def cho_example():
 
     start_time = time.time()
     k = np.linspace(0.5, 10, 1000)
-    k, Sab, rayleigh_weight, qs, fs = kernel.run(w=w, k=k, beam_energy=8.0e3, mode="STATIC")
+    k, Sab, _, rayleigh_weight, qs, fs = kernel.run(w=w, k=k, beam_energy=8.0e3, mode="STATIC")
     end_time = time.time()
     print(f"Run took {end_time - start_time} s")
 

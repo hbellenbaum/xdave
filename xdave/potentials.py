@@ -23,7 +23,7 @@ def coulomb_r(Qa, Qb, r):
 
 def coulomb_k(Qa, Qb, k):
     """
-    Coulomb potential in k-space, note that the inputs Qa and Qb here are given in units of C.
+    Coulomb potential in k-space, note that the inputs Qa and Qb here are given in units of e.
     """
     return Qa * Qb * ELEMENTARY_CHARGE**2 / (VACUUM_PERMITTIVITY * k**2)
 

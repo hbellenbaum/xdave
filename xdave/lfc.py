@@ -26,6 +26,14 @@ from scipy.special import i1 as mod_bessel_first
 
 
 class LFC:
+    """
+    Class containing all things local field correction
+
+    Attributes:
+        state (PlasmaState): container for all plasma variables
+        rs (float): non-dimensional Wigner-Seitz radius
+        theta (float): non-dimensional temperature parameter
+    """
 
     def __init__(self, state: PlasmaState):
         self.state = state
@@ -47,6 +55,14 @@ class LFC:
         self.geeT = self._ee_pair_distribution_function_finite_T(Te=Tee)
 
     def calculate_lfc(self, k, w, model="DORNHEIM_ESA"):
+        """
+        Calculate LFC for a given model.
+
+        Parameters:
+            k (float): wave number in units of 1/m
+            w (array): array of energies in eV
+            model (str): controls the model used for the LFC calculation
+        """
         if self.state.charge_state == 0:
             return 0.0
         elif model == "NONE":
@@ -65,7 +81,7 @@ class LFC:
         elif model == "NONE":
             return 0.0
         else:
-            raise NotImplementedError(f"Model {model} not a recognized option.")
+            raise NotImplementedError(f"Model {model} not a recognized option for the local field correction.")
 
     def _ee_pair_distribution_function(self, z):
         """
@@ -229,10 +245,18 @@ class LFC:
 
     def _dornheim_esa(self, k, w):
         """
+        Effective static approximation based on PIMC simulations of the uniform electron gas.
         T. Dornheim et al., Phys. Rev. Lett. 125 (2020), DOI: 10.1103/physrevlett.125.235001
         T. Dornheim et al., Phys. Rev. B 103 (2021), DOI: 10.1103/physrevb.103.165102
 
-        Code copied over from: https://github.com/ToDor90/LFC (and modified slightly)
+        Code copied over from: https://github.com/ToDor90/LFC (and modified slightly).
+
+        Parameters:
+            k (float/array): scattering wavenumber in units of a_B^{-1}
+            w (array): array of energies in eV
+
+        Returns:
+            float/array: output type depending on the input type of k, local field correction, non-dimensional
         """
         rs = self.rs
         theta = self.theta
@@ -344,9 +368,16 @@ class LFC:
 
     def _utsumi_ichimaru_static(self, k, w):
         """
-        K. Utsumi and S. Ichimaru, Phys. Rev. A, 26 (1982), DOI: 10.1103/physreva.26.603
+        Static local field correction based on K. Utsumi and S. Ichimaru, Phys. Rev. A, 26 (1982), DOI: 10.1103/physreva.26.603
         Details also in Gregori et al., High Energy Density Phys. 3 (2007)
         and Farid et al., Phys. Rev. B 48 (1993)
+
+        Parameters:
+            k (float/array): scattering wavenumber in units of a_B^{-1}
+            w (array): array of energies in eV, not used here
+
+        Returns:
+            float/array: output type depending on the input type of k, local field correction, non-dimensional
         """
         kF = self.state.fermi_wave_number(self.state.free_electron_number_density)
         kF = (3 * np.pi * np.pi * self.state.free_electron_number_density) ** (1 / 3)
@@ -374,8 +405,15 @@ class LFC:
 
     def _geldart_vosko(self, k, w):
         """
-        D.J.W. Geldart, S.H. Vosko, Can. J. Phys. 44 (1966), DOI: 10.1139/p64-183
+        Static local field correction based on D.J.W. Geldart, S.H. Vosko, Can. J. Phys. 44 (1966), DOI: 10.1139/p64-183
         Details in Gregori et al., High Energy Density Phys. 3 (2007)
+
+        Parameters:
+            k (float/array): scattering wavenumber in units of a_B^{-1}
+            w (array): array of energies in eV
+
+        Returns:
+            float/array: output type depending on the input type of k, local field correction, non-dimensional
         """
         kF = self.state.fermi_wave_number(self.state.free_electron_number_density)
         Gamma_ee = self.Gamma_ee
@@ -387,7 +425,14 @@ class LFC:
 
     def _pade_interp_static(self, k, w):
         """
-        G. Gregori et al., High Energy Denity Phys. 3 (2007), DOI: 10.1016/j.hedp.2007.02.006
+        Static local field correction based on G. Gregori et al., High Energy Denity Phys. 3 (2007), DOI: 10.1016/j.hedp.2007.02.006
+
+        Parameters:
+            k (float/array): scattering wavenumber in units of a_B^{-1}
+            w (array): array of energies in eV, not used here
+
+        Returns:
+            float/array: output type depending on the input type of k, local field correction, non-dimensional
         """
         G0 = self._geldart_vosko(k, w)
         GT = self._utsumi_ichimaru_static(k, w)
@@ -423,7 +468,14 @@ class LFC:
 
     def _farid_static(self, k, w):
         """
-        B. Farid et al., Phys. Rev. B 48 (1993), DOI: 10.1103/physrevb.48.11602
+        Static local field correction based on B. Farid et al., Phys. Rev. B 48 (1993), DOI: 10.1103/physrevb.48.11602.
+
+        Parameters:
+            k (float/array): scattering wavenumber in units of a_B^{-1}
+            w (array): array of energies in eV, not used here
+
+        Returns:
+            float/array: output type depending on the input type of k, local field correction, non-dimensional
         """
         kF = self.state.fermi_wave_number(self.state.free_electron_number_density)
         Q = k / kF
