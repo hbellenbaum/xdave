@@ -60,6 +60,7 @@ class xDave:
         hnc_delta: float = 1.0e-6,
         hnc_max_iterations: float = 1000,
         user_defined_inputs: dict = None,
+        verbose: bool = False,
     ):
         assert np.sum(partial_densities) == 1.0, f"Fractional densities do not add up 1. Try again sucker."
         self.number_of_states = len(partial_densities)
@@ -115,6 +116,7 @@ class xDave:
 
         # Run Variables
         self.enforce_fsum = enforce_fsum
+        self.verbose = verbose
 
         self.hnc_mix_fraction = hnc_mix_fraction
         self.hnc_delta = hnc_delta
@@ -195,15 +197,20 @@ class xDave:
         self.ocp_flag = len(states) < 2  # (len(np.unique(atomic_numbers)) < len(states)) and len(states) <= 2
         return np.array(states), overlord_state
 
+    ## ------------------------ ##
+    ## -- Main run functions -- ##
+    ## ------------------------ ##
+
     def run(self, w, k=None, angle=None, beam_energy=None, mode="DYNAMIC"):
 
-        self._print_logo()
+        if self.verbose:
+            self._print_logo()
 
         if angle is None:
             assert k is not None, f"You have to set either the angle or the scattering wave number."
             if beam_energy is None:
                 beam_energy = 8.0e3
-                print(f"Assuming beam energy of 8 keV.")
+                print(f"Assuming beam energy of 8 keV.") if self.verbose else None
             angle = calculate_angle(q=k, energy=beam_energy)
         elif k is None:
             assert angle is not None, f"You have to set either the angle or the scattering wave number."
@@ -251,14 +258,16 @@ class xDave:
 
         lfc_kernel = LFC(state=self.overlord_state)
         lfc = lfc_kernel.calculate_lfc(k=k, w=w, model=self.models.lfc_model)
-        print(f"Calculated LFC={lfc}")
+        print(f"Calculated LFC={lfc}") if self.verbose else None
 
         if self.ipd_eV is not None:
             ipd = self.ipd_eV * eV_TO_J
-            print(f"Applying user-defined input IPD: {self.ipd_eV}")
+            if self.verbose:
+                print(f"Applying user-defined input IPD: {self.ipd_eV}")
         else:
             ipd = get_ipd(state=self.overlord_state, model=self.models.ipd_model, user_defined_ipd=self.ipd_eV)
-            print(f"Calculated IPD={ipd * J_TO_eV} eV")
+            if self.verbose:
+                print(f"Calculated IPD={ipd * J_TO_eV} eV")
 
         ff = FreeFreeDSF(state=self.overlord_state)
         if self.overlord_state.charge_state > 0:
@@ -272,12 +281,14 @@ class xDave:
         ff_i = np.zeros((len(self.states), len(w)))
         bf_i = np.zeros((len(self.states), len(w)))
 
-        print(f"Mean charge state = {self.overlord_state.charge_state}.")
+        if self.verbose:
+            print(f"Mean charge state = {self.overlord_state.charge_state}.")
 
         for i in range(0, len(self.states)):
             state = self.states[i]
             x = self.partial_densities[i]
-            print(f"\nRunning state {i} with Z={state.charge_state} and x={x}\n")
+            if self.verbose:
+                print(f"\nRunning state {i} with Z={state.charge_state} and x={x}\n")
             binding_energies = state.binding_energies * eV_TO_J
 
             ff_i[i] = x * ff_dsf
@@ -421,14 +432,17 @@ class xDave:
 
         lfc_kernel = LFC(state=self.overlord_state)
         lfc = lfc_kernel.calculate_lfc(k=k_value, w=omega_array, model=self.models.lfc_model)
-        print(f"Calculated LFC={lfc}")
+        if self.verbose:
+            print(f"Calculated LFC={lfc}")
 
         if self.ipd_eV is not None:
             ipd = self.ipd_eV * eV_TO_J
-            print(f"Applying user-defined input IPD: {self.ipd_eV}")
+            if self.verbose:
+                print(f"Applying user-defined input IPD: {self.ipd_eV}")
         else:
             ipd = get_ipd(state=self.overlord_state, model=self.models.ipd_model, user_defined_ipd=self.ipd_eV)
-            print(f"Calculated IPD={ipd * J_TO_eV} eV")
+            if self.verbose:
+                print(f"Calculated IPD={ipd * J_TO_eV} eV")
 
         ff = FreeFreeDSF(state=self.overlord_state)
         ff_dsf = ff.get_dsf(k=k_value, w=omega_array, lfc=lfc, model=self.models.polarisation_model)
@@ -438,12 +452,14 @@ class xDave:
         ff_i = np.zeros((len(self.states), len(omega_array)))
         bf_i = np.zeros((len(self.states), len(omega_array)))
 
-        print(f"Mean charge state = {self.overlord_state.charge_state}.")
+        if self.verbose:
+            print(f"Mean charge state = {self.overlord_state.charge_state}.")
 
         for i in range(0, len(self.states)):
             state = self.states[i]
             x = self.partial_densities[i]
-            print(f"\nRunning state {i} with Z={state.charge_state} and x={x}\n")
+            if self.verbose:
+                print(f"\nRunning state {i} with Z={state.charge_state} and x={x}\n")
             binding_energies = state.binding_energies * eV_TO_J
 
             ff_i[i] = x * ff_dsf
@@ -475,7 +491,7 @@ class xDave:
 
         lfc_kernel = LFC(state=self.overlord_state)
         lfc = lfc_kernel.calculate_lfc(k=k_value, w=omega_array, model=self.models.lfc_model)
-        print(f"Calculated LFC={lfc}")
+        # print(f"Calculated LFC={lfc}")
 
         # Calculate the Rayleigh weight
         if self.ocp_flag:
@@ -503,6 +519,10 @@ class xDave:
                 return_full=False,
             )
         return rayleigh_weight
+
+    ## --------------------- ##
+    ## -- Post-processing -- ##
+    ## --------------------- ##
 
     def convolve_with_sif(
         self, omega, bf, ff, dsf, Wr, beam_energy, type="GAUSSIAN", fwhm=10, source_energy=None, source=None
@@ -574,8 +594,8 @@ class xDave:
             spectrum += np.interp(x=spec_energy, xp=scttr_ene, fp=scttr_spc) * Bi
             inelastic += np.interp(x=spec_energy, xp=scttr_ene, fp=scttr_spc_inel) * Bi
 
-        # new_source = np.interp(x=spec_ene, xp=source_ene, fp=source)
-        new_source = interpolate.interp1d(source_energy, source)(spec_energy)
+        # new_source = np.interp(x=spec_energy, xp=source_energy, fp=source)
+        new_source = np.interp(x=spec_energy, xp=source_energy, fp=source_spectrum)
         new_source /= np.sum(new_source)
 
         elastic = new_source * Wr / (source_energy[1] - source_energy[0])
@@ -672,7 +692,9 @@ class xDave:
             )
         else:
             raise NotImplementedError(f"Cannot save outputs in mode {mode}. I do not know what that means.")
-        print(f"Saving output to file {fname}")
+
+        if self.verbose:
+            print(f"Saving output to file {fname}")
 
     def save_result_static(self, fname, dirname, k, Sab, Wr, qs, fs, lfc):
 
@@ -701,6 +723,10 @@ class xDave:
             delimiter=",",
             header=header,
         )
+
+    ## ------------------- ##
+    ## -- Miscellaneous -- ##
+    ## ------------------- ##
 
     def _print_logo(self):
         print(

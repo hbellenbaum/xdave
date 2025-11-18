@@ -15,9 +15,10 @@ class OCPRayleighWeight:
         state (PlasmaState):
     """
 
-    def __init__(self, overlord_state, state):
+    def __init__(self, overlord_state, state, verbose: bool = False):
         self.overlord_state = overlord_state
         self.state = state
+        self.verbose = verbose
 
     def get_rayleigh_weight(
         self,
@@ -59,7 +60,11 @@ class OCPRayleighWeight:
             float/array: non-dimensional ionic form factor, will only be returned if return_full=True
         """
         sf = OCPStaticStructureFactor(
-            state=self.state, max_iterations=hnc_max_iterations, mix_fraction=hnc_mix_fraction, delta=hnc_delta
+            state=self.state,
+            max_iterations=hnc_max_iterations,
+            mix_fraction=hnc_mix_fraction,
+            delta=hnc_delta,
+            verbose=self.verbose,
         )
 
         if self.state.free_electron_number_density > 0:
@@ -103,10 +108,11 @@ class MCPRayleighWeight:
         nspecies (int): number of species
     """
 
-    def __init__(self, overlord_state, states) -> None:
+    def __init__(self, overlord_state, states, verbose: bool = False) -> None:
         self.overlord_state = overlord_state
         self.states = states
         self.nspecies = len(states)
+        self.verbose = verbose
 
     def get_rayleigh_weight(
         self,
@@ -181,6 +187,7 @@ class MCPRayleighWeight:
             mix_fraction=hnc_mix_fraction,
             delta=hnc_delta,
             max_iterations=hnc_max_iterations,
+            verbose=self.verbose,
         )
         if self.overlord_state.charge_state > 0:
             Sab = sf.get_ab_static_structure_factor(

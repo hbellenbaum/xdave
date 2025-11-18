@@ -15,7 +15,6 @@ from unit_conversions import *
 
 from scipy.interpolate import interp1d
 from scipy.optimize import minimize
-import matplotlib.pyplot as plt
 import numpy as np
 
 
@@ -70,14 +69,7 @@ class OCPStaticStructureFactor:
         n (int): number of points in the HNC grid
     """
 
-    def __init__(
-        self,
-        state: PlasmaState,
-        max_iterations=5000,
-        mix_fraction=0.8,
-        delta=1.0e-8,
-        n=8192,
-    ):
+    def __init__(self, state: PlasmaState, max_iterations=5000, mix_fraction=0.8, delta=1.0e-8, n=8192, verbose=False):
         self.state = state
         self.beta = 1 / (BOLTZMANN_CONSTANT * state.ion_temperature)  # [1/J]
         self.n = n  # per themis [#]
@@ -91,6 +83,7 @@ class OCPStaticStructureFactor:
         self.delta = delta
 
         self.success = False
+        self.verbose = verbose
 
         if self.state.ion_core_radius is None:
             self.ion_core_radius = get_sigmac(
@@ -435,7 +428,8 @@ class OCPStaticStructureFactor:
             converged = np.sum((g_rs_prev - g_rs_new) ** 2) < delta
             if converged:
                 self.success = True
-                print(f"HNC solver converged after {i} iterations.")
+                if self.verbose:
+                    print(f"HNC solver converged after {i} iterations.")
                 break
 
             # save variables for next iteration
@@ -578,7 +572,8 @@ class OCPStaticStructureFactor:
             converged = np.sum((g_rs_prev - g_rs_new) ** 2) < delta
             if converged:
                 self.success = True
-                print(f"HNC solver converged after {i} iterations.")
+                if self.verbose:
+                    print(f"HNC solver converged after {i} iterations.")
                 break
 
             # save variables for next iteration
@@ -640,6 +635,7 @@ class MCPStaticStructureFactor:
         mix_fraction=0.8,
         delta=1.0e-6,
         n=8192,
+        verbose=False,
     ):
 
         self.overlord_state = overlord_state
@@ -665,6 +661,7 @@ class MCPStaticStructureFactor:
         self.delta = delta
         self.states = states
         self.success = False
+        self.verbose = verbose
 
     def get_ab_static_structure_factor(self, k, sf_model="HNC", pseudo_potential="DEBYE_HUCKEL", return_full=False):
         """
@@ -887,7 +884,8 @@ class MCPStaticStructureFactor:
             converged = np.sum((g_rs_prev - g_rs_new) ** 2) < delta
             if converged:
                 self.success = True
-                print(f"HNC solver converged after {i} iterations.")
+                if self.verbose:
+                    print(f"HNC solver converged after {i} iterations.")
                 break
 
             # save variables for next iteration
