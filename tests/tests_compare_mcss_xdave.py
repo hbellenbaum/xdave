@@ -375,7 +375,7 @@ def compare_mcss_xdave_ch_static():
     mcss_norm = kernel.overlord_state.atomic_number
 
     k = np.linspace(0.1, 15, 10000)
-    k, Sab, _, WR, qs, fs = kernel.run(k=k, w=0.0, mode="STATIC")
+    k, Sab, _, WR, qs, fs, lfc = kernel.run(k=k, w=0.0, mode="STATIC")
     print(qs[0])
 
     # plot result
