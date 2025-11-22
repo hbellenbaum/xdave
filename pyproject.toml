@@ -1,0 +1,28 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "xdave"
+version = "0.0.1a0"
+description = "X-Ray Diagnostics, Analysis, Verification and Exploration Code"
+readme = "README.md"
+requires-python = ">=3.10"
+license = "MIT"
+authors = [
+    { name = "Hannah M. Bellenbaum", email = "h.bellenbaum@hzdr.de" },
+    { name = "Maximilian P. Boehme", email = "boehme4@llnl.gov" },
+    { name = "Tobias Dornheim", email = "t.dornheim@hzdr.de" },
+]
+dependencies = [
+    "numpy>=2.3",
+    "matplotlib>=3.10",
+    "scipy>=1.16.2",
+    "plasmapy>=2025.8.0",
+]
+
+[tool.setuptools]
+packages = ["xdave"]
+
+[tool.setuptools.package-data]
+xdave = ["data/*.csv"]

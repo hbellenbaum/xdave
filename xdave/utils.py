@@ -11,6 +11,8 @@ import os
 
 from collections import defaultdict
 
+from importlib.resources import files
+
 
 def read_mcss_output(filepath, start_line=0, end_line=96022):
     grouped_data = defaultdict(lambda: {"xnl": [], "Jnl": []})
@@ -208,8 +210,11 @@ def laplace(tau, E, wff, wbf):
 
 
 def get_atomic_mass_for_element(e):
+
+    data_path = files("xdave") / "data" / "atomic_data.csv"
+
     ANs, elements, amus, _ = np.genfromtxt(
-        "/home/bellen85/code/dev/xdave/xdave/data/atomic_data.csv",
+        data_path,
         delimiter=",",
         skip_header=1,
         dtype=None,
