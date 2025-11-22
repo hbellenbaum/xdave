@@ -210,7 +210,9 @@ def laplace(tau, E, wff, wbf):
 
 
 def get_atomic_mass_for_element(e):
-
+    """
+    Load data from atomic data in folder xdave/data. 
+    """
     data_path = files("xdave") / "data" / "atomic_data.csv"
 
     ANs, elements, amus, _ = np.genfromtxt(
