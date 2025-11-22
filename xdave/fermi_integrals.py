@@ -32,6 +32,7 @@ import numpy as np
 
 
 ## MATHS
+# TODO(Hannah): I am currently not even using this, so it should be deleted :)
 
 ## Copied over from: fdint python package: https://pypi.org/project/fdint/
 

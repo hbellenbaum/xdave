@@ -6,7 +6,7 @@ For more information, see: https://gitlab.com/heart-ray-tracing/HEART
 
 import sys
 
-sys.path.insert(1, "/home/bellen85/code/dev/xdave/xdave")
+sys.path.insert(1, "./xdave")
 
 from HEART import Spectrometer
 from HEART.standards.standard_spectrometers import *
@@ -16,7 +16,6 @@ import matplotlib.pyplot as plt
 
 
 def create_xdave_spectrum(plot=False):
-    plt.style.use("~/Desktop/resources/plotting/poster.mplstyle")
 
     T = 155.5  # eV
     rho = 30.0  # g/cc
@@ -53,30 +52,35 @@ def create_xdave_spectrum(plot=False):
     print(f"Calculated Rayleigh weight = {WR}")
 
     sif_fwhm = 10  # eV
-    P_inelastic, P_elastic, spectrum = kernel.convolve_with_sif(
-        omega=omega_array, bf=bf_tot, ff=ff_tot, WR=WR, type="GAUSSIAN", fwhm=sif_fwhm
+    spec_energy, _, _, spectrum = kernel.convolve_with_sif(
+        omega=omega_array,
+        dsf=(bf_tot + ff_tot),
+        Wr=WR,
+        beam_energy=9.0e3,
+        type="GAUSSIAN",
+        fwhm=10,
     )
 
     if plot:
         plt.figure(figsize=(8, 6))
-        plt.semilogy(omega_array, P_inelastic / np.max(spectrum), label="inel", ls="-.", c="dodgerblue")
-        plt.semilogy(omega_array, P_elastic / np.max(spectrum), label="el", ls="-.", c="magenta")
-        plt.semilogy(omega_array, spectrum / np.max(spectrum), label="tot", ls="-.", c="orange")
+        # plt.semilogy(omega_array, P_inelastic / np.max(spectrum), label="inel", ls="-.", c="dodgerblue")
+        # plt.semilogy(omega_array, P_elastic / np.max(spectrum), label="el", ls="-.", c="magenta")
+        plt.semilogy(spec_energy, spectrum / np.max(spectrum), label="tot", ls="-.", c="orange")
         plt.legend()
         plt.ylim(1.0e-10, 1.5)
         plt.show()
 
-    return omega_array, P_inelastic, P_elastic, spectrum
+    return spec_energy, spectrum
 
 
 def test():
     ## everything is in keV or mm
     Eb = 8  # keV
 
-    output_dir = f"/home/bellen85/code/dev/xdave/heart_outputs"
+    output_dir = f"./heart_outputs"
     fname = "test_heart_output"
 
-    energy, P_inel, P_el, intensity = create_xdave_spectrum(plot=True)
+    energy, intensity = create_xdave_spectrum(plot=True)
     photon_energy_keV = energy * 1.0e-3 + Eb
 
     ## this is where the spectrum will go...

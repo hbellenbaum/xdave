@@ -7,12 +7,25 @@ from unit_conversions import *
 
 # NOTE(TG): Would recommend replacing this with Antia fits. At high densities fdi becomes
 #           extremely slow, if it even is able to reach an answer.
+# NOTE(HB): Noted! But I am being lazy.
 from plasmapy.formulary.mathematics import Fermi_integral as fdi
 
 import numpy as np
 
 
+# TODO(HB): this should really be a class as well
 def get_ipd(state: PlasmaState, model, user_defined_ipd=0.0):
+    """
+    Function to calculate the IPD for a given model for a given model.
+
+    Parameters:
+        state (PlasmaState): container for all plasma parameters
+        model (str): controls the model used
+        user_defined_input(float): if the user specifies the IPD it will be overwritten here.
+
+    Returns:
+        float: calculated IPD in units of J
+    """
     Zi = state.atomic_number - state.charge_state
     ne = state.total_electron_number_density
     ni = state.ion_number_density
@@ -38,7 +51,10 @@ def get_ipd(state: PlasmaState, model, user_defined_ipd=0.0):
     elif model == "USER_DEFINED":
         return user_defined_ipd * eV_TO_J
     else:
-        raise NotImplementedError(f"IPD model {model} is not recognised.")
+        raise NotImplementedError(f"IPD model {model} is not recognised. Try STEWART_PYATT.")
+
+
+# TODO(HB): these should all be called from state
 
 
 def chem_potential_fit(T, n_e):
@@ -94,6 +110,7 @@ def inverse_electron_screening_length_sqr(ne, Te):
 def ipd_debye_hueckel(Zi, ne, ni, Te, Ti):
 
     # NOTE(TG): Setting up some stuff here in case code eventually handles multiple charge states
+    # NOTE(HB): it will never handle multiple charge states, but thank you!
     Zmean = ne / ni  # Zmean = ne/ni_tot
     Zstar = Zi**2 / Zmean  # Zstar = np.sum(Zi**2 * csd) / Zmean  # csd = charge state distribution
 

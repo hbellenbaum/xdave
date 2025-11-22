@@ -1,7 +1,6 @@
-from constants import DIRAC_CONSTANT, SPEED_OF_LIGHT, BOHR_RADIUS, PI
+from constants import DIRAC_CONSTANT, SPEED_OF_LIGHT, BOHR_RADIUS, PI, ATOMIC_MASS_UNIT
 from unit_conversions import eV_TO_J
 
-from mendeleev import element
 from scipy.fft import dst
 import pandas as pd
 import numpy as np
@@ -80,6 +79,11 @@ def calculate_angle(q, energy):
 
     # convert angle from radians to degrees
     angle *= 180 / np.pi
+
+    # if np.isnan(angle):
+    #     print(
+    #         f"Attempted to calculate an angle, but either the wave number is too large or the beam energy is too small."
+    #     )
 
     return angle
 
@@ -209,6 +213,21 @@ def laplace(tau, E, wff, wbf):
     return tau, F_tot_inel, F_wff, F_wbf
 
 
+def get_atomic_data_for_all_elements(elements):
+
+    nstates = len(elements)
+
+    atomic_masses = np.zeros_like(elements, dtype=float)
+    atomic_numbers = np.zeros_like(elements, dtype=float)
+    for i in range(0, nstates):
+        element = elements[i]
+        amu, AN = get_atomic_mass_for_element(element)
+        atomic_masses[i] = amu * ATOMIC_MASS_UNIT
+        atomic_numbers[i] = AN
+
+    return atomic_masses, atomic_numbers
+
+
 def get_atomic_mass_for_element(e):
     """
     Load data from atomic data in folder xdave/data. 
@@ -217,6 +236,7 @@ def get_atomic_mass_for_element(e):
 
     ANs, elements, amus, _ = np.genfromtxt(
         data_path,
+
         delimiter=",",
         skip_header=1,
         dtype=None,
@@ -227,12 +247,8 @@ def get_atomic_mass_for_element(e):
     atomic_number = ANs[idx]
     return atomic_weight, atomic_number
 
-    # y = element(int(AN))
-    # amu = y.atomic_weight
-    # return element(str(e)).atomic_weight, element(str(e)).atomic_number
 
-
-def get_binding_energies_from_elements(AN):
+def get_binding_energies_from_element(AN):
     # TODO(Hannah): this is a temporary fix until I get the file structure sorted out
     dat_file = os.path.dirname(__file__) + f"/data/binding_energies_xrdb.csv"
     df = pd.read_csv(dat_file)
@@ -279,7 +295,9 @@ def find_nearest(array, value):
         return array[idx], idx
 
 
-# Fourier transform stuff
+# ----------------------- #
+# Fourier transform stuff #
+# ----------------------- #
 
 
 def forward_transform_fft(yr, r, k, dr, dk):
@@ -347,6 +365,71 @@ def inverse_transform_fftn(yk, k, norm):
     return yr
 
 
+def spectral_convolution(spec_ene, omega, dsf, source_ene, source, Wr):
+    """
+    Tom's convolution :) I take no credit
+    """
+    spectrum = np.zeros_like(spec_ene)
+    source /= np.sum(source)  # Normalise for convolution
+
+    for ii, Ei in enumerate(source_ene):
+        Bi = source[ii]
+        momentum = (1.0 - omega / Ei) ** 2
+        spectrum += np.interp(x=spec_ene, xp=Ei - omega, fp=dsf * momentum) * Bi
+
+    # Now need to interpolate source on to the spectrum grid
+    new_source = np.interp(x=spec_ene, xp=source_ene, fp=source)
+    new_source /= np.sum(new_source)  # need to normalise
+
+    # Apply Wr
+    spectrum += new_source * Wr / (spec_ene[1] - spec_ene[0])
+
+    return spectrum
+
+
+def print_error_message():
+    print(f"You done messed up!")
+    error_msg = r"""                          
+                         #####.                                     
+                           #*****#.                                  
+                           #********#.                               
+                          -***********#.                             
+                         #**************#.                           
+                        .***************###                          
+                        #**************#####.                        
+                        +************#######%                        
+                       ##**********##########.                       
+                    #***********#############                        
+                  #**********###############%-.                      
+                 #********#################******#.                  
+                ##***##################%#*********##                 
+               .####################%#***********####                
+                #####----*######%##*********----#####+               
+                %#-::::::::-##***********-:::..:::-##                
+              ..#::...+@....:***********::...%#...::%                
+           .#***::..@@@@@@...:*********:...@@@@@@...:***#.           
+          #*****:..+@@@@@@@...:****###+:..@@@@@@@@..:****##.         
+         #******:..@@@@@@@@...:#######:...@@@@@@@@...+***###.        
+        .#******:..=@@@@@@@...:#######*...@@@@@@@@..:**######        
+        ###*****:...@@@@@@...:######%#*:...@@@@@@...:########        
+        -########:.....:....:##%##******:..........:#########        
+         #########+:..  ...:*************:.......::##########        
+          =%%%####***=:::******************#-::-###########*##.      
+    .#**********************************#################******##    
+  .#******************++=====================++########********####  
+ :#*******************=-:::::::::::::::::::::-#######********####### 
+.##*********************-:.................:*#####*********##########
+###########################-:..........::######**********###########%
+###########################################************#############%
+.######################################*************################.
+ .################################****************################%. 
+   -%#########################****************##################%#   
+      ..%%%####%%%%+..  .. ....-+########################%%%%.  
+    """
+    print(error_msg)
+
+
 if __name__ == "__main__":
-    amu = get_atomic_mass_for_element(e="He")
-    print(amu)
+    # amu = get_atomic_mass_for_element(e="He")
+    # print(amu)
+    print_error_message()

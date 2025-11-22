@@ -581,9 +581,9 @@ def xrts_code_single_ar(params: MCSSParameters):
 
     res = params.resolution  # 0.1 # resulution in eV
 
-    Z_min, Z_max = get_Z(params.Zfs[0])
-    frac_min, frac_max = get_frac(params.Zfs[0], Z_min, Z_max)
-    ipd_model = params.ipd_model
+    # Z_min, Z_max = get_Z(params.Zfs[0])
+    # frac_min, frac_max = get_frac(params.Zfs[0], Z_min, Z_max)
+    # ipd_model = params.ipd_model
 
     if params.ipd_model == "USER_DEFINED":
         ipd_calc = params.ipd
@@ -603,10 +603,10 @@ def xrts_code_single_ar(params: MCSSParameters):
         data = data.format(
             AN1=params.ANs[0],
             AN2=params.ANs[1],
-            Z_min=Z_min,
-            Z_max=Z_max,
-            frac_min=frac_min,
-            frac_max=frac_max,
+            Z_min=params.Zfs[0],
+            Z_max=params.Zfs[1],
+            frac_min=params.fracs[0],
+            frac_max=params.fracs[1],
             rho=params.rho,
             T=params.Te,
             probe_energy=params.probe_energy,
@@ -675,7 +675,7 @@ def run_mcss(deck_data, params: MCSSParameters):
             warnings.warn(print(f"Cannot load MCSS output file: {e}"))
             exit()
 
-        return k, WR, f1, f2, q1, q2, S11, S12, S22
+        return k, WR, f1, f2, q1, q2, S11, S12, S22, lfc
 
 
 # if __name__ == "__main__":

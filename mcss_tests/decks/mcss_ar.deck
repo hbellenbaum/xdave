@@ -2,7 +2,7 @@ $SETUP
 	mode_of_operation = "XRTS_ANGULAR"
 	number_of_ions = 2
 	perform_error_checks = .TRUE.
-	run_code_silently = .TRUE.
+	run_code_silently = .FALSE.
 !	wk_relation = "exact"
 	output_wr_parts = .TRUE.
 $END

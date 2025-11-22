@@ -3,6 +3,18 @@ import warnings
 
 
 def iyetomi_bridge_function(rs, Rii, Gamma):
+    """
+    Bridge function for strongly coupled one-component systems based on Iyetomi et al., Phys. Rev. A 46 (1992).
+
+    Parameters:
+        rs (array): r-grid to calculate bridge function over in units of m
+        Rii (float): effective ion core radius in units of m
+        Gamma (float): coupling strength, non-dimensional
+
+    Returns:
+        array: non-dimensional grid over which bridge function is calculated
+        array: bridge function in r-space
+    """
     ## Iyetomi, Phys. Rev. A 46 (1992) bridge function
     if Gamma < 5:
         warnings.warn(

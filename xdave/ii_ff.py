@@ -1,25 +1,32 @@
 # Ionic form factors
 from constants import BOHR_RADIUS
-from numpy import zeros, arange
+from numpy import zeros
 
 
 class ScreeningConstants(object):
     r"""
     The screening constants give simple corrections to the charge of an ion of a given atomic number ZA for a given
     number of bound electrons Zb. The values come from linear interpolation of the tabulated results given by Pauling
-    and Sherman (1932).
+    and Sherman Zeitschift für Kristallographie 1, 81 (1932).
 
-    References
-    ----------
-    L. Pauling and J. Sherman, "Screening constants for many-electron atoms. The calculation and interpretation of
-    x-ray term values and and the calculation of atomic scattering factors", Zeitschift für Kristallographie 1, 81
-    (1932).
+    Attributes:
+        _ZA_max (int): max atomic number implemented here
     """
 
     _ZA_max = 29
 
     @classmethod
     def get_all_screening_constants(self, ZA, Zb):
+        """
+        Function to collect all screening constants for a given charge state.
+
+        Parameters:
+            ZA (int): atomic number
+            Zb (int): number of bound electrons per ion
+
+        Returns:
+            array: screening constants, non-dimensional
+        """
         return (
             self.c1s(ZA, Zb),
             self.c2s(ZA, Zb),
@@ -32,6 +39,9 @@ class ScreeningConstants(object):
 
     @classmethod
     def c1s(self, ZA, Zb):
+        """
+        1s sub-shell
+        """
         s = zeros((self._ZA_max, self._ZA_max), dtype=float)
         s[1, 1:2] = 0.190e0
         s[2, 1:3] = 0.190e0
@@ -65,6 +75,9 @@ class ScreeningConstants(object):
 
     @classmethod
     def c2s(cls, ZA, Zb):
+        """
+        2s sub-shell
+        """
         s = zeros((cls._ZA_max, cls._ZA_max), dtype=float)
         s[2, 2] = 1.250e0
         s[3, 2:4] = [1.250e0, 1.510e0]
@@ -437,6 +450,9 @@ class ScreeningConstants(object):
 
     @classmethod
     def c2p(self, ZA, Zb):
+        """
+        2p sub-shell
+        """
         s = zeros((self._ZA_max, self._ZA_max), dtype=float)
         s[4, 4:5] = 2.500e0
         s[5, 4:6] = [2.500e0, 2.910e0]
@@ -752,6 +768,9 @@ class ScreeningConstants(object):
 
     @classmethod
     def c3s(self, ZA, Zb):
+        """
+        3s sub-shell
+        """
         s = zeros((self._ZA_max, self._ZA_max), dtype=float)
         s[10, 10:11] = 6.600e0
         s[11, 10:12] = [6.600e0, 6.960e0]
@@ -920,6 +939,9 @@ class ScreeningConstants(object):
 
     @classmethod
     def c3p(self, ZA, Zb):
+        """
+        3p sub-shell
+        """
         s = zeros((self._ZA_max, self._ZA_max), dtype=float)
         s[12, 12:13] = 8.700e0
         s[13, 12:14] = [8.700e0, 9.140e0]
@@ -1047,6 +1069,9 @@ class ScreeningConstants(object):
 
     @classmethod
     def c4s(self, ZA, Zb):
+        """
+        4s sub-shell
+        """
         s = zeros((self._ZA_max, self._ZA_max), dtype=float)
         s[18, 18:19] = 1.340e1
         s[19, 18:20] = [1.340e1, 1.390e1]
@@ -1089,11 +1114,30 @@ class ScreeningConstants(object):
 
 
 class PaulingShermanIonicFormFactor:
+    """
+    Class containing the ionic form factors based on Pauling
+    and Sherman Zeitschift für Kristallographie 1, 81 (1932).
+
+    Attributes:
+        screening_table (ScreeningConstants): constant values used for the screening around the ions
+    """
 
     def __init__(self) -> None:
         self.screening_table = ScreeningConstants()
 
     def calculate_effective_charge_state(self, Z, Zb, n, l):
+        """
+        Function to calculate an effective charge state for a given ion.
+
+        Parameters:
+            Z (float): mean charge state
+            Zb (float): number of bound electrons per ion
+            n (int): n-shell
+            l (int): l-shell
+
+        Returns:
+            float: effective charge state, non-dimensional
+        """
         Z = int(Z)
         Zb = int(Zb)
         Z_eff_nl = 0
@@ -1129,6 +1173,17 @@ class PaulingShermanIonicFormFactor:
         return Z_eff_nl
 
     def calculate_form_factor(self, Z, Z_b, k):  # ZA, Zb,
+        """
+        Function to calculate an effective charge state for a given ion.
+
+        Parameters:
+            Z (float): mean charge state
+            Zb (float): number of bound electrons per ion
+            k (float): wave number in units of 1/m
+
+        Returns:
+            float: ionic form factor, non-dimensional
+        """
         # In order to get the correct charge-state we also have to cast the charge states to ints
         Z_b = int(Z_b)
         Z = int(Z)

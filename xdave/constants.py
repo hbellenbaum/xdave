@@ -3,10 +3,11 @@ Provides constants used in the code
 """
 
 import sys
-from numpy import log
+
+# from numpy import log
 
 from math import pi as PI
-from numpy import cbrt, sqrt, log as ln
+from numpy import cbrt, sqrt, log
 
 # from constants.maths import PI_SQR, FOUR_THIRDS_PI, TWO_PI, FOUR_PI, NINE_PI
 
@@ -59,8 +60,8 @@ SQRT_TEN = SQRT_TWO * SQRT_FIVE
 CBRT_TWO = cbrt(2.0)
 CBRT_THREE = cbrt(3.0)
 
-LN_TWO = ln(2.0)
-LN_TEN = ln(10.0)
+LN_TWO = log(2.0)
+LN_TEN = log(10.0)
 
 EULER_MASCHERONI = 0.57721566490153286060651209008240243104215933593992
 GOLDEN_RATIO = 0.5 * (1.0 + SQRT_FIVE)

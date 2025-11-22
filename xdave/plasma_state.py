@@ -4,6 +4,12 @@ from unit_conversions import *
 import numpy as np
 
 # from fermi_integrals import
+from plasmapy.formulary.mathematics import Fermi_integral as fdi
+
+from scipy.integrate import quad
+from scipy.optimize import root_scalar
+
+from dataclasses import dataclass
 
 
 def get_Z(Z):
@@ -102,18 +108,27 @@ def get_rs_theta_from_rho_T_SI(rho, T, atomic_mass):
     return rs, theta
 
 
+# @dataclass(slots=True)
 class PlasmaState:
 
     def __init__(
         self,
-        electron_temperature,
-        ion_temperature,
-        mass_density,
-        charge_state,
-        atomic_mass,
-        atomic_number,
-        binding_energies,
+        electron_temperature: float,
+        ion_temperature: float,
+        mass_density: float,
+        charge_state: float,
+        atomic_mass: float,
+        atomic_number: float,
+        binding_energies: np.array,
+        electron_number_density: float = None,
+        ion_number_density: float = None,
+        ion_core_radius: float = BOHR_RADIUS,
+        sec_power: float = 2.0,
+        csd_core_charge: float = None,
+        csd_parameter: float = None,
+        srr_sigma: float = None,
     ) -> None:
+        # TODO(Hannah): also add option to initialize using rs and theta
 
         self.initiliased = False
 
@@ -124,24 +139,42 @@ class PlasmaState:
             self.temperature = electron_temperature
 
         self.mass_density = mass_density
+
+        # this is currently the only input that is not in SI units. This needs to change
+        # TODO(Hannah)
         self.atomic_mass = atomic_mass * ATOMIC_MASS_UNIT
+
+        self.atomic_number = atomic_number
         self.charge_state = charge_state
         self.ion_charge = charge_state
         mi = self.atomic_mass
-        self.ion_number_density = mass_density / mi
-        self.electron_number_density = charge_state * self.ion_number_density
-        self.atomic_number = atomic_number
-        self.free_electron_number_density = charge_state * self.ion_number_density
-        self.bound_electron_number_density = (atomic_number - charge_state) * self.ion_number_density
-        self.total_electron_number_density = self.free_electron_number_density + self.bound_electron_number_density
+        if ion_number_density is not None:
+            # assert electron_number_density is not None
+            self.ion_number_density = ion_number_density
+        else:
+            self.ion_number_density = mass_density / mi
+        if electron_number_density is not None:
+            assert ion_number_density is not None
+            self.total_electron_number_density = electron_number_density
+            self.free_electron_number_density = charge_state * self.ion_number_density
+        else:
+            self.free_electron_number_density = charge_state * self.ion_number_density
+            self.total_electron_number_density = self.atomic_number * self.ion_number_density
 
+        self.bound_electron_number_density = self.total_electron_number_density - self.free_electron_number_density
         self.binding_energies = binding_energies
 
         self.rs, self.theta = get_rs_theta_from_rho_T_SI(
             rho=self.mass_density, T=self.electron_temperature, atomic_mass=self.atomic_mass
         )
         self.Zb = atomic_number - charge_state
-        # self.initiliase()
+
+        # some potential parameters that need to be set, these are not physical parameters but instead need to be user inputs
+        self.ion_core_radius = ion_core_radius
+        self.sec_power = sec_power
+        self.csd_core_charge = csd_core_charge
+        self.csd_parameter = csd_parameter
+        self.srr_sigma = srr_sigma
 
     def initiliase(self):
         self.kF = self.fermi_wave_number(number_density=self.total_electron_number_density)
@@ -150,6 +183,9 @@ class PlasmaState:
             temperature=self.electron_temperature,
             number_density=self.total_electron_number_density,
             mass=self.atomic_mass,
+        )
+        self.kappae = self.screening_length(
+            ELECTRON_MASS, 1, self.electron_temperature, self.free_electron_number_density
         )
         self.omegaF = self.fermi_frequency(self.total_electron_number_density, self.atomic_mass)
         self.initiliased = True
@@ -184,6 +220,12 @@ class PlasmaState:
     def compton_frequency(self, mass):
         return mass * SPEED_OF_LIGHT_SQR / DIRAC_CONSTANT
 
+    def screening_length(self, mass, charge, temperature, number_density):
+        kappa_D = self.debye_screening_length(charge=charge, number_density=number_density, temperature=temperature)
+        eta = self.chemical_potential_ichimaru(temperature=temperature, number_density=number_density, mass=mass)
+        f = fdi(j=-0.5, x=eta)
+        return kappa_D * np.sqrt(f)
+
     def debye_screening_length(self, charge, number_density, temperature):
         return np.sqrt(
             number_density * charge * ELEMENTARY_CHARGE**2 / (VACUUM_PERMITTIVITY * BOLTZMANN_CONSTANT * temperature)
@@ -204,8 +246,6 @@ class PlasmaState:
         return SQRT_TWO_PI * DIRAC_CONSTANT / np.sqrt(mass * BOLTZMANN_CONSTANT * temperature)
 
     def chemical_potential(self, temperature, number_density, mass):
-        from scipy.integrate import quad
-        from scipy.optimize import minimize, root_scalar
 
         def f(mu_tilde, T_tilde):
             integrand = lambda x: x**0.5 / (np.exp((x - mu_tilde) / T_tilde) + 1)
