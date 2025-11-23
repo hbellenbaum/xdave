@@ -638,6 +638,70 @@ def xrts_code_single_ar(params: MCSSParameters):
     return run_mcss(data, params)
 
 
+def xrts_code_single_ar3(params: MCSSParameters):
+
+    res = params.resolution  # 0.1 # resulution in eV
+
+    # Z_min, Z_max = get_Z(params.Zfs[0])
+    # frac_min, frac_max = get_frac(params.Zfs[0], Z_min, Z_max)
+    # ipd_model = params.ipd_model
+
+    if params.ipd_model == "USER_DEFINED":
+        ipd_calc = params.ipd
+        ipd_model = "NONE"
+    elif params.ipd_model == "NONE":
+        ipd_model = "NONE"
+        ipd_calc = 0.0
+    else:
+        ipd_calc = 0.0  # params.ipd
+        warnings.warn(
+            f"Overwriting ipd model {ipd_model} with ipd = {ipd_calc}. If the model is not set to SAHA, USER_DEFINED or NONE, this is a mistake!"
+        )
+
+    # Read format file and create new deck for given parameters
+    with open(params.working_dir + "/decks/mcss_ar3.deck", "rt") as fr:
+        data = fr.read()
+        data = data.format(
+            AN1=params.ANs[0],
+            AN2=params.ANs[1],
+            AN3=params.ANs[2],
+            Z1=params.Zfs[0],
+            Z2=params.Zfs[1],
+            Z3=params.Zfs[2],
+            x1=params.fracs[0],
+            x2=params.fracs[1],
+            x3=params.fracs[2],
+            rho=params.rho,
+            T=params.Te,
+            probe_energy=params.probe_energy,
+            angle=params.angle,
+            n_points=10000,  # hard-coded for now
+            k_min=params.min_wave_number,
+            k_max=params.max_wave_number,
+            ee_pol_func_model=params.ee_pol_func_model,  # NUMERICAL_RPA, DANDREA_RPA_FIT, LINDHARD_RPA, TSYTOVICH_RPA, BORN_MERMIN, LANGDON_MATTE, FOURKAL_MATTE, GEN_LORENTZIAN
+            ee_lfc_model=params.ee_lfc_model,  # NONE, STATIC_GELDART_VOSKO, STATIC_UTSUMI_ICHIMARU, STATIC_FARID_ET_AL, STATIC_PADE_INTERP, INST_IWAMOTO_ICHIMARU, DYNAMIC_HONG_LEE  #TODO(Hannah): if MCSS does not recognise the model option, it will replace it with the default
+            ii_potential_model=params.ii_potential_model,  # EFFECTIVE_COULOMB, DEBYE_HUCKEL, FINITE_WAVELENGTH, NONLINEAR_HULTHEN, CHARGE_SWITCHING_DEBYE, SHORT_RANGE_REPULSION
+            screen_cloud_model=params.screen_cloud_model,  # FINITE_WAVELENGTH, DEBYE_HUCKEL
+            ei_potential_model=params.ei_potential_model,  # EFFECTIVE_COULOMB, HARD_EMPTY_CORE, SOFT_EMPTY_CORE
+            sec_core_power=6,
+            bf_dsf_model=params.bf_dsf_model,
+            ipd_model=ipd_model,  # NONE, DEBYE_HUCKEL, ION_SPHERE, STEWART_PYATT,
+            user_defined_ipd=ipd_calc,
+            output_file_name=params.output_file_name,
+            status_file_name=params.status_file_name,
+            # use_source_func_data=".FALSE.",
+            # source_func_shape="GAUSSIAN",
+            # source_func_fwhm_ev=1,
+            # source_func_file_name="default",
+            use_source_func_data=params.use_source_func_data,
+            source_func_shape=params.source_func_shape,
+            source_func_fwhm_ev=params.source_func_fwhm_ev,
+            source_func_file_name=params.source_func_file_name,
+        )
+
+    return run_mcss(data, params)
+
+
 def run_mcss(deck_data, params: MCSSParameters):
     with open(params.working_dir + f"/decks/{params.deck_file}.deck", "w") as fw:
         fw.write(deck_data)
@@ -659,6 +723,18 @@ def run_mcss(deck_data, params: MCSSParameters):
         return En[::-1], wff[::-1], wbf[::-1], ff, bf, el
 
     elif params.mode_of_operation == "XRTS_ANGULAR":
+        if len(params.ANs) == 3:
+            # ! k [1/\AA]           k [1/a_{B}]         	heta [\deg]        W_{R}(k)            f_{         1}(k)   f_{         2}(k)   f_{         3}(k)   q_{         1}(k)   q_{         2}(k)   q_{         3}(k)   S_{         1       S_{         1       S_{         1       S_{         2       S_{         2       S_{         3
+            # S_{1  S_{1  S_{1   S_{2  S_{2  S_{3
+            try:
+                _, k, _, WR, f1, f2, f3, q1, q2, q3, S11, S12, S13, S22, S23, S33 = np.genfromtxt(
+                    params.output_file_name, skip_header=1, delimiter=",", unpack=True
+                )
+                return k, WR, f1, f2, f3, q1, q2, q3, S11, S13, S12, S22, S23, S33
+            except FileNotFoundError as e:
+                warnings.warn(print(f"Cannot load MCSS output file: {e}"))
+                exit()
+
         try:
             if params.ee_lfc_model == "NONE":
                 # ! k [1/\AA]  k [1/a_{B}] 	heta [\deg]  W_{R}(k) f_{ 1}(k) f_{ 2}(k)  q_{ 1}(k)  q_{ 2}(k)  S_{ 1 1}(k)  S_{ 1 2}(k)  S_{ 2 2}(k)
