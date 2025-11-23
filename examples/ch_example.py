@@ -1,11 +1,11 @@
 ## simple Be example for comparison against MCSS
 ## also CH example
-import sys
+# import sys
 
-sys.path.insert(1, "./xdave")
+# sys.path.insert(1, "./xdave")
 
-from plasma_state import get_fractions_from_Z_partial
-from xdave import *
+from xdave.plasma_state import get_fractions_from_Z_partial
+from xdave.xdave import *
 
 import matplotlib.pyplot as plt
 import time
@@ -95,6 +95,8 @@ def ch_example():
     # note that for now this will have to be centered around 0
     spec_energy, inelastic, elastic, spectrum = kernel.convolve_with_sif(
         omega=w,
+        bf=bf_tot,
+        ff=ff_tot,
         dsf=(bf_tot + ff_tot),
         Wr=rayleigh_weight,
         beam_energy=9.0e3,
@@ -221,7 +223,7 @@ def cho_example():
     # if you want to use your own, you can add it as an input to the sif input option
     # note that for now this will have to be centered around 0
     inelastic, inelastic, elastic, spectrum = kernel.convolve_with_sif(
-        bf=bf_tot, ff=ff_tot, WR=rayleigh_weight, omega=w, sif=None, fwhm=10, type="GAUSSIAN"
+        bf=bf_tot, ff=ff_tot, dsf=dsf, WR=rayleigh_weight, omega=w, sif=None, fwhm=10, type="GAUSSIAN"
     )
 
     # plot the measured spectrum

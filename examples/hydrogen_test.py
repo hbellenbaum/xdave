@@ -1,25 +1,24 @@
-import sys
+# import sys
 
-sys.path.insert(1, "./xdave")
-sys.path.insert(1, "./mcss_tests")
+# sys.path.insert(1, "./xdave")
+# sys.path.insert(1, "./mcss_tests")
 
 
-from plasma_state import PlasmaState, get_rho_T_from_rs_theta, get_fractions_from_Z, get_rho_T_from_rs_theta_SI
-from models import ModelOptions
-from unit_conversions import *
-from constants import BOHR_RADIUS, PLANCK_CONSTANT, ELECTRON_MASS
-from freefree_dsf import FreeFreeDSF
-from boundfree_dsf import BoundFreeDSF
-from utils import calculate_angle, calculate_q, load_itcf_from_file, load_mcss_result
-from xdave import xDave
+from xdave.plasma_state import PlasmaState, get_rho_T_from_rs_theta, get_fractions_from_Z
+from xdave.models import ModelOptions
+from xdave.unit_conversions import *
+from xdave.utils import load_itcf_from_file, load_mcss_result
+from xdave.xdave import xDave
 
 import numpy as np
 import matplotlib.pyplot as plt
 from scipy.signal import fftconvolve
 
+import os
+import scipy.stats as stats
+
 
 def compare_hydrogen_against_pimc():
-    import scipy.stats as stats
 
     rs = 3
     theta = 1
@@ -126,8 +125,6 @@ def compare_hydrogen_against_pimc():
 
 
 def compare_hydrogen_against_pimc_and_mcss():
-    import os
-    import scipy.stats as stats
 
     q_index = 0
 

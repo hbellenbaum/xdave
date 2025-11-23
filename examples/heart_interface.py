@@ -4,9 +4,11 @@ Quick interface to run Spectrum produced here with the x-ray tracing code HEART.
 For more information, see: https://gitlab.com/heart-ray-tracing/HEART
 """
 
-import sys
+# import sys
 
-sys.path.insert(1, "./xdave")
+# sys.path.insert(1, "./xdave")
+from xdave.xdave import *
+from xdave.plasma_state import get_fractions_from_Z
 
 from HEART import Spectrometer
 from HEART.standards.standard_spectrometers import *
@@ -54,7 +56,9 @@ def create_xdave_spectrum(plot=False):
     sif_fwhm = 10  # eV
     spec_energy, _, _, spectrum = kernel.convolve_with_sif(
         omega=omega_array,
-        dsf=(bf_tot + ff_tot),
+        bf=bf_tot,
+        ff=ff_tot,
+        dsf=dsf,
         Wr=WR,
         beam_energy=9.0e3,
         type="GAUSSIAN",

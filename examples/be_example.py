@@ -1,14 +1,18 @@
 ## simple Be example for comparison against MCSS
 ## also CH example
-import sys
+# import sys
 
-sys.path.insert(1, "./xdave")
+# sys.path.insert(1, "./xdave")
+from xdave.xdave import xDave
+from xdave.models import ModelOptions
 
-from plasma_state import get_fractions_from_Z
+from xdave.plasma_state import get_fractions_from_Z
 from xdave import *
 
 import matplotlib.pyplot as plt
 import time
+import numpy as np
+import os
 
 
 def be_example():
@@ -49,7 +53,14 @@ def be_example():
     # if you want to use your own, you can add it as an input to the sif input option
     # note that for now this will have to be centered around 0
     spec_energy, inelastic, elastic, spectrum = kernel.convolve_with_sif(
-        omega=w, dsf=(bf_tot + ff_tot), Wr=rayleigh_weight, beam_energy=9.0e3, type="GAUSSIAN", fwhm=10
+        omega=w,
+        bf=bf_tot,
+        ff=ff_tot,
+        dsf=(bf_tot + ff_tot),
+        Wr=rayleigh_weight,
+        beam_energy=9.0e3,
+        type="GAUSSIAN",
+        fwhm=10,
     )
 
     tau_array, F_tot_inel, F_wff, F_wbf = kernel.get_itcf(w=w, ff=ff_tot, bf=bf_tot)
