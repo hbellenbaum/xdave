@@ -5,6 +5,7 @@ import numpy as np
 
 # from fermi_integrals import
 from plasmapy.formulary.mathematics import Fermi_integral as fdi
+from fermi_integrals import fdi as xdave_fdi
 
 from scipy.integrate import quad
 from scipy.optimize import root_scalar
@@ -223,8 +224,12 @@ class PlasmaState:
     def screening_length(self, mass, charge, temperature, number_density):
         kappa_D = self.debye_screening_length(charge=charge, number_density=number_density, temperature=temperature)
         eta = self.chemical_potential_ichimaru(temperature=temperature, number_density=number_density, mass=mass)
-        f = fdi(j=-0.5, x=eta)
-        return kappa_D * np.sqrt(f)
+        # f = fdi(j=-0.5, x=eta).real
+        f_xdave = xdave_fdi(j=-0.5, eta=eta, normalize=False)
+        # print(f"\nPlasmapy fdi: {f}")
+        # print(f"\nxDave fdi: {f_xdave}")
+        # print(f"Diff between plasmapy and own fermi-dirac integrals: {np.abs(f - f_xdave)}")
+        return kappa_D * np.sqrt(f_xdave)
 
     def debye_screening_length(self, charge, number_density, temperature):
         return np.sqrt(

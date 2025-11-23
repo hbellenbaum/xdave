@@ -26,9 +26,9 @@ def test_Fig1c():
     ZC = 4
     rho = 5.84  # kg/m^3
 
-    models = ModelOptions(screening_model="FINITE_WAVELENGTH")
+    models = ModelOptions(screening_model="FINITE_WAVELENGTH", ee_potential="YUKAWA", ei_potential="YUKAWA")
     elements = np.array(["H", "C"])
-    partial_densities = np.array([0.1, 0.9])
+    partial_densities = np.array([0.5, 0.5])
     charge_states = np.array([ZH, ZC])
 
     fn1 = "tests/comparison_data/screening/Chapman_NatCommun_2015_Fig1c_FWS_T_10.csv"
@@ -47,12 +47,20 @@ def test_Fig1c():
     k = np.linspace(1.0e-1 / BOHR_RADIUS, 10 / BOHR_RADIUS, 200)
 
     screening_C = ScreeningCloud(state=kernel1.states[1], overlord_state=kernel1.overlord_state)
-    f_fws_C = screening_C.get_screening_cloud(k=k, screening_model="FINITE_WAVELENGTH", ei_potential="YUKAWA")
-    f_dh_C = screening_C.get_screening_cloud(k=k, screening_model="DEBYE_HUCKEL", ei_potential="YUKAWA")
+    f_fws_C = screening_C.get_screening_cloud(
+        k=k, screening_model="FINITE_WAVELENGTH", ei_potential="YUKAWA", ee_potential="YUKAWA"
+    )
+    f_dh_C = screening_C.get_screening_cloud(
+        k=k, screening_model="DEBYE_HUCKEL", ei_potential="YUKAWA", ee_potential="YUKAWA"
+    )
 
     screening_H = ScreeningCloud(state=kernel1.states[0], overlord_state=kernel1.overlord_state)
-    f_fws_H = screening_H.get_screening_cloud(k=k, screening_model="FINITE_WAVELENGTH", ei_potential="YUKAWA")
-    f_dh_H = screening_H.get_screening_cloud(k=k, screening_model="DEBYE_HUCKEL", ei_potential="YUKAWA")
+    f_fws_H = screening_H.get_screening_cloud(
+        k=k, screening_model="FINITE_WAVELENGTH", ei_potential="YUKAWA", ee_potential="YUKAWA"
+    )
+    f_dh_H = screening_H.get_screening_cloud(
+        k=k, screening_model="DEBYE_HUCKEL", ei_potential="YUKAWA", ee_potential="YUKAWA"
+    )
 
     f_tot_fws = partial_densities[0] * f_fws_H / ZH + partial_densities[1] * f_fws_C / ZC
 
@@ -114,9 +122,18 @@ def test_Fig1b():
     ZH = 1
     ZC = 4
     T = 10.0  # eV
-    rho = 5.84
+    rho = 5.84  # 5.84
 
-    models = ModelOptions(screening_model="FINITE_WAVELENGTH", lfc_model="NONE")
+    models = ModelOptions(
+        polarisation_model="NUMERICAL",
+        bf_model="SCHUMACHER",
+        lfc_model="NONE",
+        ipd_model="NONE",
+        ee_potential="COULOMB",
+        ei_potential="YUKAWA",
+        ii_potential="YUKAWA",
+    )
+
     elements = np.array(["H", "C"])
     partial_densities = np.array([0.5, 0.5])
     charge_states = np.array([ZH, ZC])
@@ -133,23 +150,34 @@ def test_Fig1b():
         models=models,
     )
 
-    k = np.linspace(1.0e-1 / BOHR_RADIUS, 10 / BOHR_RADIUS, 1000)
+    ei_potential_model = models.ei_potential
+    ee_potential_model = models.ee_potential
 
-    screening_C = ScreeningCloud(state=kernel.states[1], overlord_state=kernel.overlord_state)
-    f_fws_C = screening_C.get_screening_cloud(k=k, screening_model="FINITE_WAVELENGTH", ei_potential="COULOMB")
-    f_dh_C = screening_C.get_screening_cloud(k=k, screening_model="DEBYE_HUCKEL", ei_potential="COULOMB")
+    k = np.linspace(1.0e-2 / BOHR_RADIUS, 10 / BOHR_RADIUS, 1000)
 
     screening_H = ScreeningCloud(state=kernel.states[0], overlord_state=kernel.overlord_state)
-    f_fws_H = screening_H.get_screening_cloud(k=k, screening_model="FINITE_WAVELENGTH", ei_potential="COULOMB")
-    f_dh_H = screening_H.get_screening_cloud(k=k, screening_model="DEBYE_HUCKEL", ei_potential="COULOMB")
+    f_fws_H = screening_H.get_screening_cloud(
+        k=k, screening_model="FINITE_WAVELENGTH", ei_potential=ei_potential_model, ee_potential=ee_potential_model
+    )
+    f_dh_H = screening_H.get_screening_cloud(
+        k=k, screening_model="DEBYE_HUCKEL", ei_potential=ei_potential_model, ee_potential=ee_potential_model
+    )
+
+    screening_C = ScreeningCloud(state=kernel.states[1], overlord_state=kernel.overlord_state)
+    f_fws_C = screening_C.get_screening_cloud(
+        k=k, screening_model="FINITE_WAVELENGTH", ei_potential=ei_potential_model, ee_potential=ee_potential_model
+    )
+    f_dh_C = screening_C.get_screening_cloud(
+        k=k, screening_model="DEBYE_HUCKEL", ei_potential=ei_potential_model, ee_potential=ee_potential_model
+    )
 
     fig, ax = plt.subplots(1, 1)
     ax.plot(k * BOHR_RADIUS, f_fws_C, label="C: FWS", ls="solid", c="orange")
-    ax.plot(k * BOHR_RADIUS, f_dh_C, label="C: DH", ls="-.", c="orange")
-    ax.plot(k * BOHR_RADIUS, f_dh_H, label="H: DH", ls="-.", c="limegreen")
+    # ax.plot(k * BOHR_RADIUS, f_dh_C, label="C: DH", ls="-.", c="orange")
+    # ax.plot(k * BOHR_RADIUS, f_dh_H, label="H: DH", ls="-.", c="limegreen")
     ax.plot(k * BOHR_RADIUS, f_fws_H, label="H: FWS", ls="solid", c="limegreen")
-    ax.plot(mcss_result[0], mcss_result[5], label="MCSS C: FWS", ls="solid", c="crimson")
-    ax.plot(mcss_result[0], mcss_result[4], label="MCSS H: FWS", ls="solid", c="darkgreen")
+    # ax.plot(mcss_result[0], mcss_result[5], label="MCSS C: FWS", ls="solid", c="crimson")
+    # ax.plot(mcss_result[0], mcss_result[4], label="MCSS H: FWS", ls="solid", c="darkgreen")
     ax.scatter(dat_C[:, 0], dat_C[:, 1], label="Chapman 2015: C", marker="x", c="crimson")
     ax.scatter(dat_H[:, 0], dat_H[:, 1], label="Chapman 2015: H", marker="x", c="darkgreen")
     ax.legend()

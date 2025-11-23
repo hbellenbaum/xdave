@@ -8,7 +8,8 @@ from unit_conversions import *
 # NOTE(TG): Would recommend replacing this with Antia fits. At high densities fdi becomes
 #           extremely slow, if it even is able to reach an answer.
 # NOTE(HB): Noted! But I am being lazy.
-from plasmapy.formulary.mathematics import Fermi_integral as fdi
+# from plasmapy.formulary.mathematics import Fermi_integral as fdi
+from fermi_integrals import fdi
 
 import numpy as np
 
@@ -100,7 +101,8 @@ def inverse_electron_screening_length_sqr(ne, Te):
     EF = 0.5 * DIRAC_CONSTANT_SQR * np.cbrt(3.0 * PI_SQR * ne) ** 2 / ELECTRON_MASS
 
     Ip0p5 = (beta * EF) ** 1.5 * 2 / 3
-    Im0p5 = fdi(x=chem_pot * beta, j=-1 / 2).real * SQRT_PI  # fdi gives norm'd FDIs.
+    # Im0p5 = fdi(x=chem_pot * beta, j=-1 / 2).real * SQRT_PI  # fdi gives norm'd FDIs.
+    Im0p5 = fdi(j=-0.5, eta=chem_pot * beta, normalize=False)
 
     kappa_sqr = ELEMENTARY_CHARGE_SQR / ELECTRIC_CONSTANT * ne * beta * 0.5 * Im0p5 / Ip0p5
 
@@ -273,7 +275,8 @@ def ipd_crowley(Zi, ne, ni, Te, Ti, ForceConst):
     eta_e = chem_pot * beta_e
     EF = 0.5 * DIRAC_CONSTANT_SQR * np.cbrt(3.0 * PI_SQR * ne) ** 2 / ELECTRON_MASS
     Ip0p5 = (beta_e * EF) ** 1.5 * 2 / 3
-    Im0p5 = fdi(x=eta_e, j=-1 / 2).real * SQRT_PI  # fdi gives norm'd FDIs.
+    # Im0p5 = fdi(x=eta_e, j=-1 / 2).real * SQRT_PI  # fdi gives norm'd FDIs.
+    Im0p5 = fdi(j=-0.5, eta=eta_e, normalize=False)
 
     # Plasma (or perturber) effective charge
     Zmean = ne / ni  # Zmean = ne/ni_tot
