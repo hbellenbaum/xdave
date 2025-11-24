@@ -12,7 +12,7 @@ license = "MIT"
 authors = [
     { name = "Hannah M. Bellenbaum", email = "h.bellenbaum@hzdr.de" },
     { name = "Maximilian P. Boehme", email = "boehme4@llnl.gov" },
-    { name = "Tobias Dornheim", email = "t.dornheim@hzdr.de" },
+    { name = "Thomas Gawne", email = "t.gawne@hzdr.de" },
 ]
 dependencies = [
     "numpy>=2.3",
