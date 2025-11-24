@@ -1,20 +1,20 @@
-from plasma_state import PlasmaState, get_fractions_from_Z
-from models import ModelOptions
-from freefree_dsf import FreeFreeDSF
-from boundfree_dsf import BoundFreeDSF
-from rayleigh_weight import OCPRayleighWeight, MCPRayleighWeight
-from lfc import LFC
-from ipd import get_ipd
+from .plasma_state import PlasmaState, get_fractions_from_Z
+from .models import ModelOptions
+from .freefree_dsf import FreeFreeDSF
+from .boundfree_dsf import BoundFreeDSF
+from .rayleigh_weight import OCPRayleighWeight, MCPRayleighWeight
+from .lfc import LFC
+from .ipd import get_ipd
 
-from utils import (
+from .utils import (
     calculate_q,
     laplace,
     get_atomic_data_for_all_elements,
     get_binding_energies_from_element,
     calculate_angle,
 )
-from unit_conversions import *
-from constants import *
+from .unit_conversions import *
+from .constants import *
 
 import numpy as np
 import warnings

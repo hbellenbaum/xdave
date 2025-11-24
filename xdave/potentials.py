@@ -1,4 +1,4 @@
-from constants import (
+from .constants import (
     VACUUM_PERMITTIVITY,
     COULOMB_CONSTANT,
     PI,
@@ -7,7 +7,7 @@ from constants import (
     SQRT_PI,
     BOHR_RADIUS,
 )
-from utils import forward_transform_fft
+from .utils import forward_transform_fft
 
 from scipy.special import erf
 import numpy as np

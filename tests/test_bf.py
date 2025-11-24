@@ -1,13 +1,13 @@
 import sys
 
-sys.path.insert(1, "./xdave")
+# sys.path.insert(1, "./xdave")
 
-from plasma_state import PlasmaState
-from models import ModelOptions
-from boundfree_dsf import BoundFreeDSF
-from constants import BOHR_RADIUS
-from unit_conversions import eV_TO_K, g_per_cm3_TO_kg_per_m3, eV_TO_J, J_TO_eV, per_cm3_TO_per_m3
-from utils import calculate_q, load_mcss_result, calculate_angle
+from xdave.plasma_state import PlasmaState
+from xdave.models import ModelOptions
+from xdave.boundfree_dsf import BoundFreeDSF
+from xdave.constants import BOHR_RADIUS
+from xdave.unit_conversions import eV_TO_K, g_per_cm3_TO_kg_per_m3, eV_TO_J, J_TO_eV, per_cm3_TO_per_m3
+from xdave.utils import calculate_q, load_mcss_result, calculate_angle
 
 
 import numpy as np

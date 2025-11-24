@@ -1,10 +1,10 @@
 import sys
 
-sys.path.insert(1, "./xdave")
+# sys.path.insert(1, "./xdave")
 
-from unit_conversions import ang_TO_m, eV_TO_K, g_per_cm3_TO_kg_per_m3, amu_TO_kg
-from constants import BOLTZMANN_CONSTANT, BOHR_RADIUS
-from potentials import *
+from xdave.unit_conversions import ang_TO_m, eV_TO_K, g_per_cm3_TO_kg_per_m3, amu_TO_kg
+from xdave.constants import BOLTZMANN_CONSTANT, BOHR_RADIUS
+from xdave.potentials import *
 
 import numpy as np
 import matplotlib.pyplot as plt

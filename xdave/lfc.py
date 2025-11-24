@@ -13,11 +13,11 @@ More details:
 C. Fortmann et al., Phys. Rev. E 81 026405 (2010), DOI: 10.1103/physreve.81.026405
 """
 
-from plasma_state import PlasmaState, get_rho_T_from_rs_theta
-from unit_conversions import *
-from constants import *
-import fxc as gdb
-from models import ModelOptions
+from .plasma_state import PlasmaState, get_rho_T_from_rs_theta
+from .unit_conversions import *
+from .constants import *
+from .fxc import Groth_A
+from .models import ModelOptions
 
 import numpy as np
 
@@ -220,11 +220,11 @@ class LFC:
         # compute the first part of ESA, i.e., fit to the neural-net representation [Dornheim et al, J. Chem. Phys. 151, 194104 (2019)] of the static LFC
         # gdb.Groth_A gives pre-factor to the exact compressibility sum-rule (CSR) computed from the prametrization of fxc by Groth et al [PRL 119 (13), 135001 (2017)]
         G_ML_fit = (
-            gdb.Groth_A(rs, theta)
+            Groth_A(rs, theta)
             * x
             * x
             * (1.0 + alpha * x + beta * x**0.5)
-            / (1.0 + gamma * x + delta * x**1.25 + gdb.Groth_A(rs, theta) * x**2)
+            / (1.0 + gamma * x + delta * x**1.25 + Groth_A(rs, theta) * x**2)
         )
 
         # Obtain the value of the full ontop PDF g(0). Factor 0.5, because, OnTop returns only same-spin component

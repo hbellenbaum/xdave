@@ -1,12 +1,12 @@
-from potentials import coulomb_k
-from static_sf import OCPStaticStructureFactor
+from .potentials import coulomb_k
+from .static_sf import OCPStaticStructureFactor
 
-from freefree_dsf import FreeFreeDSF
+from .freefree_dsf import FreeFreeDSF
 
 # import freefree_dsf
-from plasma_state import PlasmaState
+from .plasma_state import PlasmaState
 
-from constants import PI, DIRAC_CONSTANT, BOHR_RADIUS, ELECTRON_MASS
+from .constants import PI, DIRAC_CONSTANT, BOHR_RADIUS, ELECTRON_MASS
 
 from scipy.interpolate import interp1d
 from scipy.integrate import quad, quad_vec

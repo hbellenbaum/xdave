@@ -1,17 +1,17 @@
 import sys
 
-sys.path.insert(1, "./xdave")
+# sys.path.insert(1, "./xdave")
 sys.path.insert(1, "./mcss_tests")
 
-from constants import BOHR_RADIUS
-from unit_conversions import g_per_cm3_TO_kg_per_m3, eV_TO_K, per_m3_TO_per_cm3
-from plasma_state import PlasmaState, get_rho_T_from_rs_theta
+from xdave.constants import BOHR_RADIUS
+from xdave.unit_conversions import g_per_cm3_TO_kg_per_m3, eV_TO_K, per_m3_TO_per_cm3
+from xdave.plasma_state import PlasmaState, get_rho_T_from_rs_theta
 from run_mcss_sim import run_c_ar_mode
 
-from lfc import LFC
+from xdave.lfc import LFC
 
 from xdave import xDave
-from models import ModelOptions
+from xdave.models import ModelOptions
 
 import numpy as np
 import matplotlib.pyplot as plt

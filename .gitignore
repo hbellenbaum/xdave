@@ -10,3 +10,6 @@ __pycache__/
 **.log
 **.h5
 **.lprof
+build/
+xdave.egg-info/
+TESTING/

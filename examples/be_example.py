@@ -1,13 +1,8 @@
 ## simple Be example for comparison against MCSS
 ## also CH example
-# import sys
-
-# sys.path.insert(1, "./xdave")
-from xdave.xdave import xDave
-from xdave.models import ModelOptions
 
 from xdave.plasma_state import get_fractions_from_Z
-from xdave import *
+from xdave import xDave, ModelOptions
 
 import matplotlib.pyplot as plt
 import time

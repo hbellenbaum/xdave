@@ -1,8 +1,8 @@
 import sys
 
-sys.path.insert(1, "./xdave")
+# sys.path.insert(1, "./xdave")
 
-from unit_conversions import (
+from xdave.unit_conversions import (
     amu_TO_kg,
     eV_TO_K,
     K_TO_eV,
@@ -11,12 +11,12 @@ from unit_conversions import (
     per_A_TO_per_aB,
     per_m3_TO_per_cm3,
 )
-from constants import BOLTZMANN_CONSTANT, VACUUM_PERMITTIVITY, BOHR_RADIUS, ELEMENTARY_CHARGE
-from plasma_state import PlasmaState
-from static_sf import OCPStaticStructureFactor, MCPStaticStructureFactor
+from xdave.constants import BOLTZMANN_CONSTANT, VACUUM_PERMITTIVITY, BOHR_RADIUS, ELEMENTARY_CHARGE
+from xdave.plasma_state import PlasmaState
+from xdave.static_sf import OCPStaticStructureFactor, MCPStaticStructureFactor
 
-from xdave import xDave
-from models import ModelOptions
+from xdave.xdave import xDave
+from xdave.models import ModelOptions
 
 import numpy as np
 import matplotlib.pyplot as plt
@@ -30,7 +30,7 @@ def test_ocp():
     r"""
     Comparison against K W\"unsch PhD Thesis (2011), Fig. 4.5
     """
-    plt.style.use("~/Desktop/resources/plotting/poster.mplstyle")
+    # plt.style.use("~/Desktop/resources/plotting/poster.mplstyle") # TG: Removed as I don't have this file :)
 
     # Case 1: Gamma_ii = 12.3, Ti = 4 eV
     T = 4 * eV_TO_K

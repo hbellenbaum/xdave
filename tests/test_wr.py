@@ -1,14 +1,14 @@
 import sys
 
-sys.path.insert(1, "./xdave")
+# sys.path.insert(1, "./xdave")
 
-from unit_conversions import ang_TO_m, eV_TO_K, g_per_cm3_TO_kg_per_m3, per_aB_TO_per_A
-from constants import BOLTZMANN_CONSTANT, VACUUM_PERMITTIVITY, BOHR_RADIUS, ELEMENTARY_CHARGE
-from plasma_state import PlasmaState
-from rayleigh_weight import OCPRayleighWeight, MCPRayleighWeight
+from xdave.unit_conversions import ang_TO_m, eV_TO_K, g_per_cm3_TO_kg_per_m3, per_aB_TO_per_A
+from xdave.constants import BOLTZMANN_CONSTANT, VACUUM_PERMITTIVITY, BOHR_RADIUS, ELEMENTARY_CHARGE
+from xdave.plasma_state import PlasmaState
+from xdave.rayleigh_weight import OCPRayleighWeight, MCPRayleighWeight
 
-from xdave import xDave
-from models import ModelOptions
+from xdave.xdave import xDave
+from xdave.models import ModelOptions
 
 import numpy as np
 import matplotlib.pyplot as plt

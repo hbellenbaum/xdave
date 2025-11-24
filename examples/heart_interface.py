@@ -4,15 +4,12 @@ Quick interface to run Spectrum produced here with the x-ray tracing code HEART.
 For more information, see: https://gitlab.com/heart-ray-tracing/HEART
 """
 
-# import sys
-
-# sys.path.insert(1, "./xdave")
-from xdave.xdave import *
 from xdave.plasma_state import get_fractions_from_Z
 
 from HEART import Spectrometer
 from HEART.standards.standard_spectrometers import *
-from xdave import *
+from xdave import xDave, ModelOptions
+from xdave.utils import calculate_q
 
 import matplotlib.pyplot as plt
 

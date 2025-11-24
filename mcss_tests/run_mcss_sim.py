@@ -1,10 +1,10 @@
 import sys
 
-sys.path.insert(1, "/home/bellen85/code/dev/xdave")
+# sys.path.insert(1, "/home/bellen85/code/dev/xdave")
 
 from mcss_tests.pymcss import *
 from xdave import *
-from unit_conversions import *
+from xdave.unit_conversions import *
 
 # from utils import calculate_angle
 

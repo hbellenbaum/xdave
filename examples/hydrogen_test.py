@@ -5,10 +5,9 @@
 
 
 from xdave.plasma_state import PlasmaState, get_rho_T_from_rs_theta, get_fractions_from_Z
-from xdave.models import ModelOptions
 from xdave.unit_conversions import *
 from xdave.utils import load_itcf_from_file, load_mcss_result
-from xdave.xdave import xDave
+from xdave import xDave, ModelOptions
 
 import numpy as np
 import matplotlib.pyplot as plt

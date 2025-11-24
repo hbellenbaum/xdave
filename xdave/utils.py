@@ -1,5 +1,5 @@
-from constants import DIRAC_CONSTANT, SPEED_OF_LIGHT, BOHR_RADIUS, PI, ATOMIC_MASS_UNIT
-from unit_conversions import eV_TO_J
+from .constants import DIRAC_CONSTANT, SPEED_OF_LIGHT, BOHR_RADIUS, PI, ATOMIC_MASS_UNIT
+from .unit_conversions import eV_TO_J
 
 from scipy.fft import dst
 import pandas as pd

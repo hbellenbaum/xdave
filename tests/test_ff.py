@@ -1,12 +1,12 @@
 import sys
 
-sys.path.insert(1, "./xdave")
+# sys.path.insert(1, "./xdave")
 
-from constants import BOHR_RADIUS, ELECTRON_MASS, DIRAC_CONSTANT
-from unit_conversions import g_per_cm3_TO_kg_per_m3, eV_TO_K, eV_TO_J, RYDBERG_TO_eV, J_TO_eV
-from plasma_state import PlasmaState, get_rho_T_from_rs_theta
-from models import ModelOptions
-from freefree_dsf import FreeFreeDSF
+from xdave.constants import BOHR_RADIUS, ELECTRON_MASS, DIRAC_CONSTANT
+from xdave.unit_conversions import g_per_cm3_TO_kg_per_m3, eV_TO_K, eV_TO_J, RYDBERG_TO_eV, J_TO_eV
+from xdave.plasma_state import PlasmaState, get_rho_T_from_rs_theta
+from xdave.models import ModelOptions
+from xdave.freefree_dsf import FreeFreeDSF
 
 import numpy as np
 import matplotlib.pyplot as plt

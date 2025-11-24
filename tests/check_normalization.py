@@ -1,6 +1,6 @@
 import sys
 
-sys.path.insert(1, "./xdave")
+# sys.path.insert(1, "./xdave")
 sys.path.insert(1, "./mcss_tests")
 
 # from plasma_state import get_fractions_from_Z_partial

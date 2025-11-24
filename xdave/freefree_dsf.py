@@ -1,8 +1,10 @@
-from constants import *
-from unit_conversions import *
-from maths import log1pexp
+from .constants import *
+from .unit_conversions import *
+from .maths import log1pexp
+from .plasma_state import PlasmaState
+
+
 from scipy import integrate
-from plasma_state import PlasmaState
 
 # from collision_frequency import CollisionFrequency
 

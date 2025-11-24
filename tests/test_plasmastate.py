@@ -1,8 +1,8 @@
 import sys
 
-sys.path.insert(1, "./xdave")
+# sys.path.insert(1, "./xdave")
 
-from unit_conversions import (
+from xdave.unit_conversions import (
     amu_TO_kg,
     eV_TO_K,
     K_TO_erg,
@@ -11,8 +11,8 @@ from unit_conversions import (
     g_per_cm3_TO_kg_per_m3,
     kg_per_m3_TO_g_per_cm3,
 )
-from constants import ELECTRON_MASS
-from plasma_state import PlasmaState
+from xdave.constants import ELECTRON_MASS
+from xdave.plasma_state import PlasmaState
 
 import numpy as np
 import matplotlib.pyplot as plt

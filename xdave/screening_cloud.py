@@ -1,10 +1,10 @@
-from models import ModelOptions
-from plasma_state import PlasmaState
-from constants import ELEMENTARY_CHARGE, BOHR_RADIUS
-from potentials import *
+from .models import ModelOptions
+from .plasma_state import PlasmaState
+from .constants import ELEMENTARY_CHARGE, BOHR_RADIUS
+from .potentials import *
 
-from unit_conversions import *
-from constants import PI_SQR, SQRT_HALF_PI, SQRT_PI
+from .unit_conversions import *
+from .constants import PI_SQR, SQRT_HALF_PI, SQRT_PI
 
 import numpy as np
 import matplotlib.pyplot as plt
