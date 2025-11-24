@@ -26,9 +26,6 @@ def test_ff():
     atomic_number = 1.0
     lfc = 0.0
 
-    models = ModelOptions(polarisation_model="NUMERICAL")
-    models2 = ModelOptions(polarisation_model="DANDREA_FIT")
-
     omega_array = np.linspace(-100, 100, 5000) * eV_TO_J
     state = PlasmaState(
         electron_temperature=Te,
@@ -69,7 +66,7 @@ def test_ff():
             c=cs,
         )
 
-        axes.plot(omega_new * J_TO_eV, dsfs2_new / J_TO_eV, label=f"Fit: q={q}", c=cs, ls="-.")
+        axes.plot(omega_new * J_TO_eV, dsfs2_new / J_TO_eV, label=f"RPA: q={q}", c=cs, ls="-.")
 
     axes.set_xlabel(r"$\omega$ [eV]")
     axes.set_ylabel(r"DSF [1/eV]")
@@ -153,5 +150,5 @@ def test_mermin_ff():
 
 
 if __name__ == "__main__":
-    # test_ff()
-    test_mermin_ff()
+    test_ff()
+    # test_mermin_ff()

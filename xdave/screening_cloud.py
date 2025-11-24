@@ -9,7 +9,8 @@ from .constants import PI_SQR, SQRT_HALF_PI, SQRT_PI
 import numpy as np
 import matplotlib.pyplot as plt
 
-from plasmapy.formulary.mathematics import Fermi_integral as fdi
+# from plasmapy.formulary.mathematics import Fermi_integral as fdi
+from fermi_integrals import fdi
 
 
 class ScreeningCloud:
@@ -46,6 +47,9 @@ class ScreeningCloud:
         Returns:
             float/array: screening cloud depending on the k-input type
         """
+        print(
+            f"Running screening cloud for Zi={self.state.charge_state}, ee_model={ee_potential}, ei_model={ei_potential}"
+        )
         screening_length = 0.0
         Zi = self.state.ion_charge
 
@@ -83,6 +87,9 @@ class ScreeningCloud:
 
         return screening_cloud
 
+    def __debye_huckel_screening(self, k, lfc, Uee, Uea):
+        return
+
     def _debye_huckel_screening(self, k):
         """
         Small wavenumber limit of the screening cloud in the RPA
@@ -102,6 +109,9 @@ class ScreeningCloud:
         kappa_e = np.real(kappa_e)
         screening_length = kappa_e**2
         return screening_length
+
+    def _finite_wavelength_full(self, k, lfc, Uee, Uea):
+        return
 
     def _finite_wavelength_screening_short(self, k):
         r"""
@@ -136,10 +146,10 @@ class ScreeningCloud:
         )
         eta /= EF
 
-        Fm1p5 = fdi(j=-1.5, x=eta)
-        Fm0p5 = fdi(j=-0.5, x=eta)
-        Fp1p5 = fdi(j=1.5, x=eta)
-        Fp2p5 = fdi(j=2.5, x=eta)
+        Fm1p5 = fdi(j=-1.5, eta=eta, normalize=True)
+        Fm0p5 = fdi(j=-0.5, eta=eta, normalize=True)
+        Fp1p5 = fdi(j=1.5, eta=eta, normalize=True)
+        Fp2p5 = fdi(j=2.5, eta=eta, normalize=True)
 
         c2 = np.array([-2.28e-1, 4.222e-1, -6.466e-1, 7.0572e-1, 5.882])
         c4 = np.array([-3.0375, 6.4646e1, 1.9608e1, -9.6978e1, 4.2366e2, -3.3101e2, 2.0833e1])

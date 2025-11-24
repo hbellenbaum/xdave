@@ -333,22 +333,23 @@ def compare_mcss_xdave_ch_static():
     rho = 1.2  # g/cc
     ZC = 3
     ZH = 1.0
-    xH = 0.5
+    xH = 0.2
     xC = 1 - xH
     # q = 4.0
     angle = 75  # degrees
     beam_energy = 9.0e3  # eV
     q = calculate_q(angle=angle, energy=beam_energy)
+    Zmin, Zmax, xmin, xmax = get_fractions_from_Z_partial(Z=ZC, x0=xH)
     # print(f"Running at q={q:.3f}")
 
     k_mcss, WR_mcss, f1_mcss, f2_mcss, q1_mcss, q2_mcss, S11_mcss, S12_mcss, S22_mcss = run_ch_ar_mode(
         T=T, rho=rho, xH=xH, ZH=ZH, ZC=ZC, angle=angle, user_defined_ipd=0.0, user_defined_lfc=0.0, plot=False
     )
 
-    elements = np.array(["H", "C"])
+    elements = np.array(["H", "C", "C"])
 
-    partial_densities = np.array([xH, xC])
-    charge_states = np.array([ZH, ZC])
+    partial_densities = np.array([xH, xmin, xmax])
+    charge_states = np.array([ZH, Zmin, Zmax])
     user_defined_inputs = dict()
 
     models = ModelOptions(
@@ -356,6 +357,9 @@ def compare_mcss_xdave_ch_static():
         bf_model="SCHUMACHER",
         lfc_model="NONE",
         ipd_model="NONE",
+        ee_potential="YUKAWA",
+        ei_potential="YUKAWA",
+        ii_potential="YUKAWA",
     )
 
     k = q  # 1/aB
@@ -394,7 +398,8 @@ def compare_mcss_xdave_ch_static():
     ax.plot(k, qs[0], label="H", c="crimson", ls="-.")
     ax.plot(k, qs[1], label="C", c="forestgreen", ls="-.")
     ax.plot(k_mcss, q1_mcss, label="MCSS: H", c="crimson", ls=":")
-    ax.plot(k_mcss, q2_mcss, label="MCSS: C", c="forestgreen", ls=":")
+    ax.plot(k_mcss, q2_mcss, label="MCSS: C3", c="forestgreen", ls=":")
+    ax.plot(k_mcss, q2_mcss, label="MCSS: C4", c="forestgreen", ls=":")
     ax.set_xlabel(r"$k$ [$a_B^{-1}$]")
     ax.set_ylabel(r"$q_{a}$ [ ]")
     ax.legend()
@@ -421,8 +426,146 @@ def compare_mcss_xdave_ch_static():
     fig.savefig(f"ch_test_T={T:.1f}_rho={rho:.1f}_ZC={ZC}_q={q:.2f}_static.pdf")
 
 
+def compare_mcss_xdave_ch_static_partialZC():
+
+    T = 100.0  # eV
+    rho = 1.2  # g/cc
+    ZC = 4.5
+    ZH = 1.0
+    xH = 0.2
+    xC = 1 - xH
+    # q = 4.0
+    angle = 75  # degrees
+    beam_energy = 9.0e3  # eV
+    q = calculate_q(angle=angle, energy=beam_energy)
+    ZC1, ZC2, xC1, xC2 = get_fractions_from_Z_partial(Z=ZC, x0=xH)
+    # print(f"Running at q={q:.3f}")
+
+    (
+        k_mcss,
+        WR_mcss,
+        f1_mcss,
+        f2_mcss,
+        f3_mcss,
+        q1_mcss,
+        q2_mcss,
+        q3_mcss,
+        S11_mcss,
+        S13_mcss,
+        S12_mcss,
+        S22_mcss,
+        S23_mcss,
+        S33_mcss,
+    ) = run_ch_ar_mode3(
+        T=T,
+        rho=rho,
+        xH=xH,
+        xC1=xC1,
+        xC2=xC2,
+        ZH=ZH,
+        ZC=ZC,
+        ZC1=ZC1,
+        ZC2=ZC2,
+        angle=angle,
+        user_defined_ipd=0.0,
+        user_defined_lfc=0.0,
+        plot=False,
+    )
+
+    elements = np.array(["H", "C", "C"])
+
+    partial_densities = np.array([xH, xC1, xC2])
+    charge_states = np.array([ZH, ZC1, ZC2])
+    user_defined_inputs = dict()
+
+    models = ModelOptions(
+        polarisation_model="NUMERICAL",
+        bf_model="SCHUMACHER",
+        lfc_model="NONE",
+        ipd_model="NONE",
+        ee_potential="YUKAWA",
+        ei_potential="YUKAWA",
+        ii_potential="YUKAWA",
+    )
+
+    k = q  # 1/aB
+
+    kernel = xDave(
+        models=models,
+        electron_temperature=T,
+        ion_temperature=T,
+        mass_density=rho,
+        charge_states=charge_states,
+        elements=elements,
+        partial_densities=partial_densities,
+        user_defined_inputs=user_defined_inputs,
+    )
+
+    mcss_norm = kernel.overlord_state.atomic_number
+
+    k = np.linspace(0.1, 15, 10000)
+    k, Sab, _, WR, qs, fs, lfc = kernel.run(k=k, w=0.0, mode="STATIC")
+    print(qs[0])
+
+    ZC1 = int(ZC1)
+    ZC2 = int(ZC2)
+    # plot result
+    fig, axes = plt.subplots(2, 2, figsize=(16, 16))
+    ax = axes[0, 0]
+    ax.plot(k, Sab[0, 0, :], label="H-H", c="crimson", ls="-.")
+    ax.plot(k, Sab[0, 1, :], label=f"C{ZC1}-H", c="magenta", ls="-.")
+    ax.plot(k, Sab[0, 2, :], label=f"C{ZC2}-H", c="navy", ls="-.")
+    ax.plot(k, Sab[1, 1, :], label=f"C{ZC1}-C{ZC1}", c="orange", ls="-.")
+    ax.plot(k, Sab[1, 2, :], label=f"C{ZC1}-C{ZC2}", c="black", ls="-.")
+    ax.plot(k, Sab[2, 2, :], label=f"C{ZC2}-C{ZC2}", c="forestgreen", ls="-.")
+    ax.plot(k_mcss, S11_mcss, label=f"MCSS: H-H", c="crimson", ls=":")
+    ax.plot(k_mcss, S12_mcss, label=f"MCSS: C{ZC1}-H", c="magenta", ls=":")
+    ax.plot(k_mcss, S13_mcss, label=f"MCSS: C{ZC2}-H", c="navy", ls=":")
+    ax.plot(k_mcss, S23_mcss, label=f"MCSS: C{ZC1}-C{ZC2}", c="black", ls=":")
+    ax.plot(k_mcss, S22_mcss, label=f"MCSS: C{ZC1}-C{ZC2}", c="orange", ls=":")
+    ax.plot(k_mcss, S33_mcss, label=f"MCSS: C{ZC2}-C{ZC2}", c="forestgreen", ls=":")
+    ax.legend()
+    ax.set_xlabel(r"$k$ [$a_B^{-1}$]")
+    ax.set_ylabel(r"$S_{ab}$ [ ]")
+
+    ax = axes[0, 1]
+    ax.plot(k, qs[0], label="H", c="crimson", ls="-.")
+    ax.plot(k, qs[1], label=f"C{ZC1}", c="forestgreen", ls="-.")
+    ax.plot(k, qs[2], label=f"C{ZC2}", c="navy", ls="-.")
+    ax.plot(k_mcss, q1_mcss, label=f"MCSS: H", c="crimson", ls=":")
+    ax.plot(k_mcss, q2_mcss, label=f"MCSS: C{ZC1}", c="forestgreen", ls=":")
+    ax.plot(k_mcss, q3_mcss, label=f"MCSS: C{ZC2}", c="navy", ls=":")
+    ax.set_xlabel(r"$k$ [$a_B^{-1}$]")
+    ax.set_ylabel(r"$q_{a}$ [ ]")
+    ax.legend()
+
+    ax = axes[1, 0]
+    ax.plot(k, fs[0], label="H", c="crimson", ls="-.")
+    ax.plot(k, fs[1], label=f"C{ZC1}", c="forestgreen", ls="-.")
+    ax.plot(k, fs[2], label=f"C{ZC2}", c="navy", ls="-.")
+    ax.plot(k_mcss, f1_mcss, label=f"MCSS: H", c="crimson", ls=":")
+    ax.plot(k_mcss, f2_mcss, label=f"MCSS: C{ZC1}", c="forestgreen", ls=":")
+    ax.plot(k_mcss, f3_mcss, label=f"MCSS: C{ZC2}", c="navy", ls=":")
+    ax.set_xlabel(r"$k$ [$a_B^{-1}$]")
+    ax.set_ylabel(r"$f_{a}$ [ ]")
+    ax.legend()
+
+    ax = axes[1, 1]
+    ax.plot(k, WR, label=r"$W_R$", c="darkgreen", ls="-.")
+    ax.plot(k_mcss, WR_mcss, label=r"MCSS: $W_R$", c="limegreen", ls=":")
+    ax.set_xlabel(r"$k$ [$a_B^{-1}$]")
+    ax.set_ylabel(r"$W_R$ [ ]")
+    ax.legend()
+
+    plt.tight_layout()
+    plt.show()
+    date = datetime.today().strftime("%Y-%m-%d")
+    fig.savefig(f"ch_test_T={T:.1f}_rho={rho:.1f}_ZC={ZC}_q={q:.2f}_static.pdf")
+
+
 if __name__ == "__main__":
     # compare_mcss_xdave_be()
     # compare_mcss_xdave_ch()
     # compare_mcss_xdave_c()
-    compare_mcss_xdave_ch_static()
+    # compare_mcss_xdave_ch_static()
+    compare_mcss_xdave_ch_static_partialZC()

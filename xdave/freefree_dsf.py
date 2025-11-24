@@ -8,8 +8,8 @@ from scipy import integrate
 
 # from collision_frequency import CollisionFrequency
 
-from plasmapy.formulary.mathematics import Fermi_integral as fdi
-from scipy.special import gamma
+# from plasmapy.formulary.mathematics import Fermi_integral as fdi
+from fermi_integrals import fdi
 
 import numpy as np
 
@@ -387,8 +387,8 @@ class FreeFreeDSF:
         )
         q = q0 / np.sqrt(Theta_e)
 
-        F_m0p5 = fdi(j=-0.5, x=eta)
-        F_p0p5 = fdi(j=+0.5, x=eta)
+        F_m0p5 = fdi(j=-0.5, eta=eta, normalize=True)
+        F_p0p5 = fdi(j=+0.5, eta=eta, normalize=True)
 
         def phi_function(x):
             a2 = (_c2[0] + Theta_e) / (_c2[1] + _c2[2] * Theta_e ** _c2[3] + _c2[4] * Theta_e**2)
@@ -436,8 +436,8 @@ class FreeFreeDSF:
             )
             Theta_3 = Theta_e**3
             Im0p5 = SQRT_PI * F_m0p5
-            Ip1p5 = 0.750 * SQRT_PI * fdi(j=+1.5, x=eta)
-            Ip2p5 = 1.875 * SQRT_PI * fdi(j=+2.5, x=eta)
+            Ip1p5 = fdi(j=+1.5, eta=eta, normalize=False)
+            Ip2p5 = fdi(j=+2.5, eta=eta, normalize=False)
             b10 = 1.5 * sqrt_Theta_e * Im0p5 * a8
             b8 = sqrt_Theta_e * (1.5 * Im0p5 * a6 - 0.5 * Theta_2 * Ip1p5 * b10)
             b6 = sqrt_Theta_e * (1.5 * Im0p5 * a4 - 0.5 * Theta_2 * Ip1p5 * b8 - 0.3 * Theta_3 * Ip2p5 * b10)
@@ -448,9 +448,9 @@ class FreeFreeDSF:
             v = 1.0 + x2 * (b2 + x2 * (b4 + x2 * (b6 + x2 * (b8 + x2 * b10))))
             return x * u / v
 
-        exp_arg_p = eta - (w + q) ** 2
-        exp_arg_m = eta - (w - q) ** 2
-        imag_part = SQRT_PI * (log1pexp(exp_arg_p) - log1pexp(exp_arg_m))
+        exp_arg_pos = eta - (w + q) ** 2
+        exp_arg_neg = eta - (w - q) ** 2
+        imag_part = SQRT_PI * (log1pexp(exp_arg_pos) - log1pexp(exp_arg_neg))
         delta_F = phi_function(w0 + q0) - phi_function(w0 - q0)
         real_part = -2.0 * F_m0p5 * delta_F / sqrt_Theta_e
         prefactor = self.state.free_electron_number_density / (BOLTZMANN_CONSTANT * self.state.electron_temperature)
