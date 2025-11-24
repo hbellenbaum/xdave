@@ -130,7 +130,7 @@ def test_Fig1b():
         lfc_model="NONE",
         ipd_model="NONE",
         ee_potential="COULOMB",
-        ei_potential="YUKAWA",
+        ei_potential="COULOMB",
         ii_potential="YUKAWA",
     )
 
@@ -173,11 +173,11 @@ def test_Fig1b():
 
     fig, ax = plt.subplots(1, 1)
     ax.plot(k * BOHR_RADIUS, f_fws_C, label="C: FWS", ls="solid", c="orange")
-    # ax.plot(k * BOHR_RADIUS, f_dh_C, label="C: DH", ls="-.", c="orange")
-    # ax.plot(k * BOHR_RADIUS, f_dh_H, label="H: DH", ls="-.", c="limegreen")
+    ax.plot(k * BOHR_RADIUS, f_dh_C, label="C: DH", ls="-.", c="orange")
+    ax.plot(k * BOHR_RADIUS, f_dh_H, label="H: DH", ls="-.", c="limegreen")
     ax.plot(k * BOHR_RADIUS, f_fws_H, label="H: FWS", ls="solid", c="limegreen")
-    # ax.plot(mcss_result[0], mcss_result[5], label="MCSS C: FWS", ls="solid", c="crimson")
-    # ax.plot(mcss_result[0], mcss_result[4], label="MCSS H: FWS", ls="solid", c="darkgreen")
+    ax.plot(mcss_result[0], mcss_result[5], label="MCSS C: FWS", ls="solid", c="crimson")
+    ax.plot(mcss_result[0], mcss_result[4], label="MCSS H: FWS", ls="solid", c="darkgreen")
     ax.scatter(dat_C[:, 0], dat_C[:, 1], label="Chapman 2015: C", marker="x", c="crimson")
     ax.scatter(dat_H[:, 0], dat_H[:, 1], label="Chapman 2015: H", marker="x", c="darkgreen")
     ax.legend()

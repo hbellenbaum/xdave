@@ -1,4 +1,4 @@
-from .models import ModelOptions
+from .freefree_dsf import FreeFreeDSF
 from .plasma_state import PlasmaState
 from .constants import ELEMENTARY_CHARGE, BOHR_RADIUS
 from .potentials import *
@@ -47,10 +47,7 @@ class ScreeningCloud:
         Returns:
             float/array: screening cloud depending on the k-input type
         """
-        print(
-            f"Running screening cloud for Zi={self.state.charge_state}, ee_model={ee_potential}, ei_model={ei_potential}"
-        )
-        screening_length = 0.0
+
         Zi = self.state.ion_charge
 
         alpha = 2 / self.state.mean_sphere_radius(number_density=self.state.ion_number_density)
@@ -74,21 +71,43 @@ class ScreeningCloud:
             raise NotImplementedError(f"Cannot recognize ei-potential {ei_potential} in the screening cloud.")
 
         if screening_model == "DEBYE_HUCKEL":
-            screening_length = self._debye_huckel_screening(k)
+            screening_cloud = self._debye_huckel_screening_full(k=k, lfc=lfc, Uee=Uee, Uei=Uei)
         elif screening_model == "FINITE_WAVELENGTH":
-            screening_length = self._finite_wavelength_screening_short(k)
+            screening_cloud = self._finite_wavelength_screening_full(k=k, lfc=lfc, Uee=Uee, Uei=Uei)
         elif screening_model == "NONE":
-            screening_length = np.zeros_like(k)
+            screening_cloud = np.zeros_like(k)
         else:
             raise NotImplementedError(f" Model for the screening cloud: {screening_model} not recognised.")
 
+        return screening_cloud
+
+        # if screening_model == "DEBYE_HUCKEL":
+        #     screening_length = self._debye_huckel_screening(k)
+        # elif screening_model == "FINITE_WAVELENGTH":
+        #     screening_length = self._finite_wavelength_screening_short(k)
+        # elif screening_model == "NONE":
+        #     screening_length = np.zeros_like(k)
+        # else:
+        #     raise NotImplementedError(f" Model for the screening cloud: {screening_model} not recognised.")
+
+        # ratio = Uei / Uee
+        # screening_cloud = -ratio * screening_length / (k**2 + (1 - lfc) * screening_length)
+
+        # return screening_cloud
+
+    def _debye_huckel_screening_full(self, k, lfc, Uee, Uei):
+        kappa_e = self.overlord_state.screening_length(
+            mass=ELECTRON_MASS,
+            charge=1,
+            temperature=self.overlord_state.electron_temperature,
+            number_density=self.overlord_state.total_electron_number_density,
+        )
+        kappa_e = np.real(kappa_e)
+        screening_length = kappa_e**2
         ratio = Uei / Uee
         screening_cloud = -ratio * screening_length / (k**2 + (1 - lfc) * screening_length)
 
         return screening_cloud
-
-    def __debye_huckel_screening(self, k, lfc, Uee, Uea):
-        return
 
     def _debye_huckel_screening(self, k):
         """
@@ -100,18 +119,26 @@ class ScreeningCloud:
         Returns:
             float/array: screening length depending on the k-input type
         """
-        kappa_e = self.overlord_state.screening_length(
-            mass=ELECTRON_MASS,
-            charge=1,
-            temperature=self.overlord_state.electron_temperature,
-            number_density=self.overlord_state.total_electron_number_density,
+        # kappa_e = self.overlord_state.screening_length(
+        #     mass=ELECTRON_MASS,
+        #     charge=1,
+        #     temperature=self.overlord_state.electron_temperature,
+        #     number_density=self.overlord_state.total_electron_number_density,
+        # )
+        kappa_e = self.overlord_state.debye_screening_length(
+            1, self.overlord_state.free_electron_number_density, self.overlord_state.electron_temperature
         )
         kappa_e = np.real(kappa_e)
         screening_length = kappa_e**2
         return screening_length
 
-    def _finite_wavelength_full(self, k, lfc, Uee, Uea):
-        return
+    def _finite_wavelength_screening_full(self, k, lfc, Uee, Uei):
+        pol_func = FreeFreeDSF(state=self.state).dandrea_fit(k=k, omega=0.0).real
+        screening_length = -(k**2) * Uee * pol_func
+        ratio = Uei / Uee
+        screening_cloud = -ratio * screening_length / (k**2 + (1 - lfc) * screening_length)
+
+        return screening_cloud
 
     def _finite_wavelength_screening_short(self, k):
         r"""
@@ -129,15 +156,15 @@ class ScreeningCloud:
         EF = self.overlord_state.fermi_energy(
             mass=ELECTRON_MASS, number_density=self.overlord_state.free_electron_number_density
         )
-        # kappa_e = self.overlord_state.screening_length(
-        #     ELECTRON_MASS,
-        #     1,
-        #     self.overlord_state.electron_temperature,
-        #     self.overlord_state.free_electron_number_density,
-        # )
-        kappa_e = self.overlord_state.debye_screening_length(
-            1, self.overlord_state.free_electron_number_density, self.overlord_state.electron_temperature
+        kappa_e = self.overlord_state.screening_length(
+            ELECTRON_MASS,
+            1,
+            self.overlord_state.electron_temperature,
+            self.overlord_state.free_electron_number_density,
         )
+        # kappa_e = self.overlord_state.debye_screening_length(
+        #     1, self.overlord_state.free_electron_number_density, self.overlord_state.electron_temperature
+        # )
         theta = ELEMENTARY_CHARGE * self.overlord_state.electron_temperature / EF
         sqrt_theta = np.sqrt(theta)
         x = 0.5 * k / kF
