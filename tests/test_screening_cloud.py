@@ -1,10 +1,10 @@
 import sys
 
-# sys.path.insert(1, "./xdave")
 sys.path.insert(1, "./mcss_tests")
 
 from xdave import *
 from xdave.screening_cloud import ScreeningCloud
+from xdave.constants import BOHR_RADIUS
 
 from run_mcss_sim import run_ch_ar_mode
 

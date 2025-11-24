@@ -1,12 +1,11 @@
 import sys
 
-sys.path.insert(1, "./xdave")
 sys.path.insert(1, "./mcss_tests")
 
-from constants import ELECTRON_MASS
-from unit_conversions import eV_TO_K, g_per_cm3_TO_kg_per_m3, J_TO_eV
-from plasma_state import PlasmaState
-from fermi_integrals import fdi as xdave_fdi
+from xdave.constants import ELECTRON_MASS
+from xdave.unit_conversions import eV_TO_K, g_per_cm3_TO_kg_per_m3, J_TO_eV
+from xdave.plasma_state import PlasmaState
+from xdave.fermi_integrals import fdi as xdave_fdi
 from plasmapy.formulary.mathematics import Fermi_integral as fdi
 
 from scipy.special import gamma

@@ -2,14 +2,12 @@ from .constants import *
 from .unit_conversions import *
 from .maths import log1pexp
 from .plasma_state import PlasmaState
-
+from .fermi_integrals import fdi
 
 from scipy import integrate
 
 # from collision_frequency import CollisionFrequency
 
-# from plasmapy.formulary.mathematics import Fermi_integral as fdi
-from fermi_integrals import fdi
 
 import numpy as np
 

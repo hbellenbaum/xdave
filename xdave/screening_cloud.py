@@ -10,7 +10,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 
 # from plasmapy.formulary.mathematics import Fermi_integral as fdi
-from fermi_integrals import fdi
+from .fermi_integrals import fdi
 
 
 class ScreeningCloud:

@@ -1,7 +1,3 @@
-import sys
-
-# sys.path.insert(1, "./xdave")
-
 from xdave.unit_conversions import ang_TO_m, eV_TO_K, g_per_cm3_TO_kg_per_m3, per_aB_TO_per_A
 from xdave.constants import BOLTZMANN_CONSTANT, VACUUM_PERMITTIVITY, BOHR_RADIUS, ELEMENTARY_CHARGE
 from xdave.plasma_state import PlasmaState
@@ -40,9 +36,7 @@ def test_Fig615a():
         models=models,
     )
 
-    kernel = OCPRayleighWeight(
-        overlord_state=code_kernel.overlord_state, state=code_kernel.states[0], ion_core_radius=ion_core_radius
-    )
+    kernel = OCPRayleighWeight(overlord_state=code_kernel.overlord_state, state=code_kernel.states[0])
 
     ks = np.linspace(0.1, 20, 1000) / BOHR_RADIUS
 
@@ -53,6 +47,9 @@ def test_Fig615a():
         ee_potential="YUKAWA",
         ei_potential="YUKAWA",
         screening_model="NONE",
+        hnc_mix_fraction=0.9,
+        hnc_delta=1.0e-12,
+        hnc_max_iterations=1000,
         bridge_function=None,
         return_full=False,
     )

@@ -195,8 +195,8 @@ def compare_hydrogen_against_pimc_and_mcss():
     ax.set_xlabel(r"$\omega$ [eV]")
     ax.set_ylabel(r"DSF [1/eV]")
 
-    inelastic, elastic, spectrum = xdave.convolve_with_sif(
-        sif=sif, bf=bf_tot, ff=ff_tot, WR=WR, type="GAUSSIAN", fwhm=10, omega=omega_array
+    spectral_energy, inelastic, elastic, spectrum = xdave.convolve_with_sif(
+        bf=bf_tot, ff=ff_tot, dsf=dsf, Wr=WR, type="GAUSSIAN", fwhm=10, omega=omega_array, beam_energy=9.0e3
     )
     mcss_tot = mcss_ff + mcss_bf + mcss_el
 

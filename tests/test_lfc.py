@@ -1,6 +1,5 @@
 import sys
 
-# sys.path.insert(1, "./xdave")
 sys.path.insert(1, "./mcss_tests")
 
 from xdave.constants import BOHR_RADIUS

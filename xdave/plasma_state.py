@@ -5,7 +5,7 @@ import numpy as np
 
 # from fermi_integrals import
 from plasmapy.formulary.mathematics import Fermi_integral as fdi
-from fermi_integrals import fdi as xdave_fdi
+from .fermi_integrals import fdi as xdave_fdi
 
 from scipy.integrate import quad
 from scipy.optimize import root_scalar

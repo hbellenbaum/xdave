@@ -1,7 +1,3 @@
-import sys
-
-# sys.path.insert(1, "./xdave")
-
 from xdave.unit_conversions import (
     amu_TO_kg,
     eV_TO_K,

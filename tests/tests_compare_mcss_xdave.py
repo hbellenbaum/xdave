@@ -1,12 +1,12 @@
 import sys
 
 # sys.path.insert(1, "./xdave")
-# sys.path.insert(1, "./mcss_tests")
-
+sys.path.insert(1, "./mcss_tests")
 
 from xdave import *
 from xdave.plasma_state import get_fractions_from_Z_partial
-from run_mcss_sim import run_be_sr_mode, run_ch_sr_mode, run_c_sr_mode, run_ch_ar_mode
+from xdave.utils import calculate_q
+from run_mcss_sim import run_be_sr_mode, run_ch_sr_mode, run_c_sr_mode, run_ch_ar_mode, run_ch_ar_mode3
 
 import numpy as np
 import matplotlib.pyplot as plt

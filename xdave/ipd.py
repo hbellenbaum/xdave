@@ -8,8 +8,8 @@ from .unit_conversions import *
 # NOTE(TG): Would recommend replacing this with Antia fits. At high densities fdi becomes
 #           extremely slow, if it even is able to reach an answer.
 # NOTE(HB): Noted! But I am being lazy.
-# from plasmapy.formulary.mathematics import Fermi_integral as fdi
-from fermi_integrals import fdi
+# NOTE(HB): 2025-11-24 done
+from .fermi_integrals import fdi
 
 import numpy as np
 

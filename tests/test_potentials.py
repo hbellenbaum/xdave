@@ -1,7 +1,3 @@
-import sys
-
-# sys.path.insert(1, "./xdave")
-
 from xdave.unit_conversions import ang_TO_m, eV_TO_K, g_per_cm3_TO_kg_per_m3, amu_TO_kg
 from xdave.constants import BOLTZMANN_CONSTANT, BOHR_RADIUS
 from xdave.potentials import *

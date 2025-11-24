@@ -1,7 +1,3 @@
-import sys
-
-# sys.path.insert(1, "./xdave")
-
 from xdave.plasma_state import PlasmaState
 from xdave.models import ModelOptions
 from xdave.boundfree_dsf import BoundFreeDSF

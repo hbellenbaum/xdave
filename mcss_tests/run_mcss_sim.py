@@ -2,7 +2,8 @@ import sys
 
 # sys.path.insert(1, "/home/bellen85/code/dev/xdave")
 
-from mcss_tests.pymcss import *
+# from mcss_tests.pymcss import *
+from pymcss import *
 from xdave import *
 from xdave.unit_conversions import *
 

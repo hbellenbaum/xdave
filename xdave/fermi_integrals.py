@@ -32,7 +32,7 @@
 
 # The fd_m3h function was added by H. Bellenbaum, so was the general fdi
 
-from constants import SQRT_PI
+from .constants import SQRT_PI
 from scipy.special import gamma
 from numpy import ndarray, zeros
 from numpy import exp as npexp

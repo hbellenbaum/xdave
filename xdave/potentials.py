@@ -68,12 +68,6 @@ def short_range_screening_r(Qa, Qb, r, Ti, srr_core_power, ion_core_radius, srr_
     """
     Corrected version of the SSR first published in K. Wunsch et al., PRE 79 (2009) doi: 10.1103/physreve.79.010201
     """
-    # This is currently in MCSS
-    # Vab = np.exp(-kappa_e * r) + np.exp(srr_sigma - r / ion_core_radius) * ELEMENTARY_CHARGE / (
-    #     4 * PI * VACUUM_PERMITTIVITY
-    # ) * (ion_core_radius / r) ** srr_core_power / (ion_core_radius * Ti)
-    # Vab *= coulomb_r(Qa, Qb, r)
-    # This is written in the user manual
     Vab = (
         debye_huckel_r(Qa, Qb, r, alpha, kappa_e)
         + ELEMENTARY_CHARGE**2

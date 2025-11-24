@@ -3,13 +3,14 @@ import sys
 # sys.path.insert(1, "./xdave")
 sys.path.insert(1, "./mcss_tests")
 
-# from plasma_state import get_fractions_from_Z_partial
+from xdave.plasma_state import get_fractions_from_Z
+from xdave.utils import calculate_angle
 
 from run_mcss_sim import run_c_sr_mode, run_c_ar_mode
 from xdave import *
 
 import numpy as np
-import matplotlib.pyplot
+import matplotlib.pyplot as plt
 
 
 def check_inelastic():
@@ -120,7 +121,7 @@ def check_elastic():
     beam_energy = 9.0e3
     ks = np.linspace(0.1, 10, 1000)
     angle = 75
-    _, Sab, Sab_tot, rayleigh_weight, qs, fs = kernel.run(w=w, k=ks, beam_energy=beam_energy, mode="STATIC")
+    _, Sab, Sab_tot, rayleigh_weight, qs, fs, lfc = kernel.run(w=w, k=ks, beam_energy=beam_energy, mode="STATIC")
     k_mcss, WR_mcss, f1, f2, q1, q2, S11_mcss, S12_mcss, S22_mcss, lfc = run_c_ar_mode(
         T=T, rho=rho, Z=Z_C, angle=angle
     )
