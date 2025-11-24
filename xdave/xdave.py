@@ -307,7 +307,9 @@ class xDave:
 
         # Calculate the Rayleigh weight
         if self.ocp_flag:
-            wr_kernel = OCPRayleighWeight(overlord_state=self.overlord_state, state=self.states[0])
+            wr_kernel = OCPRayleighWeight(
+                overlord_state=self.overlord_state, state=self.states[0], verbose=self.verbose
+            )
             rayleigh_weight = wr_kernel.get_rayleigh_weight(
                 k=k,
                 lfc=lfc,
@@ -323,7 +325,7 @@ class xDave:
                 return_full=False,
             )
         else:
-            wr_kernel = MCPRayleighWeight(overlord_state=self.overlord_state, states=self.states)
+            wr_kernel = MCPRayleighWeight(overlord_state=self.overlord_state, states=self.states, verbose=self.verbose)
             rayleigh_weight = wr_kernel.get_rayleigh_weight(
                 k=k,
                 lfc=lfc,
@@ -383,7 +385,9 @@ class xDave:
         lfc = lfc_kernel.calculate_lfc(k=k, w=0, model=self.models.lfc_model)
 
         if self.ocp_flag:
-            wr_kernel = OCPRayleighWeight(overlord_state=self.overlord_state, state=self.states[0])
+            wr_kernel = OCPRayleighWeight(
+                overlord_state=self.overlord_state, state=self.states[0], verbose=self.verbose
+            )
             _, Sab, rayleigh_weight, qs, fs = wr_kernel.get_rayleigh_weight(
                 k=k,
                 lfc=lfc,
@@ -402,7 +406,7 @@ class xDave:
             Sab_tot = Sab
 
         else:
-            wr_kernel = MCPRayleighWeight(overlord_state=self.overlord_state, states=self.states)
+            wr_kernel = MCPRayleighWeight(overlord_state=self.overlord_state, states=self.states, verbose=self.verbose)
 
             _, Sab, rayleigh_weight, qs, fs = wr_kernel.get_rayleigh_weight(
                 k=k,
@@ -495,7 +499,7 @@ class xDave:
 
         # Calculate the Rayleigh weight
         if self.ocp_flag:
-            wr_kernel = OCPRayleighWeight(state=self.overlord_state)
+            wr_kernel = OCPRayleighWeight(state=self.overlord_state, verbose=self.verbose)
             rayleigh_weight = wr_kernel.get_rayleigh_weight(
                 k=k_value,
                 lfc=lfc,
@@ -507,7 +511,7 @@ class xDave:
                 return_full=False,
             )
         else:
-            wr_kernel = MCPRayleighWeight(overlord_state=self.overlord_state, states=self.states)
+            wr_kernel = MCPRayleighWeight(overlord_state=self.overlord_state, states=self.states, verbose=self.verbose)
             rayleigh_weight = wr_kernel.get_rayleigh_weight(
                 k=k_value,
                 lfc=lfc,

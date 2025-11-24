@@ -39,6 +39,7 @@ def be_example():
         models=models,
         enforce_fsum=False,
         user_defined_inputs=None,
+        verbose=True,
     )
 
     w = np.linspace(-1000, 1000, 10000)
