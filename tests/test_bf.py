@@ -1,16 +1,22 @@
 from xdave.plasma_state import PlasmaState
-from xdave.models import ModelOptions
 from xdave.boundfree_dsf import BoundFreeDSF
 from xdave.constants import BOHR_RADIUS
-from xdave.unit_conversions import eV_TO_K, g_per_cm3_TO_kg_per_m3, eV_TO_J, J_TO_eV, per_cm3_TO_per_m3
+from xdave.unit_conversions import (
+    eV_TO_K,
+    g_per_cm3_TO_kg_per_m3,
+    eV_TO_J,
+    J_TO_eV,
+    per_cm3_TO_per_m3,
+)
 from xdave.utils import calculate_q, load_mcss_result, calculate_angle
 
 
 import numpy as np
+import matplotlib.pyplot as plt
+import os
 
 
-def test_bf():
-    import matplotlib.pyplot as plt
+def test_bf_mcss():
 
     Te = 10 * eV_TO_K
     rho = 0.1 * g_per_cm3_TO_kg_per_m3
@@ -25,7 +31,7 @@ def test_bf():
     EB = (
         np.array(
             [
-                -13.7,  # -13.6,  # -13.6,
+                -13.6,
             ]
         )
         * eV_TO_J
@@ -39,7 +45,6 @@ def test_bf():
         atomic_number=atomic_number,
         binding_energies=EB,
     )
-    models = ModelOptions(bf_model="SCHUMACHER")
 
     colors = ["red", "green", "blue", "orange", "gray", "black", "yellow", "magenta", "purple"]
 
@@ -96,48 +101,65 @@ def test_bf():
 def test_be_bf():
     # Comparison to Fig. 2 Mattern and Seidel, Phys. Plasmas 20 (2013)
     # Be at q~10.2 1/A, phi = 171, Eb = 9890 eV
-    import matplotlib.pyplot as plt
+    data_dir = os.path.dirname(__file__)
 
     # values from Fortman et al., PRL 108, 175006 (2012)
     Te = 13 * eV_TO_K
-    ne = 1.8e24 * per_cm3_TO_per_m3
     Zf = 2.0
+    ZA = 4
+    Zb = ZA - Zf
+    ne = 1.8e24 * per_cm3_TO_per_m3
+    ni = ne / Zf
 
-    rho = 0.1 * g_per_cm3_TO_kg_per_m3
+    rho = 10 * g_per_cm3_TO_kg_per_m3
     charge_state = 0.0
-    atomic_number = 1
-    atomic_mass = 1.0
+    atomic_number = ZA
+    atomic_mass = 9.012182  # amu
     beam_energy = 9890  # eV
     scattering_angle = 171  # degree
     q_approx = 10.2  # 1/Angstrom
+    A_TO_m = 1.0e-10
+    k = q_approx / A_TO_m
 
-    angles = np.array([13, 30, 45, 60, 80, 100, 120, 140, 160])
-    omega_array = np.linspace(-40, 300, 500) * eV_TO_J
-    EB = (
-        np.array(
-            [
-                -111.5,
-            ]
-        )
-        * eV_TO_J
-    )
+    # angles = np.array([13, 30, 45, 60, 80, 100, 120, 140, 160])
+    omega_array = np.linspace(-500, 900, 1000) * eV_TO_J
+    binding_energies = np.array([-111.5, -111.5, -111.5]) * eV_TO_J
     state = PlasmaState(
         electron_temperature=Te,
         ion_temperature=Te,
         mass_density=rho,
-        charge_state=charge_state,
+        electron_number_density=ne,
+        ion_number_density=ni,
+        charge_state=Zf,
         atomic_mass=atomic_mass,
         atomic_number=atomic_number,
+        binding_energies=binding_energies,
     )
-    models = ModelOptions(bf_model="SCHUMACHER")
 
-    exp_data = np.genfromtxt(f"validation/bf_dsf/mattern2013/Be_Fig1.csv", delimiter=",")
-    hm_data = np.genfromtxt(f"validation/bf_dsf/mattern2013/Be_HM.csv", delimiter=",")
-    ia_data = np.genfromtxt(f"validation/bf_dsf/mattern2013/Be_IA.csv", delimiter=",")
-    pwffa = np.genfromtxt(f"validation/bf_dsf/mattern2013/Be_PWFFA.csv", delimiter=",")
-    rsgf = np.genfromtxt(f"validation/bf_dsf/mattern2013/Be_RSGF.csv", delimiter=",")
-    rsgf_core = np.genfromtxt(f"validation/bf_dsf/mattern2013/RSGF_Be_3.6_core.csv", delimiter=",")
+    bf_dsf = BoundFreeDSF(state=state)
+    xdave_bf_IA = bf_dsf.get_dsf(ZA=ZA, Zb=Zb, k=k, w=omega_array, Eb=binding_energies, model="SCHUMACHER")
+    xdave_bf_HR = bf_dsf.get_dsf(ZA=ZA, Zb=Zb, k=k, w=omega_array, Eb=binding_energies, model="HR_CORRECTION")
+
+    exp_data = np.genfromtxt(data_dir + f"/comparison_data/bf_dsf/mattern2013/Be_Fig1.csv", delimiter=",")
+    hm_data = np.genfromtxt(data_dir + f"/comparison_data/bf_dsf/mattern2013/Be_HM.csv", delimiter=",")
+    ia_data = np.genfromtxt(data_dir + f"/comparison_data/bf_dsf/mattern2013/Be_IA.csv", delimiter=",")
+    pwffa = np.genfromtxt(data_dir + f"/comparison_data/bf_dsf/mattern2013/Be_PWFFA.csv", delimiter=",")
+    rsgf = np.genfromtxt(data_dir + f"/comparison_data/bf_dsf/mattern2013/Be_RSGF.csv", delimiter=",")
+    rsgf_core = np.genfromtxt(data_dir + f"/comparison_data/bf_dsf/mattern2013/RSGF_Be_3.6_core.csv", delimiter=",")
+
+    plt.figure()
+    plt.scatter(exp_data[:, 0], exp_data[:, 1], label="Exp")
+    plt.plot(hm_data[:, 0], hm_data[:, 1], label="HM")
+    plt.plot(ia_data[:, 0], ia_data[:, 1], label="IA")
+    plt.plot(pwffa[:, 0], pwffa[:, 1], label="PWFFA")
+    plt.plot(rsgf[:, 0], rsgf[:, 1], label="RSGF")
+    plt.plot(rsgf_core[:, 0], rsgf_core[:, 1], label="RSGF Core")
+    plt.plot(omega_array * J_TO_eV, xdave_bf_IA * 1.0e2 / J_TO_eV, label="xdave: IA", ls="--", c="black")
+    plt.plot(omega_array * J_TO_eV, xdave_bf_HR * 1.0e2 / J_TO_eV, label="xdave: HR", ls="--", c="green")
+    plt.legend()
+    plt.show()
 
 
 if __name__ == "__main__":
-    test_bf()
+    test_bf_mcss()
+    # test_be_bf()
