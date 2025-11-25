@@ -17,7 +17,7 @@ def test_ff():
     rs = 2
     theta = 1
     rho, Te = get_rho_T_from_rs_theta(rs=rs, theta=theta)
-    ks = np.array((1.0,)) / BOHR_RADIUS  # 0.5, 1.0, 2.0, 4.0
+    ks = np.array((0.5, 1.0, 2.0, 4.0)) / BOHR_RADIUS  # 0.5, 1.0, 2.0, 4.0
     rho *= g_per_cm3_TO_kg_per_m3
     Te *= eV_TO_K
     # Te = 200  #
@@ -66,7 +66,8 @@ def test_ff():
             c=cs,
         )
 
-        axes.plot(omega_new * J_TO_eV, dsfs2_new / J_TO_eV, label=f"RPA: q={q}", c=cs, ls="-.")
+        axes.plot(omega_new * J_TO_eV, dsfs2_new / J_TO_eV, label=f"RPA Fit: q={q}", c=cs, ls="-.")
+        axes.plot(omega_new * J_TO_eV, dsfs_new / J_TO_eV, label=f"RPA Fit: q={q}", c=cs, ls="solid")
 
     axes.set_xlabel(r"$\omega$ [eV]")
     axes.set_ylabel(r"DSF [1/eV]")

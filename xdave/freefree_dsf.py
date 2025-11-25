@@ -352,11 +352,12 @@ class FreeFreeDSF:
         Returns:
             array: polarisation function, non-dimensional
         """
-        _cJ = [+3.2488e03, -6.9147e02, -3.2027e06, -4.5356e03, -4.6240e05]
-        _cK = [-4.8780e00, +4.7325e02, -2.3375e03, +3.4831e02, +1.5173e03]
-        _c2 = [-2.2800e-01, +4.2220e-01, -6.4660e-01, +7.0572e-01, +5.8820e00]
-        _c4 = [-3.0375e00, +6.4646e01, +1.9608e01, -9.6978e01, +4.2366e02, -3.3101e02, +2.0833e01]
-        _c6 = [-1.9000e-01, +3.6538e-01, -2.2575e00, +2.2942e01, -4.3492e01, +1.0640e02]
+        # See Table 1, Dandrea et al., Phys. Rev. B 34 (1986), rows for each set of constants are given by comments
+        _cJ = [3248.8, -691.47, -3202700, -4535.6, -462400]  # (A19)
+        _cK = [-4.8780e00, +4.7325e02, -2.3375e03, +3.4831e02, +1.5173e03]  # (A20)
+        _c2 = [-2.2800e-01, +4.2220e-01, -6.4660e-01, +7.0572e-01, +5.8820e00]  # (A21)
+        _c4 = [-3.0375e00, +6.4646e01, +1.9608e01, -9.6978e01, +4.2366e02, -3.3101e02, +2.0833e01]  # (A22)
+        _c6 = [-1.9000e-01, +3.6538e-01, -2.2575e00, +2.2942e01, -4.3492e01, +1.0640e02]  # (A23)
         _c8 = [
             -7.1316e00,
             +2.2725e01,
@@ -367,35 +368,49 @@ class FreeFreeDSF:
             +9.1000e-01,
             -6.4453e00,
             +1.22324e01,
-        ]
+        ]  # (A24)
 
         EF = self.state.fermi_energy(self.state.free_electron_number_density, ELECTRON_MASS)
         kF = self.state.fermi_wave_number(self.state.free_electron_number_density)
         Theta_e = self.state.alt_degeneracy_parameter(
             self.state.free_electron_number_density, self.state.electron_temperature, ELECTRON_MASS
         )
-
         sqrt_Theta_e = np.sqrt(Theta_e)
+        Theta_2 = Theta_e**2
+        Theta_3 = Theta_e**3
 
+        # non-dimensional variables for integral
         q0 = 0.5 * k / kF
         w0 = 0.25 * omega / (EF * q0)  #  * DIRAC_CONSTANT
         w = w0 / sqrt_Theta_e
-        eta = self.state.chemical_potential_ichimaru(
+        beta = 1 / (BOLTZMANN_CONSTANT * self.state.electron_temperature)
+        mue = self.state.chemical_potential_ichimaru(
             self.state.electron_temperature, self.state.free_electron_number_density, ELECTRON_MASS
         )
+        eta = mue * beta
         q = q0 / np.sqrt(Theta_e)
 
+        # normalized Fermi-Dirac integrals
         F_m0p5 = fdi(j=-0.5, eta=eta, normalize=True)
         F_p0p5 = fdi(j=+0.5, eta=eta, normalize=True)
 
         def phi_function(x):
+            """
+            See Eq. (4.6) - (4.8) in Dandrea et al., Phys. Rev. B 34 (1986), constants and functions are given in
+            the Appendix.
+            The original form of the phi function is given by Eq. (4.7), Eq. (4.8b) describes the fit implemented here.
+            """
+            # Eq. (A21)
             a2 = (_c2[0] + Theta_e) / (_c2[1] + _c2[2] * Theta_e ** _c2[3] + _c2[4] * Theta_e**2)
+            # Eq. (A22)
             a4 = (1.0 + Theta_e * (_c4[0] + _c4[1] * Theta_e)) / (
                 _c4[2] + Theta_e * (_c4[3] + Theta_e * (_c4[4] + Theta_e * (_c4[5] + Theta_e * _c4[6] * _c4[1])))
             )
+            # Eq. (A23)
             a6 = (_c6[0] + Theta_e) / (
                 _c6[1] + Theta_e * (_c6[2] + Theta_e * (_c6[3] + Theta_e * (_c6[4] + Theta_e * _c6[5])))
             )
+            # Eq. (A24)
             a8 = (_c8[6] + Theta_e * (_c8[7] + Theta_e * _c8[8])) / (
                 1.0
                 + Theta_e
@@ -405,52 +420,63 @@ class FreeFreeDSF:
                     * (_c8[1] + Theta_e * (_c8[2] + Theta_e * (_c8[3] + Theta_e * (_c8[4] + Theta_e * _c8[5]))))
                 )
             )
-            Theta_2 = Theta_e**2
-            J = (1.0 + Theta_2 * (_cJ[0] + Theta_2 * (_cJ[1] + Theta_2 * Theta_e * _cJ[2]))) / (
-                1.0
-                + Theta_2
-                * (
-                    (_cJ[0] - PI_SQR / 6.0)
-                    + Theta_2
-                    * (
-                        _cJ[3]
-                        + Theta_2 * (_cJ[4] + Theta_e**1.5 * 0.75 * _cJ[2] * (1.0 / SQRT_HALF_PI + Theta_e**1.5))
-                    )
-                )
+
+            # Eq. (A17) and (A19)
+            J1 = 1 + _cJ[0] * Theta_2 + _cJ[1] * Theta_2**2 + _cJ[2] * Theta_e**7
+            J2 = (
+                1
+                + (_cJ[0] - PI_SQR / 6) * Theta_2
+                + _cJ[3] * Theta_2**2
+                + _cJ[4] * Theta_e**6
+                + (3 * SQRT_TWO * _cJ[2] / (4 * SQRT_PI)) * Theta_e**7.5
+                + (3 * _cJ[2] / 4) * Theta_e**9
             )
-            K = (1.0 + Theta_2 * (_cK[0] + Theta_2 * (_cK[1] + Theta_2 * Theta_e * _cK[2]))) / (
-                1.0
-                + Theta_2
-                * (
-                    (_cK[0] - 0.75 * PI_SQR)
-                    + Theta_2
-                    * (
-                        _cK[3]
-                        + Theta_e
-                        * Theta_2
-                        * (_cK[4] - Theta_e**1.5 * 0.125 * _cK[2] * (7.0 / SQRT_HALF_PI + 3.0 * Theta_e**1.5))
-                    )
-                )
+            J = J1 / J2
+
+            # Eq. (A18) and (A20)
+            K1 = 1 + _cK[0] * Theta_2 + _cK[1] * Theta_2**2 + _cK[2] * Theta_e**7
+            K2 = (
+                1
+                + (_cK[0] - 3 * PI_SQR / 4) * Theta_2
+                + _cK[3] * Theta_2**2
+                + _cK[4] * Theta_e**7
+                - (7 * SQRT_TWO * _cK[2] / (8 * SQRT_PI)) * Theta_e**8.5
+                - (3 * _cK[2] / 8) * Theta_e**10
             )
-            Theta_3 = Theta_e**3
+            K = K1 / K2
+            # Un-normalized Fermi-Dirac integrals
             Im0p5 = SQRT_PI * F_m0p5
             Ip1p5 = fdi(j=+1.5, eta=eta, normalize=False)
             Ip2p5 = fdi(j=+2.5, eta=eta, normalize=False)
+
+            # Eq. (A12)
             b10 = 1.5 * sqrt_Theta_e * Im0p5 * a8
-            b8 = sqrt_Theta_e * (1.5 * Im0p5 * a6 - 0.5 * Theta_2 * Ip1p5 * b10)
-            b6 = sqrt_Theta_e * (1.5 * Im0p5 * a4 - 0.5 * Theta_2 * Ip1p5 * b8 - 0.3 * Theta_3 * Ip2p5 * b10)
-            b2 = a2 + J / (1.5 * sqrt_Theta_e * Im0p5)
-            b4 = b2**2 - a2 * b2 + a4 + 2.0 * K / (15.0 * sqrt_Theta_e * Im0p5)
+            # Eq. (A13)
+            b8 = 1.5 * sqrt_Theta_e * Im0p5 * a6 - 0.5 * Theta_e**2.5 * Ip1p5 * b10
+            # Eq. (A14)
+            b6 = (
+                sqrt_Theta_e * 1.5 * Im0p5 * a4 - 0.5 * Theta_e**2.5 * Ip1p5 * b8 - 3 / 10 * Theta_e**3.5 * Ip2p5 * b10
+            )
+            # Eq. (A15)
+            b2 = a2 + 2 * J / (3 * sqrt_Theta_e * Im0p5)
+            # Eq. (A16)
+            b4 = b2**2 - a2 * b2 + a4 + 2 * K / (15 * sqrt_Theta_e * Im0p5)
+
             x2 = x * x
-            u = 1.0 + x2 * (a2 + x2 * (a4 + x2 * (a6 + x2 * a8)))
-            v = 1.0 + x2 * (b2 + x2 * (b4 + x2 * (b6 + x2 * (b8 + x2 * b10))))
+            # Eq. (4.8b)
+            u = 1 + a2 * x2 + a4 * x**4 + a6 * x**6 + a8 * x**8
+            v = 1 + b2 * x2 + b4 * x**4 + b6 * x**6 + b8 * x**8 + b10 * x**10
+            # Eq. (4.8a)
             return x * u / v
 
         exp_arg_pos = eta - (w + q) ** 2
         exp_arg_neg = eta - (w - q) ** 2
+
         imag_part = SQRT_PI * (log1pexp(exp_arg_pos) - log1pexp(exp_arg_neg))
+        # Eq. (4.6)
         delta_F = phi_function(w0 + q0) - phi_function(w0 - q0)
         real_part = -2.0 * F_m0p5 * delta_F / sqrt_Theta_e
+
         prefactor = self.state.free_electron_number_density / (BOLTZMANN_CONSTANT * self.state.electron_temperature)
         pol_func = prefactor * (real_part + 1.0j * imag_part) / (4.0 * F_p0p5 * q)
 
