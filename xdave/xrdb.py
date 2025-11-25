@@ -212,7 +212,7 @@ def extract_atomic_data():
     print("Extracting data from PDF...")
     data = scrape_pdf_with_symbol(tmp_path)
 
-    output_file = "/home/bellen85/code/dev/xdave/xdave/data/atomic_data_new.csv"
+    output_file = os.path.dirname(__file__) + "/data/atomic_data_new.csv"
     with open(output_file, "w", newline="") as f:
         writer = csv.DictWriter(f, fieldnames=["atomic_number", "symbol", "atomic_mass", "density"])
         writer.writeheader()
