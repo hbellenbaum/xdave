@@ -1,0 +1,130 @@
+
+================================================================================================================
+MCSS was run on 30-10-2025 at 09:25 using the deck file: decks/mcss_run_ch_T=80.00_rho=3.50_ZC=3.0_angle=75.deck
+================================================================================================================
+
+ ========================================
+  .##.....##..######...######...######.. 
+  .###...###.##....##.##....##.##....##. 
+  .####.####.##.......##.......##....... 
+  .##.###.##.##........######...######.. 
+  .##.....##.##.............##.......##. 
+  .##.....##.##....##.##....##.##....##. 
+  .##.....##..######...######...######.. 
+ ========================================
+  Multi-Component Scattering Simulation  
+ ========================================
+
+ Written and maintained by D. A. Chapman (AWE)
+ Tel: +44 (0)1189 856097                      
+ Email: david.chapman@awe.co.uk               
+
+================================================================================================================
+The parameters entered in the deck file are listed below. Copy this region (without headers/borders) to be able
+to re-run this calcualtion if the deck file has been deleted/lost/over-written.:
+================================================================================================================
+
+$SETUP
+  mode_of_operation = "XRTS_SPECTRAL"
+  number_of_ions =          3
+$END
+$FILE
+  output_file_name = "/home/bellen85/code/dev/xdave/mcss_tests/ch_runs_T=80.00_rho=3.50/mcss_run_ch_T=80.00_rho=3.50_ZC=3.0_angle=75.csv"
+  status_file_name = "/home/bellen85/code/dev/xdave/mcss_tests/ch_runs_T=80.00_rho=3.50/mcss_run_ch_T=80.00_rho=3.50_ZC=3.0_angle=75_status.txt"
+$END
+$PLASMA
+  use_mean_charge_states = .FALSE.
+  atomic_number =  1.0000000E+000,  6.0000000E+000,  6.0000000E+000
+  ionization_state =  1.0000000E+000,  3.0000000E+000,  3.0000000E+000
+  density_fraction =  2.0000000E-001,  0.0000000E+000,  8.0000000E-001
+  atomic_mass = -1.0000000E+000, -1.0000000E+000, -1.0000000E+000
+  mass_density =  3.5000000E+000
+  elec_temperature =  8.0000000E+001
+  ion_temperature =  8.0000000E+001
+  temperature =  8.0000000E+001
+  elec_flow_along_k =  0.0000000E+000
+  ion_flow_along_k =  0.0000000E+000
+  bulk_flow_along_k =  0.0000000E+000
+$END
+$PROBE
+  probe_energy =  2.0000000E+004
+  probe_wavelength = -1.0000000E+000
+  source_func_shape = "GAUSSIAN"
+  source_func_fwhm_ev =  1.0000000E+000
+  source_func_fwhm_nm = -1.0000000E+000
+  use_source_func_data = .FALSE.
+  source_func_file_name = "default"
+$END
+$DETECTOR
+  scattering_angle =  7.5000000E+001
+  number_of_points =      16000
+  min_scat_energy =  1.6000000E+004
+  max_scat_energy =  2.4000000E+004
+  min_scat_wavelength = -1.0000000E-009 nm
+  max_scat_wavelength = -1.0000000E-009 nm
+  number_of_angles =          1
+  min_scat_angle =  7.5000000E+001
+  max_scat_angle =  7.5000000E+001
+  angle_dist_fwhm = -1.0000000E+000
+  angle_dist_power =  2.0000000E+000
+  use_angle_dist_data = .FALSE.
+  angle_dist_file_name = "default"
+$END
+$MODELS
+  ee_pol_func_model = "NUMERICAL_RPA"
+  user_defined_vei = (-1.0000000E+000,  0.0000000E+000)
+  ee_lfc_model = "NONE"
+  user_defined_Gee = ( 0.0000000E+000,  0.0000000E+000)
+  bf_dsf_model = "IMPULSE_SCHUMACHER"
+  calculate_rk_factor = .FALSE.
+  user_defined_rk =  1.0000000E+000
+  ipd_model = "NONE"
+  user_defined_ipd = -1.0000000E+000
+  use_ideal_wr = .FALSE.
+  ideal_peak_ratio = -1.0000000E+000
+  calibration_energy = -1.0000000E+000
+  user_defined_wr = -1.0000000E+000
+  ii_potential_model = "DEBYE_HUCKEL"
+  srr_sigma_parameter = -1.0000000E+004, -1.0000000E+004, -1.0000000E+004
+  srr_core_power = -1.0000000E+000, -1.0000000E+000, -1.0000000E+000
+  ion_core_radius =  4.0000000E+001, -1.0000000E+000, -1.0000000E+000
+  csd_gamma_parameter = -1.0000000E+000, -1.0000000E+000, -1.0000000E+000
+  csd_core_charge = -1.0000000E+000, -1.0000000E+000, -1.0000000E+000
+  screen_cloud_model = "FINITE_WAVELENGTH"
+  ei_potential_model = "EFFECTIVE_COULOMB"
+  sec_core_power =  6.0000000E+000, -1.0000000E+000, -1.0000000E+000
+$END
+
+================================================================================================================
+The following plasma properties were calculated:
+================================================================================================================
+
+  The target composition is:         20.         0% H(         1+) +         80.         0% C(         3+)
+  The free electron density is:  5.5865163E+023 /cc
+  The screening length is:  9.0829238E-002 nm
+  The plasma frequency is:  4.2165966E+016 Hz
+  The mean ionization state is:  2.6000000E+000
+  The electron chemical potential is: -1.9965713E+000
+  The electron degeneracy parameter is:  2.5864566E-001
+  The electron coupling parameter is:  1.5526778E-001
+  The ion coupling parameters are:  6.7753328E-002,             NaN,  9.6796871E-001
+  The scattering parameter is:  8.9218323E-002
+  The approximate wave number is:  6.5301237E+000 1/aB
+  The compton energy is:  5.8018090E+002 eV
+  The plasmon energy is:  5.3526616E+002 eV
+  The IPD energy shift is:  0.0000000E+000 eV
+
+================================================================================================================
+The following messages were generated by the code during the run:
+================================================================================================================
+
+MCSS is running in spectrally resolved XRTS mode with          3 ion species
+
+  Calculating inelastic scattering profile...Done.
+  Convolving inelastic scattering profile with source/instrument function...Done.
+  Calculating the weight of the Rayleigh peak...Done.
+  Convolving elastic scattering profile with source/instrument function...Done.
+
+The calculated weight of the Rayleigh feature is:  1.1510287E+000
+
+Writing MCSS output to file: /home/bellen85/code/dev/xdave/mcss_tests/ch_runs_T=80.00_rho=3.50/mcss_run_ch_T=80.00_rho=3.50_ZC=3.0_angle=75.csv

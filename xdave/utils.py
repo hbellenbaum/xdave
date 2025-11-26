@@ -105,6 +105,19 @@ def load_mcss_result_ar(filename, use_lfc_model=False):
     return k, WR, f1, f2, q1, q2, S11, S12, S22, lfc
 
 
+def load_mcss_result_ar_3species(filename, use_lfc_model=False):
+    if use_lfc_model:
+        _, k, _, WR, f1, f2, f3, q1, q2, q3, S11, S13, S12, S22, S23, S33, lfc = np.genfromtxt(
+            filename, skip_header=1, delimiter=",", unpack=True
+        )
+    else:
+        _, k, _, WR, f1, f2, f3, q1, q2, q3, S11, S13, S12, S22, S23, S33 = np.genfromtxt(
+            filename, skip_header=1, delimiter=",", unpack=True
+        )
+        lfc = np.zeros_like(k)
+    return k, WR, f1, f2, f3, q1, q2, q3, S11, S13, S12, S22, S23, S33, lfc
+
+
 def get_mcss_wr_from_status_file(status_file):
     WR_message = "The calculated weight of the Rayleigh feature is:"
     # status_file = os.path.join(status_file)
