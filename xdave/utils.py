@@ -93,6 +93,18 @@ def load_mcss_result(filename):
     return En[::-1], wff[::-1], wbf[::-1], ff, bf, el
 
 
+def load_mcss_result_ar(filename, use_lfc_model=False):
+    # Note: this only works for two-component systems
+    if use_lfc_model:
+        _, k, _, WR, f1, f2, q1, q2, S11, S12, S22, lfc = np.genfromtxt(
+            filename, skip_header=1, delimiter=",", unpack=True
+        )
+    else:
+        _, k, _, WR, f1, f2, q1, q2, S11, S12, S22 = np.genfromtxt(filename, skip_header=1, delimiter=",", unpack=True)
+        lfc = np.zeros_like(k)
+    return k, WR, f1, f2, q1, q2, S11, S12, S22, lfc
+
+
 def get_mcss_wr_from_status_file(status_file):
     WR_message = "The calculated weight of the Rayleigh feature is:"
     # status_file = os.path.join(status_file)
@@ -230,13 +242,12 @@ def get_atomic_data_for_all_elements(elements):
 
 def get_atomic_mass_for_element(e):
     """
-    Load data from atomic data in folder xdave/data. 
+    Load data from atomic data in folder xdave/data.
     """
     data_path = files("xdave") / "data" / "atomic_data.csv"
 
     ANs, elements, amus, _ = np.genfromtxt(
         data_path,
-
         delimiter=",",
         skip_header=1,
         dtype=None,

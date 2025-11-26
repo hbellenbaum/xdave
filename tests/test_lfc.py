@@ -1,11 +1,7 @@
-import sys
-
-sys.path.insert(1, "./mcss_tests")
-
 from xdave.constants import BOHR_RADIUS
 from xdave.unit_conversions import g_per_cm3_TO_kg_per_m3, eV_TO_K, per_m3_TO_per_cm3
 from xdave.plasma_state import PlasmaState, get_rho_T_from_rs_theta
-from run_mcss_sim import run_c_ar_mode
+from xdave.utils import load_mcss_result_ar
 
 from xdave.lfc import LFC
 
@@ -101,15 +97,14 @@ def test_ui_gv_mcss():
         models=models,
     )
 
-    k_UI, WR, f1, f2, q1, q2, S11, S12, S22, lfc_UI = run_c_ar_mode(
-        T=T1, rho=rho, Z=Z, lfc_model="STATIC_UTSUMI_ICHIMARU"
-    )
-    k_GV, WR, f1, f2, q1, q2, S11, S12, S22, lfc_GV = run_c_ar_mode(
-        T=T1, rho=rho, Z=Z, lfc_model="STATIC_GELDART_VOSKO"
-    )
-    k_interp, WR, f1, f2, q1, q2, S11, S12, S22, lfc_interp = run_c_ar_mode(
-        T=T1, rho=rho, Z=Z, lfc_model="STATIC_INTERP"
-    )
+    data_dir = os.path.dirname(__file__) + "/comparison_data/lfc/mcss_tests"
+    assert os.path.exists(data_dir), f"Data folder cannot be found. Check your paths."
+    fn_UI = os.path.join(data_dir, f"mcss_ar_run_c_T=20.00_rho=0.42_Z=2_model=STATIC_UTSUMI_ICHIMARU.csv")
+    fn_GV = os.path.join(data_dir, f"mcss_ar_run_c_T=20.00_rho=0.42_Z=2_model=STATIC_GELDART_VOSKO.csv")
+    fn_interp = os.path.join(data_dir, f"mcss_ar_run_c_T=20.00_rho=0.42_Z=2_model=STATIC_INTERP.csv")
+    k_UI, WR, f1, f2, q1, q2, S11, S12, S22, lfc_UI = load_mcss_result_ar(fn_UI, use_lfc_model=True)
+    k_GV, WR, f1, f2, q1, q2, S11, S12, S22, lfc_GV = load_mcss_result_ar(fn_GV, use_lfc_model=True)
+    k_interp, WR, f1, f2, q1, q2, S11, S12, S22, lfc_interp = load_mcss_result_ar(fn_interp, use_lfc_model=True)
 
     THIS_DIR = os.path.dirname(__file__)
     datT1 = np.genfromtxt(
@@ -135,6 +130,7 @@ def test_ui_gv_mcss():
     plt.plot(ks1 * BOHR_RADIUS, lfcs1_ui, label="UI", c="purple", ls="-.")
     plt.plot(k_UI, lfc_UI, label="MCSS: UI", c="purple", ls="solid")
     plt.plot(k_GV, lfc_GV, label="MCSS: GV", c="crimson", ls="solid")
+    plt.plot(k_interp, lfc_interp, label="MCSS: Interp", c="navy", ls="solid")
     plt.legend()
     plt.show()
 
@@ -478,7 +474,6 @@ def test_gv():
 
         fn = os.path.join(os.path.dirname(__file__), f"./mcss_tests/mcss_outputs_lfc/lfc=gv_rs={rs:.0f}_theta=1.csv")
         dat = np.genfromtxt(fn, delimiter=",", skip_header=1)
-        # plt.plot(ks / kF, lfcs, label=f"rs={rs}", ls="-.", c=c)
         plt.plot(ks / kF, lfcs_iu, label=f"GV: rs={rs}", ls=":", c=c)
         plt.plot(dat[:, 0], dat[:, -1], label=f"MCSS, rs={rs}", ls="solid", c=c)
 
@@ -490,8 +485,8 @@ def test_gv():
 
 
 if __name__ == "__main__":
-    test()
-    # test_ui_gv_mcss()
+    # test()
+    test_ui_gv_mcss()
     # test_gv()
     # test_gregori_2007()
     # test_fortmann_2010()
