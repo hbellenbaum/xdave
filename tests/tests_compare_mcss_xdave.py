@@ -18,9 +18,6 @@ from datetime import datetime
 
 THIS_DIR = os.path.dirname(__file__)
 
-mcss_dir = "~/code/mcss/mcss_ndtt/pro/mcss"
-mcss_executable = "mcss_60"  # "mcss_ndtt"  'mcss_51'
-
 
 def compare_mcss_xdave_be():
     T = 155.5  # eV

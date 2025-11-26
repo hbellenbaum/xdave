@@ -1,10 +1,8 @@
 from xdave.unit_conversions import (
-    amu_TO_kg,
     eV_TO_K,
     kg_per_m3_TO_g_per_cm3,
     g_per_cm3_TO_kg_per_m3,
     J_TO_eV,
-    eV_TO_J,
     K_TO_eV,
 )
 from xdave.ipd import get_ipd
