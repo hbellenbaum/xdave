@@ -61,7 +61,8 @@ def test_bf_mcss():
         dsf_tr = kernel.get_dsf(ZA=1, Zb=1, Eb=EB, w=omega_array, k=k, model="TRUNCATED_IA")
 
         En, wff, wbf, ff, bf, el = load_mcss_result(
-            filename=f"./mcss_tests/mcss_outputs_model=IA/mcss_bf_test_angle={angle:0.0f}.csv"
+            filename=os.path.dirname(__file__)
+            + f"/comparison_data/bf_dsf/mcss_test/mcss_bf_test_angle={angle:0.0f}.csv"
         )
         ax.plot(
             omega_array * J_TO_eV,
