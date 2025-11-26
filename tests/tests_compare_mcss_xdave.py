@@ -444,37 +444,6 @@ def compare_mcss_xdave_ch_static_partialZC():
     q = calculate_q(angle=angle, energy=beam_energy)
     ZC1, ZC2, xC1, xC2 = get_fractions_from_Z_partial(Z=ZC, x0=xH)
 
-    (
-        k_mcss,
-        WR_mcss,
-        f1_mcss,
-        f2_mcss,
-        f3_mcss,
-        q1_mcss,
-        q2_mcss,
-        q3_mcss,
-        S11_mcss,
-        S13_mcss,
-        S12_mcss,
-        S22_mcss,
-        S23_mcss,
-        S33_mcss,
-    ) = run_ch_ar_mode3(
-        T=T,
-        rho=rho,
-        xH=xH,
-        xC1=xC1,
-        xC2=xC2,
-        ZH=ZH,
-        ZC=ZC,
-        ZC1=ZC1,
-        ZC2=ZC2,
-        angle=angle,
-        user_defined_ipd=0.0,
-        user_defined_lfc=0.0,
-        plot=False,
-    )
-
     fn = os.path.join(
         os.path.dirname(__file__),
         f"comparison_data/mcss_comparisons/ch_ar_runs_T={T:.2f}_rho={rho:.2f}/mcss_ar_run_ch_T={T:.2f}_rho={rho:.2f}_ZC={ZC}.csv",
