@@ -1,32 +1,23 @@
-import sys
-
-# sys.path.insert(1, "./xdave")
-sys.path.insert(1, "./mcss_tests")
-
-
-from xdave.plasma_state import PlasmaState, get_rho_T_from_rs_theta, get_fractions_from_Z, get_rho_T_from_rs_theta_SI
+from xdave import xDave
 from xdave.models import ModelOptions
 from xdave.unit_conversions import *
-from xdave.constants import BOHR_RADIUS, PLANCK_CONSTANT, ELECTRON_MASS
-from xdave.freefree_dsf import FreeFreeDSF
-from xdave.boundfree_dsf import BoundFreeDSF
-from xdave.utils import calculate_angle, calculate_q, load_itcf_from_file, load_mcss_result, get_mcss_wr_from_status_file
+from xdave.constants import BOHR_RADIUS
+from xdave.utils import (
+    calculate_angle,
+    load_mcss_result,
+    get_mcss_wr_from_status_file,
+)
 from xdave.xdave import xDave
 import scipy.stats as stats
 
 import numpy as np
 import matplotlib.pyplot as plt
-from scipy.signal import fftconvolve
-
-
-def test_full_spectrum():
-    return
 
 
 def test_setup():
     elements = np.array(["H", "H", "C", "C"])
-    rho = 1  # * g_per_cm3_TO_kg_per_m3
-    T = 70  # * eV_TO_K
+    rho = 1  # g/cc
+    T = 70  # eV
 
     partial_densities = np.array([0.15, 0.15, 0.34, 0.36])
     charge_states = np.array([0.0, 1.0, 3, 4])
@@ -71,7 +62,6 @@ def test_setup():
     ax.plot(omega_array, ff_tot, label="FF")
     ax.plot(omega_array, dsf, label="Tot")
     ax.plot(mcss_En, (mcss_wbf + mcss_wff) / mcss_norm, lw=2, ls="dashed", c="black", label="MCSS")
-    # ax.plot(mcss_En, (mcss_wbf + mcss_wff), lw=2, c="black", ls="dashed", label="MCSS")
     ax.legend()
 
     ax = axes[1, 0]
@@ -82,7 +72,6 @@ def test_setup():
     ax.plot(omega_array, ff_i[3], label="C4: FF")
     ax.plot(omega_array, ff_tot, label="Tot FF")
     ax.plot(mcss_En, mcss_wff / mcss_norm, lw=2, c="black", ls="dashed", label="MCSS")
-    # ax.plot(mcss_En, mcss_wff, lw=2, c="black", ls="solid", label="MCSS")
     ax.legend()
 
     ax = axes[1, 1]
@@ -117,92 +106,46 @@ def test_setup():
     fig.savefig(f"ch_test_T={T}_rho={rho}_Z={kernel.overlord_state.charge_state}.pdf", dpi=200)
 
 
-def test_be():
-    rs = 3
-    theta = 1
-    Z_mean = 3.73
-    rho = 22.0  # g/cc
-    T = 150  # eV
+def test_mc_setup():
+    # Random black Kapton example
+    T = 45  # eV
+    rho = 2 * 1.42  # g/cc
 
-    beam_energy = 9.0e3  # eV
-    angles = np.array([13, 30, 45, 60, 80, 100, 120, 140, 160])
-    ks = calculate_q(angle=angles, energy=beam_energy) / BOHR_RADIUS  # 1/a_B
-    omega_array = np.linspace(-800, 1400, 1000)  # eV
+    partial_densities = np.array([0.026362, 0.691133, 0.073270, 0.209235])
+    charge_states = np.array([1, 4, 4, 4])
+    elements = np.array(["H", "C", "N", "O"])
 
-    # WR = 0.1
+    models = ModelOptions()
 
-    models = ModelOptions(
-        polarisation_model="NUMERICAL", bf_model="SCHUMACHER", lfc_model="DORNHEIM_ESA", ipd_model="STEWART_PYATT"
-    )
-    Z1, Z2, x1, x2 = get_fractions_from_Z(Z=Z_mean)
-    xs = np.array([x1, x2])
+    user_defined_inputs = {
+        "ipd": -10,
+        "lfc": 0.1,
+        "ion_core_radii": [1, 1, 1, 1],
+        "csd_parameters": [1, 1, 1, 1],
+        "csd_core_charges": [1, 6, 7, 8],
+        "sec_core_power": 0.1,
+        "srr_sigma_parameter": 1,
+    }
 
-    elements = np.array(["Be", "Be"])
-    charge_states = np.array([Z1, Z2])
-
-    user_defined_inputs = {"ipd": 0.0, "lfc": 1.0, "ion_core_radii": np.array([2.0, 2.0])}
-
-    xdave = xDave(
-        models=models,
+    kernel = xDave(
+        mass_density=rho,
         electron_temperature=T,
         ion_temperature=T,
-        mass_density=rho,
         elements=elements,
-        partial_densities=xs,
+        partial_densities=partial_densities,
         charge_states=charge_states,
+        models=models,
         user_defined_inputs=user_defined_inputs,
     )
+    models.print_default_options()
+    print(f"Initialized kernel with states:\n")
+    print(f"Overlord state: {vars(kernel.overlord_state)}")
 
-    k = 8 / A_TO_aB
-    q = k  # 1/ aB
-
-    bf_tot, ff_tot, dsf, WR, _, _ = xdave.run(k=k, w=omega_array)
-    ff_tot[np.isnan(ff_tot)] = 0.0
-
-    print(f"Calculate Rayleigh weight: {WR}")
-
-    fig, axes = plt.subplots(1, 2, figsize=(14, 10))
-
-    ax = axes[0]
-    ax.plot(omega_array, bf_tot, label="BF")
-    ax.plot(omega_array, ff_tot, label="FF")
-    ax.plot(omega_array, dsf, label="Tot")
-    ax.legend()
-
-    sif = stats.norm.pdf(omega_array, 0, 2)
-    sif /= np.max(sif)
-
-    spectrum_energy, spectrum = xdave.convolve_with_sif(
-        # source=sif,
-        # source_ene=omega_array,
-        omega=omega_array,
-        dsf=(bf_tot + ff_tot),
-        Wr=WR,
-        beam_energy=beam_energy,
-        type="GAUSSIAN",
-        fwhm=10,
-    )
-
-    ax = axes[1]
-    # ax.plot(omega_array, inelastic / np.max(spectrum), label="inel", ls="-.")
-    # ax.plot(omega_array, elastic / np.max(spectrum), label="el", ls="-.")
-    ax.plot(spectrum_energy, spectrum / np.max(spectrum), label="tot", ls="-.")
-    ax.legend()
-    # ax.set_xlim(-800, 750)
-
-    plt.show()
-    fig.savefig(f"beryllium_test_rs={rs}_theta={theta}_Z={Z_mean}_q={q:.2f}.pdf", dpi=200)
+    for i in range(0, len(kernel.states)):
+        print(f"State {i}: {vars(kernel.states[i])}")
 
 
 if __name__ == "__main__":
-
-    #     ##TODO(Hannah):
-    #     ## check that the mass density and number of electrons is being handled correctly across all states
-    #     ## compare against MCSS and PIMC for this set of conditions
-    #     ## Add IPD model: DONE
-    #     ## Clean up bf call (arguments are a bit messy): DONE
-    #     ## Start calculating things like kF, EF, omega_p, etc. for the plasma state upon initialisation to avoid extra computation
-    #     ## Start timing and looking at how much this scales with number of points
-    #     ## I should move away from defining states by their mass density (problematic when you have mixed species) and just look at electron number density... probably a lot easier to split up: STILL THINKING ABOUT THIS
     # test_setup()
-    test_be()
+    # test_be()
+    test_mc_setup()

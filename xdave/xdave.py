@@ -81,7 +81,7 @@ class xDave:
             self.ipd_eV = user_defined_inputs["ipd"] if "ipd" in keys else None
             self.user_defined_lfc = user_defined_inputs["lfc"] if "lfc" in keys else None
             self.ion_core_radii = (
-                user_defined_inputs["ion_core_radii"] * BOHR_RADIUS
+                np.array(user_defined_inputs["ion_core_radii"]) * BOHR_RADIUS
                 if "ion_core_radii" in keys
                 else np.full(self.number_of_states, None)
             )
