@@ -28,9 +28,6 @@ def compare_mcss_xdave_be():
     q = calculate_q(angle=angle, energy=beam_energy)
     print(f"Running at q={q:.3f}")
 
-    # En_mcss, wff_mcss, wbf_mcss, ff_mcss, bf_mcss, el_mcss, WR_mcss = run_be_sr_mode(
-    #     T=T, rho=rho, Z=Z, angle=angle, user_defined_ipd=0.0, user_defined_lfc=0.0, plot=False
-    # )
     fn = os.path.join(
         os.path.dirname(__file__),
         f"comparison_data/mcss_comparisons/be_runs_T={T:.2f}_rho={rho:.2f}/mcss_run_be_T={T:.2f}_rho={rho:.2f}_Z={Z}_angle={angle:.0f}.csv",
