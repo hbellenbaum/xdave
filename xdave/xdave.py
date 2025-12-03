@@ -168,7 +168,7 @@ class xDave:
             amu = atomic_masses[i] / ATOMIC_MASS_UNIT  # this is also dumb!
             amu_mean += x * amu
             binding_energies = get_binding_energies_from_element(AN, Z)
-            print("DEBUG xdave", binding_energies)
+            
             state = PlasmaState(
                 electron_temperature=self.electron_temperature,
                 ion_temperature=self.ion_temperature,

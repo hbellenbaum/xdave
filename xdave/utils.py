@@ -253,6 +253,9 @@ def get_binding_energies_from_element(AN, Z):
 
     N_bind_enes = 12
 
+    if Z == AN:
+        return -np.zeros(N_bind_enes, dtype=np.float64)
+
     try:
         these_bind_enes = binding_energies[AN][Z]
         bind_enes = np.zeros(N_bind_enes, dtype=np.float64)
