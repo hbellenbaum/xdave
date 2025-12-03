@@ -124,6 +124,233 @@ def test_ei_potentials():
     plt.show()
 
 
+def update_ii_files_k(ks, coulomb, yukawa, dh, csd, kelbg, deutsch, fn):
+    arr = np.array([ks, coulomb, yukawa, dh, csd, kelbg, deutsch]).T
+    np.savetxt(fn, arr, header="k Coulomb Yukawa DH CSD Kelbg Deutsch")
+    print(f"Updating ii potentials in k-space: file={fn}")
+
+
+def update_ii_files_r(rs, coulomb, yukawa, dh, srr, csd, kelbg, deutsch, fn):
+    arr = np.array([rs, coulomb, yukawa, dh, srr, csd, kelbg, deutsch]).T
+    np.savetxt(fn, arr, header="r Coulomb Yukawa DH SRR CSD Kelbg Deutsch")
+    print(f"Updating ii potentials in r-space: file={fn}")
+
+
+def test_ii_version():
+    """
+    Comparing the ion-ion potentials against a previous version to track changes.
+    """
+    n = 8192
+    r0 = 0.5e-1 * BOHR_RADIUS  # [m]
+    rf = 1.0e2 * BOHR_RADIUS  # [m]
+    dr = (rf - r0) / n
+    dk = np.pi / (n * dr)  # [1/m] as it should be [1/m],
+    kf = r0 + n * dk
+    rs = np.linspace(r0, rf, n)  # [m]
+    ks = np.linspace(r0, kf, n)  # [1/m]
+    Ti = 2 * eV_TO_K
+    rho = 6.2 * g_per_cm3_TO_kg_per_m3  # g/cc
+
+    Zi = 3
+    atomic_weight = 26.9815384 * amu_TO_kg
+    ni = rho / atomic_weight
+    Rii = (3 / (4 * np.pi * ni)) ** (1 / 3)
+
+    kappa_e = 1.24 / BOHR_RADIUS
+    gamma_ii = 0.2 / BOHR_RADIUS
+    ion_core_radius = 1 * ang_TO_m
+    sigma_ii = 3.5
+    sec_power = 6
+    alpha = 2 / Rii
+
+    print(f"\nTesting potentials in r-space")
+
+    test_dh = debye_huckel_r(Qa=Zi, Qb=Zi, r=rs, alpha=gamma_ii, kappa_e=kappa_e)
+    test_coulomb = coulomb_r(Qa=Zi, Qb=Zi, r=rs)
+    test_csd = charge_switching_debye_r(
+        Qa=Zi,
+        Qb=Zi,
+        r=rs,
+        csd_parameter_a=gamma_ii,
+        csd_parameter_b=gamma_ii,
+        csd_core_charge_a=13,
+        csd_core_charge_b=13,
+        kappa_e=kappa_e,
+    )
+    test_srr = short_range_screening_r(
+        Qa=Zi,
+        Qb=Zi,
+        r=rs,
+        Ti=Ti,
+        alpha=alpha,
+        srr_core_power=sec_power,
+        ion_core_radius=ion_core_radius,
+        srr_sigma=sigma_ii,
+        kappa_e=kappa_e,
+    )
+    test_yukawa = yukawa_r(Qa=Zi, Qb=Zi, r=rs, alpha=alpha)
+    test_kelbg = kelbg_r(Qa=Zi, Qb=Zi, r=rs, alpha=alpha)
+    test_deutsch = deutsch_r(Qa=Zi, Qb=Zi, r=rs, alpha=alpha)
+
+    output_dir = os.path.join(os.path.dirname(__file__), "xdave_results/potentials")
+    if not os.path.exists(output_dir):
+        os.mkdir(output_dir)
+
+    fn = os.path.join(
+        output_dir,
+        f"ii_potentials_r-space_results_T={Ti/eV_TO_K:.0f}_rho={rho/g_per_cm3_TO_kg_per_m3:.0f}_Zi={Zi}.csv",
+    )
+    # update_ii_files_r(rs, test_coulomb, test_yukawa, test_dh, test_srr, test_csd, test_kelbg, test_deutsch, fn)
+    res = np.genfromtxt(fn, delimiter=" ", skip_header=1)
+
+    if not np.isclose(test_coulomb, res[:, 1]).all():
+        print(f"Coulomb model has failed test.")
+    if not np.isclose(test_yukawa, res[:, 2]).all():
+        print(f"Yukawa model has failed test.")
+    if not np.isclose(test_dh, res[:, 3]).all():
+        print(f"Debye-Huckel model has failed test.")
+    if not np.isclose(test_srr, res[:, 4]).all():
+        print(f"SRR model has failed test.")
+    if not np.isclose(test_csd, res[:, 5]).all():
+        print(f"CSD model has failed test.")
+    if not np.isclose(test_kelbg, res[:, 6]).all():
+        print(f"Kelbg model has failed test.")
+    if not np.isclose(test_deutsch, res[:, 7]).all():
+        print(f"Deutsch model has failed test.")
+
+    print(f"\nTesting potentials in k-space")
+    test_dh = debye_huckel_k(Qa=Zi, Qb=Zi, k=ks, alpha=gamma_ii, kappa_e=kappa_e)
+    test_coulomb = coulomb_k(Qa=Zi, Qb=Zi, k=ks)
+    test_csd = charge_switching_debye_k(
+        Qa=Zi,
+        Qb=Zi,
+        k=ks,
+        alpha=alpha,
+        csd_parameter_a=gamma_ii,
+        csd_parameter_b=gamma_ii,
+        csd_core_charge_a=13,
+        csd_core_charge_b=13,
+        kappa_e=kappa_e,
+    )
+
+    test_yukawa = yukawa_k(Qa=Zi, Qb=Zi, k=ks, alpha=alpha)
+    test_kelbg = kelbg_k(Qa=Zi, Qb=Zi, k=ks, alpha=alpha)
+    test_deutsch = deutsch_k(Qa=Zi, Qb=Zi, k=ks, alpha=alpha)
+
+    output_dir = os.path.join(os.path.dirname(__file__), "xdave_results/potentials")
+    if not os.path.exists(output_dir):
+        os.mkdir(output_dir)
+
+    fn = os.path.join(
+        output_dir,
+        f"ii_potentials_k-space_results_T={Ti/eV_TO_K:.0f}_rho={rho/g_per_cm3_TO_kg_per_m3:.0f}_Zi={Zi}.csv",
+    )
+    # update_ii_files_k(ks, test_coulomb, test_yukawa, test_dh, test_csd, test_kelbg, test_deutsch, fn)
+    res = np.genfromtxt(fn, delimiter=" ", skip_header=1)
+
+    if not np.isclose(test_coulomb, res[:, 1]).all():
+        print(f"Coulomb model has failed test.")
+    if not np.isclose(test_yukawa, res[:, 2]).all():
+        print(f"Yukawa model has failed test.")
+    if not np.isclose(test_dh, res[:, 3]).all():
+        print(f"Debye-Huckel model has failed test.")
+    if not np.isclose(test_csd, res[:, 4]).all():
+        print(f"CSD model has failed test.")
+    if not np.isclose(test_kelbg, res[:, 5]).all():
+        print(f"Kelbg model has failed test.")
+    if not np.isclose(test_deutsch, res[:, 6]).all():
+        print(f"Deutsch model has failed test.")
+
+
+def update_ei_files_k(ks, coulomb, yukawa, hc, sc, fn):
+    arr = np.array([ks, coulomb, yukawa, hc, sc]).T
+    np.savetxt(fn, arr, header="k Coulomb Yukawa Hard-core Soft-core")
+    print(f"Updating ei potentials in k-space: file={fn}")
+
+
+def update_ei_files_r(rs, coulomb, yukawa, fn):
+    arr = np.array([rs, coulomb, yukawa]).T
+    np.savetxt(fn, arr, header="r Coulomb Yukawa")
+    print(f"Updating ei potentials in r-space: file={fn}")
+
+
+def test_ei_version():
+    """
+    Comparing the electron-ion potentials against a previous version to track changes.
+    """
+    n = 8192
+    r0 = 0.5e-1 * BOHR_RADIUS  # [m]
+    rf = 1.0e2 * BOHR_RADIUS  # [m]
+    dr = (rf - r0) / n
+    dk = np.pi / (n * dr)  # [1/m] as it should be [1/m],
+    kf = r0 + n * dk
+    rs = np.linspace(r0, rf, n)  # [m]
+    ks = np.linspace(r0, kf, n)  # [1/m]
+    Ti = 2 * eV_TO_K
+    rho = 6.2 * g_per_cm3_TO_kg_per_m3  # g/cc
+
+    Zi = 3
+    atomic_weight = 26.9815384 * amu_TO_kg
+    ni = rho / atomic_weight
+    Rii = (3 / (4 * np.pi * ni)) ** (1 / 3)
+
+    kappa_e = 1.24 / BOHR_RADIUS
+    gamma_ii = 0.2 / BOHR_RADIUS
+    ion_core_radius = 1 * ang_TO_m
+    sigma_ii = 3.5
+    sec_power = 6
+    alpha = 2 / Rii
+
+    print(f"\nTesting potentials in r-space")
+
+    test_coulomb = coulomb_r(Qa=Zi, Qb=Zi, r=rs)
+    test_yukawa = yukawa_r(Qa=Zi, Qb=Zi, r=rs, alpha=alpha)
+
+    output_dir = os.path.join(os.path.dirname(__file__), "xdave_results/potentials")
+    if not os.path.exists(output_dir):
+        os.mkdir(output_dir)
+
+    fn = os.path.join(
+        output_dir,
+        f"ei_potentials_r-space_results_T={Ti/eV_TO_K:.0f}_rho={rho/g_per_cm3_TO_kg_per_m3:.0f}_Zi={Zi}.csv",
+    )
+    # update_ei_files_r(rs, test_coulomb, test_yukawa, fn)
+    res = np.genfromtxt(fn, delimiter=" ", skip_header=1)
+
+    if not np.isclose(test_coulomb, res[:, 1]).all():
+        print(f"Coulomb model has failed test.")
+    if not np.isclose(test_yukawa, res[:, 2]).all():
+        print(f"Yukawa model has failed test.")
+
+    print(f"\nTesting potentials in k-space")
+    test_coulomb = coulomb_k(Qa=Zi, Qb=Zi, k=ks)
+    test_yukawa = yukawa_k(Qa=Zi, Qb=Zi, k=ks, alpha=alpha)
+    test_hc = hard_core_ei_k(Qa=Zi, Qb=-1, k=ks, sigma_c=sigma_ii)
+    test_sc = soft_core_ei_k(Qa=Zi, k=ks, rcore=ion_core_radius, n=sec_power, r=rs, dr=dr, dk=dk)
+
+    output_dir = os.path.join(os.path.dirname(__file__), "xdave_results/potentials")
+    if not os.path.exists(output_dir):
+        os.mkdir(output_dir)
+
+    fn = os.path.join(
+        output_dir,
+        f"ei_potentials_k-space_results_T={Ti/eV_TO_K:.0f}_rho={rho/g_per_cm3_TO_kg_per_m3:.0f}_Zi={Zi}.csv",
+    )
+    # update_ei_files_k(ks, test_coulomb, test_yukawa, test_hc, test_sc, fn)
+    res = np.genfromtxt(fn, delimiter=" ", skip_header=1)
+
+    if not np.isclose(test_coulomb, res[:, 1]).all():
+        print(f"Coulomb model has failed test.")
+    if not np.isclose(test_yukawa, res[:, 2]).all():
+        print(f"Yukawa model has failed test.")
+    if not np.isclose(test_sc, res[:, 4]).all():
+        print(f"Soft-core model has failed test.")
+    if not np.isclose(test_hc, res[:, 3]).all():
+        print(f"Hard-core model has failed test.")
+
+
 if __name__ == "__main__":
-    test_ii_potentials()
+    # test_ii_potentials()
     # test_ei_potentials()
+    # test_ii_version()
+    test_ei_version()
