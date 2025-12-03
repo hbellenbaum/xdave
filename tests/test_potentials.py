@@ -326,7 +326,7 @@ def test_ei_version():
     test_coulomb = coulomb_k(Qa=Zi, Qb=Zi, k=ks)
     test_yukawa = yukawa_k(Qa=Zi, Qb=Zi, k=ks, alpha=alpha)
     test_hc = hard_core_ei_k(Qa=Zi, Qb=-1, k=ks, sigma_c=sigma_ii)
-    test_sc = soft_core_ei_k(Qa=Zi, k=ks, rcore=ion_core_radius, n=sec_power, r=rs, dr=dr, dk=dk)
+    test_sc = soft_core_ei_k(Qa=Zi, k=ks, rcore=ion_core_radius, n=sec_power)
 
     output_dir = os.path.join(os.path.dirname(__file__), "xdave_results/potentials")
     if not os.path.exists(output_dir):

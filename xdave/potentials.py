@@ -153,11 +153,11 @@ def ei_yukawa_k(Qa, k, alpha):
 
 
 # Only the k-space expression is required in the ei potential for the screening cloud, so only these are included
-def soft_core_ei_k(Qa, k, rcore, n):
+def soft_core_ei_k(Qa, k, rcore, n, r, dr, dk):
     r = np.linspace(1.0e-2 * BOHR_RADIUS, 1.0e2 * BOHR_RADIUS, 8192)
     U_eff_k = ei_coulomb_k(Qa=Qa, k=k)
     U_eff_r = ei_coulomb_r(Qa=Qa, r=r)
-    return U_eff_k - forward_transform_fft(U_eff_r * np.exp(-((r / rcore) ** n)))
+    return U_eff_k - forward_transform_fft(yr=U_eff_r * np.exp(-((r / rcore) ** n)), r=r, k=k, dr=dr, dk=dk)
 
 
 def hard_core_ei_k(Qa, Qb, k, sigma_c):
