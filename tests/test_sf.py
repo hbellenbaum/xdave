@@ -425,8 +425,103 @@ def test_wuensch_Fig617():
     plt.show()
 
 
+def update_sf_file_ocp(fn, material, ks, S):
+    arr = np.array([ks, S]).T
+    file = fn + f"static_sf_{material}.txt"
+    np.savetxt(file, arr, header="ks S")
+
+
+def update_sf_file_mcp(fn, material, ks, S):
+
+    arr = np.array([ks, S[0, 0], S[0, 1], S[1, 1]]).T
+    file = fn + f"static_sf_{material}.txt"
+    np.savetxt(file, arr, header="ks S11 S12 S22")
+
+
+def test_version():
+    ni = 5.0e22 * per_cm3_TO_per_m3
+    ZC = 2
+    ZH = 1
+    T = 8  # eV
+    nC = 5.0e22 * per_cm3_TO_per_m3
+    nH = nC
+
+    mC = 12.011 * amu_TO_kg
+    mH = 1.008 * amu_TO_kg
+
+    rho_C = nC * mC * kg_per_m3_TO_g_per_cm3
+    rho_CH = 1.2
+
+    fn = os.path.join(os.path.dirname(__file__), "xdave_results/static_sf/")
+    if not os.path.exists(fn):
+        os.mkdir(fn)
+
+    # set up kernel for CH case
+    models = ModelOptions()
+    elements = np.array(["C"])
+    charge_states = np.array([ZC])
+    partial_densities_C = np.array([1.0])
+    code_kernel_C = xDave(
+        electron_temperature=T,
+        ion_temperature=T,
+        mass_density=rho_C,
+        elements=elements,
+        partial_densities=partial_densities_C,
+        charge_states=charge_states,
+        models=models,
+    )
+
+    mix_fraction = 0.8
+    ks = np.linspace(0.5, 10, 1000) / BOHR_RADIUS
+    sf_C = OCPStaticStructureFactor(
+        state=code_kernel_C.states[0], mix_fraction=mix_fraction, max_iterations=15000, delta=1.0e-12, verbose=False
+    )
+    Sab_C = sf_C.get_ii_static_structure_factor(k=ks, sf_model="HNC", pseudo_potential="DEBYE_HUCKEL")
+    # update_sf_file_ocp(fn=fn, material="C", ks=ks, S=Sab_C)
+    Sab_C_save = np.genfromtxt(fn + "static_sf_C.txt", delimiter=" ", skip_header=1)
+
+    # multi-component
+    # set up kernel for CH case
+    models = ModelOptions()
+    elements = np.array(["H", "C"])
+    charge_states = np.array([ZH, ZC])
+    partial_densities_CH = np.array([0.5, 0.5])
+    code_kernel_CH = xDave(
+        electron_temperature=T,
+        ion_temperature=T,
+        mass_density=rho_CH,
+        elements=elements,
+        partial_densities=partial_densities_CH,
+        charge_states=charge_states,
+        models=models,
+    )
+    mix_fraction = 0.9
+    sf_CH = MCPStaticStructureFactor(
+        overlord_state=code_kernel_CH.overlord_state,
+        states=code_kernel_CH.states,
+        mix_fraction=mix_fraction,
+        max_iterations=15000,
+        delta=1.0e-10,
+        verbose=False,
+    )
+    Sab_CH = sf_CH.get_ab_static_structure_factor(k=ks, sf_model="HNC", pseudo_potential="DEBYE_HUCKEL")
+    # update_sf_file_mcp(fn=fn, material="CH", ks=ks, S=Sab_CH)
+    Sab_CH_save = np.genfromtxt(fn + "static_sf_CH.txt", delimiter=" ", skip_header=1)
+
+    rtol = 1.0e-2
+    if not np.isclose(Sab_C, Sab_C_save[:, 1], rtol=rtol).all():
+        print(f"OCP structure factor for Carbon failed.")
+    if not np.isclose(Sab_CH[0, 0], Sab_CH_save[:, 1], rtol=rtol).all():
+        print(f"OCP structure factor for CH failed for HH component.")
+    if not np.isclose(Sab_CH[0, 1], Sab_CH_save[:, 2], rtol=rtol).all():
+        print(f"OCP structure factor for CH failed for CH component.")
+    if not np.isclose(Sab_CH[1, 1], Sab_CH_save[:, 3], rtol=rtol).all():
+        print(f"OCP structure factor for CH failed for CC component.")
+
+
 if __name__ == "__main__":
-    test_ocp()
+    test_version()
+    # test_ocp()
     # test_mcp()
     # test_wuensch_Fig616()
     # test_wuensch_Fig617()
