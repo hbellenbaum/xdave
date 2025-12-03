@@ -74,10 +74,66 @@ def test_CrowleyFig1():
     plt.show()
 
 
-def compare_all():
-    return
+def update_ipd_files(Zis, fn, ipd_sp, ipd_ek, ipd_crowley, ipd_is, ipd_dh):
+    arr = np.array([Zis, ipd_sp, ipd_ek, ipd_crowley, ipd_is, ipd_dh]).T
+    np.savetxt(fn, arr, header="Zi SP EK Crowley IS DH")
+    print(f"Updating IPD file {fn}")
+
+
+def test_version():
+    AN = 13
+    amu = 26.9815384  # * amu_TO_kg
+    Te = 180 * eV_TO_K
+    rho = 2 * 2.7 * g_per_cm3_TO_kg_per_m3
+
+    Ts = np.linspace(10, 150, 10) * eV_TO_K
+
+    Zis = np.linspace(1, AN, 50)
+
+    for T in Ts:
+        ipds_sp = []
+        ipds_ek = []
+        ipds_crowley = []
+        ipds_is = []
+        ipds_dh = []
+
+        for Zi in Zis:
+            state = PlasmaState(
+                electron_temperature=T,
+                ion_temperature=T,
+                mass_density=rho,
+                charge_state=Zi,
+                atomic_mass=amu,
+                atomic_number=AN,
+                binding_energies=None,
+            )
+            ipds_sp.append(get_ipd(state=state, model="STEWART_PYATT") * J_TO_eV)
+            ipds_ek.append(get_ipd(state=state, model="ECKER_KROLL") * J_TO_eV)
+            ipds_crowley.append(get_ipd(state=state, model="CROWLEY") * J_TO_eV)
+            ipds_is.append(get_ipd(state=state, model="ION_SPHERE") * J_TO_eV)
+            ipds_dh.append(get_ipd(state=state, model="DEBYE_HUCKEL") * J_TO_eV)
+
+        output_dir = os.path.join(os.path.dirname(__file__), "xdave_results/ipd")
+        if not os.path.exists(output_dir):
+            os.mkdir(output_dir)
+
+        fn = os.path.join(output_dir, f"IPD_results_Al_T={T/eV_TO_K:.0f}_rho={rho/g_per_cm3_TO_kg_per_m3:.0f}.csv")
+        # update_ipd_files(Zis, fn, ipds_sp, ipds_ek, ipds_crowley, ipds_is, ipds_dh)
+        res = np.genfromtxt(fn, skip_header=1, delimiter=" ")
+
+        if not np.isclose(ipds_sp, res[:, 1]).all():
+            print(f"Stewart-Pyatt model has failed test at T={T/eV_TO_K:.0f}")
+        if not np.isclose(ipds_ek, res[:, 2]).all():
+            print(f"Ecker-Kroell model has failed test at T={T/eV_TO_K:.0f}")
+        if not np.isclose(ipds_crowley, res[:, 3]).all():
+            print(f"Crowley model has failed test at T={T/eV_TO_K:.0f}")
+        if not np.isclose(ipds_is, res[:, 4]).all():
+            print(f"Ion sphere model has failed test at T={T/eV_TO_K:.0f}")
+        if not np.isclose(ipds_dh, res[:, 5]).all():
+            print(f"Debye-Hueckel model has failed test at T={T/eV_TO_K:.0f}")
 
 
 if __name__ == "__main__":
-    compare_all()
-    test_CrowleyFig1()
+    # compare_all()
+    test_version()
+    # test_CrowleyFig1()
