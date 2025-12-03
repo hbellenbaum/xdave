@@ -161,6 +161,78 @@ def test_be_bf():
     plt.show()
 
 
+def update_bf_results(model, w, k_bohr, dsf, fn):
+    file = fn + f"_k={k_bohr:.1f}_model={model}.csv"
+    np.savetxt(file, np.array([w, dsf]).T)
+    print(f"Updating BF test for model = {model}: \nfile = {file}")
+
+
+def test_version():
+    Te = 110 * eV_TO_K
+    rho = 10.0 * g_per_cm3_TO_kg_per_m3
+    atomic_number = 4
+    atomic_mass = 1.0
+    beam_energy = 9.0e3
+    charge_state = 3
+
+    ZA = atomic_number
+    Zb = atomic_number - charge_state
+
+    angles = np.array([13, 30, 45, 60, 80, 100, 120, 140, 160])
+    ks = calculate_q(angle=angles, energy=beam_energy) / BOHR_RADIUS
+    omega_array = np.linspace(-450, 800, 1000) * eV_TO_J
+    binding_energies = np.array([-111.5, -111.5, -111.5]) * eV_TO_J
+    state = PlasmaState(
+        electron_temperature=Te,
+        ion_temperature=Te,
+        mass_density=rho,
+        charge_state=charge_state,
+        atomic_mass=atomic_mass,
+        atomic_number=atomic_number,
+        binding_energies=binding_energies,
+    )
+
+    colors = ["red", "green", "blue", "orange", "gray", "black", "yellow", "magenta", "purple"]
+
+    output_dir = os.path.join(os.path.dirname(__file__), "xdave_results/bf/")
+    if not os.path.exists(output_dir):
+        os.mkdir(output_dir)
+
+    fn = output_dir + f"dsf_check_be_T={Te/eV_TO_K:.0f}_rho={rho/g_per_cm3_TO_kg_per_m3:.0f}_Z={charge_state}"
+
+    test_IA = np.full_like(ks, True)
+    test_HR = np.full_like(ks, True)
+    test_trIA = np.full_like(ks, True)
+
+    for i in range(len(ks)):
+        k = ks[i]
+        k_bohr = k * BOHR_RADIUS
+        angle = np.round(calculate_angle(q=k * BOHR_RADIUS, energy=beam_energy))  # angles[i]
+        print(f"Running for k={k * BOHR_RADIUS} 1/aB and angle={angle}")
+
+        kernel = BoundFreeDSF(state=state)
+        dsf = kernel.get_dsf(ZA=ZA, Zb=Zb, Eb=binding_energies, w=omega_array, k=k, model="SCHUMACHER")
+        # update_bf_results(model="IA", w=omega_array, k_bohr=k_bohr, dsf=dsf, fn=fn)
+        dsf_ia_save = np.genfromtxt(fn + f"_k={k_bohr:.1f}_model=IA.csv", delimiter=" ")
+        dsf_hr = kernel.get_dsf(ZA=ZA, Zb=Zb, Eb=binding_energies, w=omega_array, k=k, model="HR_CORRECTION")
+        # update_bf_results(model="HR", w=omega_array, k_bohr=k_bohr, dsf=dsf, fn=fn)
+        dsf_hr_save = np.genfromtxt(fn + f"_k={k_bohr:.1f}_model=HR.csv", delimiter=" ")
+        dsf_tr = kernel.get_dsf(ZA=ZA, Zb=Zb, Eb=binding_energies, w=omega_array, k=k, model="TRUNCATED_IA")
+        # update_bf_results(model="trIA", w=omega_array, k_bohr=k_bohr, dsf=dsf, fn=fn)
+        dsf_tr_save = np.genfromtxt(fn + f"_k={k_bohr:.1f}_model=trIA.csv", delimiter=" ")
+
+        if not np.isclose(dsf, dsf_ia_save[:, 1], rtol=1.0e-2).all(axis=-1):
+            print(f"Impulse approximation BF model has failed the test at k={k_bohr:.1f} 1/aB.")
+            test_IA[i] = False
+        if not np.isclose(dsf_hr, dsf_hr_save[:, 1], rtol=1.0e-2).all(axis=-1):
+            print(f"Holm-Ribberfors correction to the IA BF model has failed the test at k={k_bohr:.1f} 1/aB.")
+            test_HR[i] = False
+        if np.isclose(dsf_tr, dsf_tr_save[:, 1], rtol=1.0e-2).all(axis=-1):
+            print(f"truncated IA BF model has failed the test at k={k_bohr:.1f} 1/aB.")
+            test_trIA[i] = False
+
+
 if __name__ == "__main__":
-    test_bf_mcss()
+    # test_bf_mcss()
     # test_be_bf()
+    test_version()

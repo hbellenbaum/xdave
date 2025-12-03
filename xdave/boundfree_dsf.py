@@ -390,6 +390,6 @@ class BoundFreeDSF:
         """
         Sce = self.schuhmacher_ia(ZA, Zb, k, w, Eb)
         beta = 1 / (BOLTZMANN_CONSTANT * self.state.electron_temperature)
-        exp_term = np.exp(beta * (w - Eb)) + 1
+        exp_term = np.exp(beta * (w - Eb[0])) + 1
         Sce_trunc = Sce * (1 - 1 / exp_term)
         return Sce_trunc
