@@ -13,7 +13,7 @@ More details:
 C. Fortmann et al., Phys. Rev. E 81 026405 (2010), DOI: 10.1103/physreve.81.026405
 """
 
-from .plasma_state import PlasmaState, get_rho_T_from_rs_theta
+from .plasma_state import PlasmaState
 from .unit_conversions import *
 from .constants import *
 from .fxc import Groth_A

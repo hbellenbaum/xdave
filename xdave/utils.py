@@ -59,6 +59,15 @@ def calculate_q(angle, energy):
     return q
 
 
+def calculate_q_SI(angle, energy):
+    # angle *= np.pi / 180.0
+    angle_rad = angle * PI / 180
+    E0 = energy * eV_TO_J
+    q = 2 * E0 / (DIRAC_CONSTANT * SPEED_OF_LIGHT) * np.sin(angle_rad / 2)
+    q *= BOHR_RADIUS
+    return q
+
+
 def calculate_angle(q, energy):
     """
     Calculates an angle for the relevant q value.

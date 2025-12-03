@@ -110,18 +110,21 @@ class OCPStaticStructureFactor:
             float/ array: will return full array of static structure factors or single value depending on the k-input type
         """
         if sf_model == "MSA":
-            warnings.warn(f"Use {sf_model} your own risk. It is dogshit.")
             if return_full:
-                print("Cannot return full outputs for the MSA. Only returning static structure factor.")
+                warnings.warn("Cannot return full outputs for the MSA. Only returning static structure factor.")
             return self.mean_spherical_approximation_ocp_ii(k)
         elif sf_model == "HNC":
             ks, rs, giir, hiir, Siik = self.hnc_ocp_ii(k, pseudo_potential)
         elif sf_model == "EXTENDED_HNC":
             ks, rs, giir, hiir, Siik = self.xhnc_ocp_ii(k, pseudo_potential, bridge_function)
         elif sf_model == "MODIFIED_HNC":
-            warnings.warn(
-                f"Model {sf_model} for the ion-ion static structure factor currently under construction. Please come back later."
+            # warnings.warn(
+            #     f"Model {sf_model} for the ion-ion static structure factor currently under construction. Please come back later."
+            # )
+            raise NotImplementedError(
+                f"Model {sf_model} for the ion-ion static structure currently under construction. Please come back later."
             )
+
         else:
             raise NotImplementedError(
                 f"Model {sf_model} for the ion-ion static structure factor is not known. Try HNC."
@@ -245,7 +248,9 @@ class OCPStaticStructureFactor:
                 Q, Q, k, csd_parameters[0], csd_parameters[1], csd_core_charges[0], csd_core_charges[1], kappa_e
             )
         else:
-            raise NotImplementedError(f"Pseudo-potential model {model} in the HNC solver not recognized.")
+            warnings.warn(f"Model {model} for ion-ion the pseudo-potential not recognized. Overwriting using YUKAWA")
+            return yukawa_r(Q, Q, r, alpha), yukawa_k(Q, Q, k, alpha)
+            # raise NotImplementedError(f"Pseudo-potential model {model} in the HNC solver not recognized.")
 
     def _hnc_bridge_function(self, rs, Rii, Gamma, model="IYETOMI"):
         """
@@ -261,8 +266,8 @@ class OCPStaticStructureFactor:
             array: values for the bridge function in r-space
         """
         if Gamma < 5:
-            print(
-                f"Don`t be a dumb-dumb. You cannot apply bridge functions for weakly coupled plasmas. Reverting back to B = 0."
+            warnings.warn(
+                f"The {model} for the bridge function should not be used for low coupling. Reverting back to B = 0."
             )
             return np.zeros_like(rs), np.zeros_like(rs)
         if model == "IYETOMI":
@@ -685,9 +690,13 @@ class MCPStaticStructureFactor:
         elif sf_model == "HNC":
             ks, rs, giir, hiir, Sabs = self.hnc_ab_ss(k, pseudo_potential)
         else:
-            raise NotImplementedError(
-                f"Model {sf_model} for the multi-species ion-ion static structure factor not recognized. Try HNC."
+            warnings.warn(
+                f"Model {sf_model} for the multi-species static structure factors not recognized. Overwriting using HNC."
             )
+            ks, rs, giir, hiir, Sabs = self.hnc_ab_ss(k, pseudo_potential)
+            # raise NotImplementedError(
+            #     f"Model {sf_model} for the multi-species ion-ion static structure factor not recognized. Try HNC."
+            # )
 
         # consider switching out the interpolation with something like np.interpolate which is meant to be faster
         interp_sf = interp1d(ks, Sabs, axis=-1, kind="linear")

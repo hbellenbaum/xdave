@@ -4,6 +4,7 @@ from .unit_conversions import *
 from .constants import *
 from scipy.special import gamma
 import numpy as np
+import warnings
 
 
 class BoundFreeDSF:
@@ -47,7 +48,8 @@ class BoundFreeDSF:
         elif model == "TRUNCATED_IA":
             Sce = self.truncated_IA(ZA, Zb, k, w, Eb)
         else:
-            raise NotImplementedError(f"Model {model} for the bound-free component not recognised. Try SCHUMACHER :)")
+            warnings.warn(f"Bound-free model {model} not recognized. Overwriting using the default SCHUMACHER.")
+            Sce = self.schuhmacher_ia(ZA, Zb, k, w, Eb)
         return Sce / DIRAC_CONSTANT
 
     def _shell_amplitude(self, Znl, n, l):
