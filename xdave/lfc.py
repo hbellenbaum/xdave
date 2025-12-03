@@ -383,9 +383,7 @@ class LFC:
         kF = (3 * np.pi * np.pi * self.state.free_electron_number_density) ** (1 / 3)
         Q = k / kF
         gee0 = self.gee0
-        # gee0 = 7.2687180436081550e-002  # self.gee0
         gamma0 = self._gamma_0()
-        # gamma0 = 0.26046315889562777  # self._gamma_0()
 
         A = 0.029
         B = 9 / 16 * gamma0 - 3 / 64 * (1 - gee0) - 16 / 15 * A

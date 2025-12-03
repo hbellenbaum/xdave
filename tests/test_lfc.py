@@ -69,7 +69,7 @@ def test_ui_gv_mcss():
     T1 = 20  # eV
     T2 = 4  # eV
 
-    Z = 2
+    Z = 1
 
     rho, _ = get_rho_T_from_rs_theta(rs=rs, theta=1)
     state1 = PlasmaState(
@@ -112,7 +112,7 @@ def test_ui_gv_mcss():
     )
 
     kF1 = 1 / rs * (3 / 4 * np.pi) ** 3
-    ks1 = np.linspace(0, 20, 500) / BOHR_RADIUS
+    ks1 = np.linspace(0.01, 20, 500) / BOHR_RADIUS
     lfcs1_interp = np.zeros_like(ks1)
     lfcs1_gv = np.zeros_like(ks1)
     lfcs1_ui = np.zeros_like(ks1)
@@ -180,8 +180,8 @@ def test_gregori_2007():
     kernel1 = LFC(state=state1)
     kernel2 = LFC(state=state2)
 
-    ks1 = np.linspace(0, 20, 500) / BOHR_RADIUS
-    ks2 = np.linspace(0, 20, 500) / BOHR_RADIUS
+    ks1 = np.linspace(0.01, 20, 500) / BOHR_RADIUS
+    ks2 = np.linspace(0.01, 20, 500) / BOHR_RADIUS
     lfcs1 = np.zeros_like(ks1)
     lfcs1_gv = np.zeros_like(ks1)
     lfcs1_ui = np.zeros_like(ks2)
@@ -249,7 +249,7 @@ def test_fortmann_2010():
 
     kernel = LFC(state=state)
 
-    ks = np.linspace(0, 4, 100) * state.fermi_wave_number(state.free_electron_number_density)
+    ks = np.linspace(0.01, 4, 100) * state.fermi_wave_number(state.free_electron_number_density)
     lfcs_iu = np.zeros_like(ks)
     lfcs_FARID = np.zeros_like(ks)
 
@@ -267,7 +267,7 @@ def test_fortmann_2010():
 
     plt.figure()
     plt.plot(ks / state.fermi_wave_number(state.free_electron_number_density), lfcs_iu, label=f"UI", ls="-.", c="navy")
-    plt.plot(dat_iu[:, 0], dat_iu[:, 1], label=f"Fortmann et al., UI", ls="solid", c="navy")
+    plt.scatter(dat_iu[:, 0], dat_iu[:, 1], label=f"Fortmann et al., UI", c="navy")
     plt.plot(
         ks / state.fermi_wave_number(state.free_electron_number_density),
         lfcs_FARID,
@@ -275,7 +275,7 @@ def test_fortmann_2010():
         ls="-.",
         c="crimson",
     )
-    plt.plot(dat_farid[:, 0], dat_farid[:, 1], label=f"Fortmann et al., Farid", ls="solid", c="crimson")
+    plt.scatter(dat_farid[:, 0], dat_farid[:, 1], label=f"Fortmann et al., Farid", c="crimson")
     plt.legend()
     plt.show()
 
@@ -300,7 +300,7 @@ def test_farid():
             binding_energies=None,
         )
         kF = state.fermi_wave_number(state.free_electron_number_density)
-        ks = np.linspace(0, 5, 500) / BOHR_RADIUS
+        ks = np.linspace(0.01, 5, 1000) / BOHR_RADIUS
         lfcs = np.zeros_like(ks)
         lfcs_iu = np.zeros_like(ks)
 
@@ -315,11 +315,13 @@ def test_farid():
         THIS_DIR = os.path.dirname(__file__)
         fn = os.path.join(THIS_DIR, f"comparison_data/lfc/Farid_et_al_Geek0_rs={rs:.0f}.csv")
         dat = np.genfromtxt(fn, delimiter=",")
-        plt.plot(ks * BOHR_RADIUS, lfcs, label=f"rs={rs}", ls="-.", c=c)
-        plt.plot(ks * BOHR_RADIUS, lfcs_iu, label=f"UI: rs={rs}", ls=":", c=c)
-        plt.plot(dat[:, 0] * kF1, dat[:, 1], label=f"Farid et al., rs={rs}", ls="solid", c=c)
+        plt.plot(ks / kF, lfcs, label=f"rs={rs}", ls="-.", c=c)
+        plt.plot(ks / kF, lfcs_iu, label=f"UI: rs={rs}", ls=":", c=c)
+        plt.scatter(dat[:, 0], dat[:, 1], label=f"Farid et al., rs={rs}", c=c)
 
     plt.legend()
+    plt.ylim(-0.1, 1.3)
+    plt.xlim(0, 6)
     plt.ylabel(r"$G_{ee}(k)$")
     plt.xlabel(r"$k/k_F$")
     plt.show()
@@ -356,7 +358,7 @@ def test_dornheim_2021():
     )
     kernel2 = LFC(state=state2)
 
-    ks = np.linspace(0, 100, 100) / BOHR_RADIUS
+    ks = np.linspace(0.01, 100, 100) / BOHR_RADIUS
     lfc_theta1 = np.zeros_like(ks)
     lfc_theta2 = np.zeros_like(ks)
 
@@ -420,7 +422,7 @@ def test_ui():
         )
         state = xrts_code.overlord_state
         kF = state.fermi_wave_number(state.free_electron_number_density)
-        ks = np.linspace(0, 5, 500) * kF
+        ks = np.linspace(0.01, 5, 500) * kF
         lfcs_iu = np.zeros_like(ks)
 
         kernel = LFC(state=state)
@@ -431,7 +433,7 @@ def test_ui():
         fn = os.path.join(THIS_DIR, f"comparison_data/lfc/Utsumi_Ichimaru_Geek0_rs={rs:.0f}.csv")
         dat = np.genfromtxt(fn, delimiter=",")
         plt.plot(ks / kF, lfcs_iu, label=f"UI: rs={rs}", ls=":", c=c)
-        plt.plot(dat[:, 0], dat[:, 1], label=f"Ichimaru et al., rs={rs}", ls="solid", c=c)
+        plt.scatter(dat[:, 0], dat[:, 1], label=f"Ichimaru et al., rs={rs}", c=c)
 
     plt.legend()
     plt.xlim(0, 5)
@@ -472,7 +474,7 @@ def test_gv():
             # lfcs[i] = kernel.calculate_lfc(k=ks[i], w=0, model="FARID")
             lfcs_iu[i] = kernel.calculate_lfc(k=ks[i], w=0, model="GV")
 
-        fn = os.path.join(os.path.dirname(__file__), f"./mcss_tests/mcss_outputs_lfc/lfc=gv_rs={rs:.0f}_theta=1.csv")
+        fn = os.path.join(os.path.dirname(__file__), f"comparison_data/lfc/mcss_tests/lfc=gv_rs={rs:.0f}_theta=1.csv")
         dat = np.genfromtxt(fn, delimiter=",", skip_header=1)
         plt.plot(ks / kF, lfcs_iu, label=f"GV: rs={rs}", ls=":", c=c)
         plt.plot(dat[:, 0], dat[:, -1], label=f"MCSS, rs={rs}", ls="solid", c=c)
@@ -484,12 +486,73 @@ def test_gv():
     plt.show()
 
 
+def update_lfc_files(ks, fn, lfcs_dornheim, lfcs_interp, lfcs_ui, lfcs_gv, lfcs_farid):
+    arr = np.array([ks, lfcs_dornheim, lfcs_interp, lfcs_ui, lfcs_gv, lfcs_farid]).T
+    np.savetxt(fn, arr, header="ks Dornheim Interp UI GV Farid")
+    print(f"Updating LFC file {fn}")
+
+
+def test_version():
+    AN = 1
+    amu = 1
+
+    Ts = np.linspace(10, 150, 5) * eV_TO_K
+    rhos = np.linspace(1, 10, 5) * g_per_cm3_TO_kg_per_m3
+
+    Zi = 1
+
+    ks = np.linspace(0.01, 10, 100) / BOHR_RADIUS
+
+    for T in Ts:
+
+        for rho in rhos:
+            state = PlasmaState(
+                electron_temperature=T,
+                ion_temperature=T,
+                mass_density=rho,
+                charge_state=Zi,
+                atomic_mass=amu,
+                atomic_number=AN,
+                binding_energies=None,
+            )
+            kernel = LFC(state=state)
+            lfcs_dornheim = kernel.calculate_lfc(k=ks, w=0.0, model="DORNHEIM_ESA")
+            lfcs_interp = kernel.calculate_lfc(k=ks, w=0.0, model="PADE_INTERP")
+            lfcs_ui = kernel.calculate_lfc(k=ks, w=0.0, model="UI")
+            lfcs_gv = kernel.calculate_lfc(k=ks, w=0.0, model="GV")
+            lfcs_farid = kernel.calculate_lfc(k=ks, w=0.0, model="FARID")
+
+            output_dir = os.path.join(os.path.dirname(__file__), "xdave_results/lfc")
+            if not os.path.exists(output_dir):
+                os.mkdir(output_dir)
+
+            fn = os.path.join(output_dir, f"lfc_results_T={T/eV_TO_K:.0f}_rho={rho/g_per_cm3_TO_kg_per_m3:.1f}.csv")
+            # update_lfc_files(ks, fn, lfcs_dornheim, lfcs_interp, lfcs_ui, lfcs_gv, lfcs_farid)
+            res = np.genfromtxt(fn, delimiter=" ")
+
+            if not np.isclose(lfcs_dornheim, res[:, 1]).all():
+                print(f"Dornheim ESA has failed test for rho={rho/g_per_cm3_TO_kg_per_m3:.1f} and T={T/eV_TO_K:.1f}")
+            if not np.isclose(lfcs_interp, res[:, 2]).all():
+                print(f"Interp LFC has failed test for rho={rho/g_per_cm3_TO_kg_per_m3:.1f} and T={T/eV_TO_K:.1f}")
+            if not np.isclose(lfcs_ui, res[:, 3]).all():
+                print(
+                    f"Utsumi-Ichimaru LFC has failed test for rho={rho/g_per_cm3_TO_kg_per_m3:.1f} and T={T/eV_TO_K:.1f}"
+                )
+            if not np.isclose(lfcs_gv, res[:, 4]).all():
+                print(
+                    f"Geldart-Vosko LFC has failed test for rho={rho/g_per_cm3_TO_kg_per_m3:.1f} and T={T/eV_TO_K:.1f}"
+                )
+            if not np.isclose(lfcs_farid, res[:, 5]).all():
+                print(f"Farid LFC has failed test for rho={rho/g_per_cm3_TO_kg_per_m3:.1f} and T={T/eV_TO_K:.1f}")
+
+
 if __name__ == "__main__":
     # test()
-    test_ui_gv_mcss()
+    # test_ui_gv_mcss()
     # test_gv()
     # test_gregori_2007()
     # test_fortmann_2010()
     # test_dornheim_2021()
     # test_farid()
     # test_ui()
+    test_version()
