@@ -291,8 +291,10 @@ class xDave:
             if self.verbose:
                 print(f"Applying user-defined input IPD: {self.ipd_eV}")
         else:
-            ipd = get_ipd(state=self.overlord_state, model=self.models.ipd_model, user_defined_ipd=self.ipd_eV,
-                          crowley_force_constant=self.crowley_force_constant)
+            state_ipds = get_ipd(
+                plasma=self, state=self.overlord_state, model=self.models.ipd_model,
+                user_defined_ipd=self.ipd_eV, crowley_force_constant=self.crowley_force_constant
+                )
             if self.verbose:
                 print(f"Calculated IPD={ipd * J_TO_eV} eV")
 
@@ -312,10 +314,12 @@ class xDave:
             print(f"Mean charge state = {self.overlord_state.charge_state}.")
 
         for i in range(0, len(self.states)):
-            state = self.states[i]
-            x = self.partial_densities[i]
+            state: PlasmaState = self.states[i]
+            x   = self.partial_densities[i]
+            ipd = state_ipds[i]
             if self.verbose:
                 print(f"\nRunning state {i} with Z={state.charge_state} and x={x}\n")
+            
             binding_energies = state.binding_energies * eV_TO_J
 
             ff_i[i] = x * ff_dsf
@@ -471,8 +475,10 @@ class xDave:
             if self.verbose:
                 print(f"Applying user-defined input IPD: {self.ipd_eV}")
         else:
-            ipd = get_ipd(state=self.overlord_state, model=self.models.ipd_model, user_defined_ipd=self.ipd_eV,
-                          crowley_force_constant=self.crowley_force_constant)
+            state_ipds = get_ipd(
+                plasma=self, state=self.overlord_state, model=self.models.ipd_model,
+                user_defined_ipd=self.ipd_eV, crowley_force_constant=self.crowley_force_constant
+                )
             if self.verbose:
                 print(f"Calculated IPD={ipd * J_TO_eV} eV")
 
@@ -488,8 +494,9 @@ class xDave:
             print(f"Mean charge state = {self.overlord_state.charge_state}.")
 
         for i in range(0, len(self.states)):
-            state = self.states[i]
-            x = self.partial_densities[i]
+            state: PlasmaState = self.states[i]
+            x   = self.partial_densities[i]
+            ipd = state_ipds[i]
             if self.verbose:
                 print(f"\nRunning state {i} with Z={state.charge_state} and x={x}\n")
             binding_energies = state.binding_energies * eV_TO_J
