@@ -15,7 +15,7 @@ import numpy as np
 
 
 # TODO(HB): this should really be a class as well
-def get_ipd(state: PlasmaState, model, user_defined_ipd=0.0):
+def get_ipd(state: PlasmaState, model, user_defined_ipd=0.0, crowley_force_constant=0.9):
     """
     Function to calculate the IPD for a given model for a given model.
 
@@ -47,7 +47,7 @@ def get_ipd(state: PlasmaState, model, user_defined_ipd=0.0):
     elif model == "ION_SPHERE":
         return ipd_ion_sphere(Zi=Zi, ne=ne, ni=ni)
     elif model == "CROWLEY":
-        return ipd_crowley(Zi=Zi, ne=ne, ni=ni, Te=Te, Ti=Ti, ForceConst=0.9)
+        return ipd_crowley(Zi=Zi, ne=ne, ni=ni, Te=Te, Ti=Ti, ForceConst=crowley_force_constant)
     elif model == "NONE":
         return 0.0
     elif model == "USER_DEFINED":

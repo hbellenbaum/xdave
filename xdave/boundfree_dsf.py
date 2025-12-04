@@ -102,9 +102,6 @@ class BoundFreeDSF:
                 c4s = int(min([2, Zb - 18]))
             if Zb > 20:
                 c3d = int(min([10, Zb - 20]))
-            
-
-            print(c1s, c2s, c2p, c3s, c3p, c4s, c3d, Eb * J_TO_eV)
 
             E = np.abs(w)  # * J_TO_eV  # PLANCK_CONSTANT *
             w_freq = np.abs(w) / DIRAC_CONSTANT  # convert the energy range to an actual frequency: E = \hbar \omega

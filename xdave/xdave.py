@@ -99,6 +99,30 @@ class xDave:
             self.srr_sigma_parameter = (
                 user_defined_inputs["srr_sigma_parameter"] if "srr_sigma_parameter" in keys else None
             )
+            
+            # Few options to check here for the Crowley constant
+            crowley_force_constant = user_defined_inputs["crowley_force_constant"] if "crowley_force_constant" in keys else None
+            if crowley_force_constant is None:
+                self.crowley_force_constant = 0.9
+            else:
+                if isinstance(crowley_force_constant, (float, int)):
+                    self.crowley_force_constant = crowley_force_constant
+                else:
+                    if crowley_force_constant.upper() in ["FLUID", "ION_SPHERE"]:
+                        self.crowley_force_constant = 0.9
+                    elif crowley_force_constant.upper() in ["FCC", "HCP"]:
+                        self.crowley_force_constant = 0.99025
+                    elif crowley_force_constant.upper() == "BCC":
+                        self.crowley_force_constant = 1.01875
+                    elif crowley_force_constant.upper() == "SC":
+                        self.crowley_force_constant = 1.09189
+                    else:
+                        self.crowley_force_constant = 0.9
+                        warnings.warn(
+                            f"crowley_force_structure = {crowley_force_constant} not known!\n"
+                           +f"Should be a number or \'FLUID\', \'ION_SPHERE\', \'FCC\', \'HCP\', \'BCC\', or \'SC\' "
+                           +f"Treating as ion sphere (constant = 0.9)"
+                        )
 
             assert hasattr(self.ion_core_radii, "__len__")
             assert hasattr(self.csd_core_charges, "__len__")
@@ -111,6 +135,7 @@ class xDave:
             self.csd_core_charges = np.full(self.number_of_states, None)
             self.sec_core_power = None
             self.srr_sigma_parameter = None
+            self.crowley_force_constant = 0.9
 
         self.states, self.overlord_state = self.get_mean_and_all_states(elements)
 
@@ -266,7 +291,8 @@ class xDave:
             if self.verbose:
                 print(f"Applying user-defined input IPD: {self.ipd_eV}")
         else:
-            ipd = get_ipd(state=self.overlord_state, model=self.models.ipd_model, user_defined_ipd=self.ipd_eV)
+            ipd = get_ipd(state=self.overlord_state, model=self.models.ipd_model, user_defined_ipd=self.ipd_eV,
+                          crowley_force_constant=self.crowley_force_constant)
             if self.verbose:
                 print(f"Calculated IPD={ipd * J_TO_eV} eV")
 
@@ -445,7 +471,8 @@ class xDave:
             if self.verbose:
                 print(f"Applying user-defined input IPD: {self.ipd_eV}")
         else:
-            ipd = get_ipd(state=self.overlord_state, model=self.models.ipd_model, user_defined_ipd=self.ipd_eV)
+            ipd = get_ipd(state=self.overlord_state, model=self.models.ipd_model, user_defined_ipd=self.ipd_eV,
+                          crowley_force_constant=self.crowley_force_constant)
             if self.verbose:
                 print(f"Calculated IPD={ipd * J_TO_eV} eV")
 
