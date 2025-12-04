@@ -461,12 +461,30 @@ class xDave:
         # Return outputs in cgs
         return k * BOHR_RADIUS, Sab, Sab_tot, rayleigh_weight, qs, fs, lfc
 
-    def run_inelastic(self, k, w):
-        k_value = k / BOHR_RADIUS
-        omega_array = w.copy() * eV_TO_J
+    def run_inelastic(self, w, k=None, angle=None, beam_energy=None):
+
+        if self.verbose:
+            self._print_logo()
+
+        if angle is None:
+            assert k is not None, f"You have to set either the angle or the scattering wave number."
+            if beam_energy is None:
+                beam_energy = 8.0e3
+                print(f"Assuming beam energy of 8 keV.") if self.verbose else None
+            angle = calculate_angle(q=k, energy=beam_energy)
+        elif k is None:
+            assert angle is not None, f"You have to set either the angle or the scattering wave number."
+            assert (
+                beam_energy is not None
+            ), f"If you set an angle, you also need to specify the beam energy. I can't read your fucking mind."
+            k = calculate_q(angle=angle, energy=beam_energy)
+
+
+        k_SI = k / BOHR_RADIUS
+        w_SI = w * eV_TO_J
 
         lfc_kernel = LFC(state=self.overlord_state)
-        lfc = lfc_kernel.calculate_lfc(k=k_value, w=omega_array, model=self.models.lfc_model)
+        lfc = lfc_kernel.calculate_lfc(k=k_SI, w=w_SI, model=self.models.lfc_model)
         if self.verbose:
             print(f"Calculated LFC={lfc}")
 
@@ -483,12 +501,12 @@ class xDave:
                 print(f"Calculated IPD={ipd * J_TO_eV} eV")
 
         ff = FreeFreeDSF(state=self.overlord_state)
-        ff_dsf = ff.get_dsf(k=k_value, w=omega_array, lfc=lfc, model=self.models.polarisation_model)
+        ff_dsf = ff.get_dsf(k=k_SI, w=w_SI, lfc=lfc, model=self.models.polarisation_model)
         ff_tot = ff_dsf * self.overlord_state.charge_state
 
-        bf_tot = np.zeros_like(omega_array)
-        ff_i = np.zeros((len(self.states), len(omega_array)))
-        bf_i = np.zeros((len(self.states), len(omega_array)))
+        bf_tot = np.zeros_like(w_SI)
+        ff_i = np.zeros((len(self.states), len(w_SI)))
+        bf_i = np.zeros((len(self.states), len(w_SI)))
 
         if self.verbose:
             print(f"Mean charge state = {self.overlord_state.charge_state}.")
@@ -512,7 +530,7 @@ class xDave:
 
             bf = BoundFreeDSF(state=state)
             bf_dsf = bf.get_dsf(
-                ZA=state.atomic_number, Zb=state.Zb, k=k_value, w=omega_array, Eb=Eb, model=self.models.bf_model
+                ZA=state.atomic_number, Zb=state.Zb, k=k_SI, w=w_SI, Eb=Eb, model=self.models.bf_model
             )
             bf_tot += x * bf_dsf
             bf_i[i] = x * bf_dsf
