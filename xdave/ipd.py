@@ -27,8 +27,9 @@ def get_ipd(state: PlasmaState, model, user_defined_ipd=0.0):
     Returns:
         float: calculated IPD in units of J
     """
-    Zi = state.atomic_number - state.charge_state
-    ne = state.total_electron_number_density
+    
+    Zi = state.charge_state #state.atomic_number - state.charge_state
+    ne = state.free_electron_number_density #state.total_electron_number_density
     ni = state.ion_number_density
     Te = state.electron_temperature
     Ti = state.ion_temperature
@@ -215,27 +216,32 @@ def f_term(a, Y):
 
 
 def X_term(a, Y):
-    f_aY = f_term(a, Y)
 
-    aY = a * Y
-    B = Y**2 * (1 - a**2) / f_aY
+    if not isinstance(Y, np.ndarray):
+        Y = np.array([Y])
+
+    X = np.full(Y.shape, np.nan, dtype=np.float64)
+    Y_m13 = np.zeros_like(Y)
+
+    good_Y = (Y!=0)
+    Y_m13[good_Y] = Y[good_Y]**(-1/3)
+    
+    f_aY = f_term(a, Y_m13)
+
+    aY = a * Y_m13
+    B = Y_m13**2 * (1 - a**2) / f_aY
 
     sol1 = f_aY - B - aY
-    if not (np.any(np.abs(sol1.imag) > 1e-12) or np.any(sol1.real < 0)):
-        return sol1.real
-
-    sol2 = 0.5 * ((1 - SQRT_THREE * 1j) * f_aY + (1 + SQRT_THREE * 1j) * B) - aY
-    if not (np.any(np.abs(sol2.imag) > 1e-12) or np.any(sol2.real < 0)):
-        return sol2.real
-
+    sol2 = 0.5 * ( (1 - SQRT_THREE * 1j) * f_aY + (1 + SQRT_THREE * 1j) * B) - aY
     sol3 = 0.5 * (-(1 + SQRT_THREE * 1j) * f_aY + (1 - SQRT_THREE * 1j) * B) - aY
-    if not (np.any(np.abs(sol3.imag) > 1e-12) or np.any(sol3.real < 0)):
-        return sol3.real
 
-    print("Uhoh! No real, positive solutions for X found!")
-    print("X1:", sol1)
-    print("X2:", sol2)
-    print("X3:", sol3)
+    unsolved = np.full(X.shape, True)
+    for sol in [sol1, sol2, sol3]:
+        accept = ~((np.abs(sol.imag)>1e-12)|(sol.real<0))
+        X[accept&unsolved] = sol1.real[accept&unsolved]
+        unsolved[accept&unsolved] = False
+    
+    return X
 
 
 # =============================================================================
@@ -275,7 +281,6 @@ def ipd_crowley(Zi, ne, ni, Te, Ti, ForceConst):
     eta_e = chem_pot * beta_e
     EF = 0.5 * DIRAC_CONSTANT_SQR * np.cbrt(3.0 * PI_SQR * ne) ** 2 / ELECTRON_MASS
     Ip0p5 = (beta_e * EF) ** 1.5 * 2 / 3
-    # Im0p5 = fdi(x=eta_e, j=-1 / 2).real * SQRT_PI  # fdi gives norm'd FDIs.
     Im0p5 = fdi(j=-0.5, eta=eta_e, normalize=False)
 
     # Plasma (or perturber) effective charge
@@ -302,10 +307,8 @@ def ipd_crowley(Zi, ne, ni, Te, Ti, ForceConst):
     Lambda_p = Lambda_00 * (Zi + 0.5)
 
     # X terms(ratio of ion core radius to ion sphere radius)
-    X_0 = X_term(alpha, Lambda_0 ** (-1 / 3))
-    X_p = X_term(alpha, Lambda_p ** (-1 / 3))
-    # X_0 = X_term(alpha, Lambda_0)
-    # X_p = X_term(alpha, Lambda_p)
+    X_0 = X_term(alpha, Lambda_0)
+    X_p = X_term(alpha, Lambda_p)
 
     # Electron polarization terms
     X_const = alpha**2 * (ForceConst / 0.9) ** 1.5 - 1
