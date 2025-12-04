@@ -54,9 +54,9 @@ def get_ipd(plasma: xDave, state: PlasmaState, model: str, user_defined_ipd: flo
     elif model == "CROWLEY":
         return ipd_crowley(csd=csd, Zis=Zis, ne=ne, ni=ni, Te=Te, Ti=Ti, ForceConst=crowley_force_constant)
     elif model == "NONE":
-        return 0.0
+        return np.zeros(Zis.shape, dtype=np.float64)
     elif model == "USER_DEFINED":
-        return user_defined_ipd * eV_TO_J
+        return np.full(Zis.shape, user_defined_ipd * eV_TO_J, dtype=np.float64)
     else:
         raise NotImplementedError(f"IPD model {model} is not recognised. Try STEWART_PYATT.")
 
