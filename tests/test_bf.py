@@ -98,6 +98,9 @@ def test_bf_mcss():
     ax.set_xlim(-40, 300)
     plt.show()
 
+    if not np.isclose(dsf / J_TO_eV, np.interp(x=omega_array * J_TO_eV, xp=En, fp=wbf), rtol=1.0e-6).all():
+        print(f"IA test has failed.")
+
 
 def test_be_bf():
     # Comparison to Fig. 2 Mattern and Seidel, Phys. Plasmas 20 (2013)
@@ -233,6 +236,6 @@ def test_version():
 
 
 if __name__ == "__main__":
-    # test_bf_mcss()
+    test_bf_mcss()
     # test_be_bf()
     test_version()

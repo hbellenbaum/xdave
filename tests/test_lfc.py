@@ -265,8 +265,10 @@ def test_fortmann_2010():
         os.path.join(THIS_DIR, f"comparison_data/lfc/Fortmann_2010_Fig2_farid.csv"), delimiter=","
     )
 
+    kF = state.fermi_wave_number(state.free_electron_number_density)
+
     plt.figure()
-    plt.plot(ks / state.fermi_wave_number(state.free_electron_number_density), lfcs_iu, label=f"UI", ls="-.", c="navy")
+    plt.plot(ks / kF, lfcs_iu, label=f"UI", ls="-.", c="navy")
     plt.scatter(dat_iu[:, 0], dat_iu[:, 1], label=f"Fortmann et al., UI", c="navy")
     plt.plot(
         ks / state.fermi_wave_number(state.free_electron_number_density),
@@ -278,6 +280,11 @@ def test_fortmann_2010():
     plt.scatter(dat_farid[:, 0], dat_farid[:, 1], label=f"Fortmann et al., Farid", c="crimson")
     plt.legend()
     plt.show()
+
+    if not np.isclose(lfcs_iu, np.interp(x=ks / kF, xp=dat_iu[:, 0], fp=dat_iu[:, 1]), atol=1.0e-1).all():
+        print(f"UI LFC test has failed.")
+    if not np.isclose(lfcs_FARID, np.interp(x=ks / kF, xp=dat_farid[:, 0], fp=dat_farid[:, 1]), atol=1.0e-1).all():
+        print(f"Farid LFC test has failed.")
 
 
 def test_farid():
@@ -398,6 +405,19 @@ def test_dornheim_2021():
     plt.xlabel(r"$k$ [$a_B^{-1}$]")
     plt.legend()
     plt.show()
+
+    ks_bohr = ks * BOHR_RADIUS
+
+    if not np.isclose(
+        lfc_theta1, np.interp(x=ks_bohr, xp=dat_theta1[:, 0] * kF1, fp=dat_theta1[:, 1]), atol=1.0e-2
+    ).all():
+        # print(np.abs(lfc_theta1 - np.interp(x=ks_bohr, xp=dat_theta1[:, 0] * kF1, fp=dat_theta1[:, 1])))
+        print(f"Dornheim LFC test has failed for theta = 1.")
+    if not np.isclose(
+        lfc_theta2, np.interp(x=ks_bohr, xp=dat_theta2[:, 0] * kF1, fp=dat_theta2[:, 1]), atol=1.0e-1
+    ).all():
+        # print(np.abs(lfc_theta2 - np.interp(x=ks_bohr, xp=dat_theta2[:, 0] * kF1, fp=dat_theta2[:, 1])))
+        print(f"Dornheim LFC test has failed for theta = 2.")
 
 
 def test_ui():
@@ -551,8 +571,8 @@ if __name__ == "__main__":
     # test_ui_gv_mcss()
     # test_gv()
     # test_gregori_2007()
-    # test_fortmann_2010()
-    # test_dornheim_2021()
+    test_fortmann_2010()
+    test_dornheim_2021()
     # test_farid()
     # test_ui()
     test_version()

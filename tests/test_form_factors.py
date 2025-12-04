@@ -36,12 +36,12 @@ def test_carbon_ff():
     plt.plot(ks, xdave_c3, label="xDave: C3", ls="-.", c="orange")
     plt.plot(ks, xdave_c4, label="xDave: C4", ls="-.", c="crimson")
     plt.plot(ks, xdave_c5, label="xDave: C5", ls="-.", c="magenta")
-    plt.plot(c0[:, 0], c0[:, 1], label="C0", ls="--", c="navy", alpha=0.4)
-    plt.plot(c1[:, 0], c1[:, 1], label="C1", ls="--", c="dodgerblue", alpha=0.4)
-    plt.plot(c2[:, 0], c2[:, 1], label="C2", ls="--", c="lightgreen", alpha=0.4)
-    plt.plot(c3[:, 0], c3[:, 1], label="C3", ls="--", c="orange", alpha=0.4)
-    plt.plot(c4[:, 0], c4[:, 1], label="C4", ls="--", c="crimson", alpha=0.4)
-    plt.plot(c5[:, 0], c5[:, 1], label="C5", ls="--", c="magenta", alpha=0.4)
+    plt.plot(c0[:, 0], c0[:, 1], label="Test data: C0", ls="--", c="navy", alpha=0.4)
+    plt.plot(c1[:, 0], c1[:, 1], label="Test data: C1", ls="--", c="dodgerblue", alpha=0.4)
+    plt.plot(c2[:, 0], c2[:, 1], label="Test data: C2", ls="--", c="lightgreen", alpha=0.4)
+    plt.plot(c3[:, 0], c3[:, 1], label="Test data: C3", ls="--", c="orange", alpha=0.4)
+    plt.plot(c4[:, 0], c4[:, 1], label="Test data: C4", ls="--", c="crimson", alpha=0.4)
+    plt.plot(c5[:, 0], c5[:, 1], label="Test data: C5", ls="--", c="magenta", alpha=0.4)
     plt.legend()
     plt.xlabel(r"$k$ [$1/a_B$]")
     plt.ylabel("Form factor")
@@ -98,5 +98,5 @@ def test_version():
 
 
 if __name__ == "__main__":
-    # test_carbon_ff()
+    test_carbon_ff()
     test_version()

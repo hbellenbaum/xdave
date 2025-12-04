@@ -66,13 +66,28 @@ def test_ff():
         )
 
         axes.plot(omega_new * J_TO_eV, dsfs2_new / J_TO_eV, label=f"RPA Fit: q={q}", c=cs, ls="-.")
-        axes.plot(omega_new * J_TO_eV, dsfs_new / J_TO_eV, label=f"RPA Fit: q={q}", c=cs, ls="solid")
+        axes.plot(omega_new * J_TO_eV, dsfs_new / J_TO_eV, label=f"RPA: q={q}", c=cs, ls="solid")
 
     axes.set_xlabel(r"$\omega$ [eV]")
     axes.set_ylabel(r"DSF [1/eV]")
     axes.legend()
     plt.tight_layout()
     plt.show()
+
+    rtol = 1.0e-2
+
+    if not np.isclose(
+        dsfs_new / J_TO_eV,
+        np.interp(x=omega_array * J_TO_eV, xp=dat_j[:, 0] * RYDBERG_TO_eV, fp=dat_j[:, 4] / RYDBERG_TO_eV),
+        rtol=rtol,
+    ).all():
+        print(f"RPA test has failed.")
+    if not np.isclose(
+        dsfs2_new / J_TO_eV,
+        np.interp(x=omega_array * J_TO_eV, xp=dat_j[:, 0] * RYDBERG_TO_eV, fp=dat_j[:, 4] / RYDBERG_TO_eV),
+        rtol=rtol,
+    ).all():
+        print(f"Dandrea test has failed.")
 
 
 def test_mermin_ff():
@@ -225,6 +240,6 @@ def test_version():
 
 
 if __name__ == "__main__":
-    # test_ff()
+    test_ff()
     # test_mermin_ff()
-    test_version()
+    # test_version()
