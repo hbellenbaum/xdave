@@ -117,8 +117,6 @@ def inverse_electron_screening_length_sqr(ne, Te):
 
 def ipd_debye_hueckel(csd, Zis, ne, ni, Te, Ti):
 
-    # NOTE(TG): Setting up some stuff here in case code eventually handles multiple charge states
-    # NOTE(HB): it will never handle multiple charge states, but thank you!
     Zmean = ne / ni
     Zstar = np.sum(Zis**2 * csd) / Zmean
 
@@ -148,9 +146,6 @@ def ipd_stewart_pyatt(csd, Zis, ne, ni, Te, Ti):
     """
     Corrected Stewart-Pyatt model [Roepke (2019)]
     """
-    # NOTE(TG): Added in the ion contribution to the IPD here, which was missing and necessary for SP.
-    #           Note that SP assumes the electrons and ions are in =ium. More advanced model like Crowley needed
-    #           to treat two-temp system with arbitrary temperature (otherwise ion screening length explodes!).
 
     # Ion sphere radius depends on the charge state you're changing into
     r_IS = (3 * (Zis + 1) / (FOUR_PI * ne)) ** (1 / 3)
@@ -174,7 +169,6 @@ def ipd_ecker_kroell(csd, Zis, ne, ni, Te, Ti, Zns):
     Original Ecker-Kroell model
     """
 
-    # NOTE(TG): Setting up some stuff here in case code eventually handles multiple charge states
     Zmean = ne / ni
     Zstar = Zstar = np.sum(Zis**2 * csd) / Zmean  # csd = charge state distribution
 
@@ -182,11 +176,9 @@ def ipd_ecker_kroell(csd, Zis, ne, ni, Te, Ti, Zns):
     kappa_C_sqr *= 1 + Zstar
     kappa_D = np.sqrt(kappa_C_sqr)
 
-    # NOTE(TG): Missing the electron term in the EK radius, which was probably causing the issue
     inv_R_EK = ((FOUR_PI * (ne + ni)) / 3) ** (1 / 3)
 
     # Critical density
-    # NOTE(TG): if multiple species included, there needs to be a different nc for each species...
     n_c = 3 / FOUR_PI * (BOLTZMANN_CONSTANT * Te / UNIT_COULOMB_POTENTIAL / Zns**2) ** 3
 
     # Ecker-Kroells constant
@@ -195,8 +187,6 @@ def ipd_ecker_kroell(csd, Zis, ne, ni, Te, Ti, Zns):
 
     common_const = (Zis + 1) * UNIT_COULOMB_POTENTIAL
 
-    # The ionization potential depression energy shift
-    # NOTE(TG): n_c is tested against total particle density in the system, not just ions
     ipd_shift = common_const * np.where(ni + ne <= n_c, kappa_D, C_EK * inv_R_EK)
 
     return -ipd_shift
