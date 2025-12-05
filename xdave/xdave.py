@@ -287,7 +287,7 @@ class xDave:
         print(f"Calculated LFC={lfc}") if self.verbose else None
 
         if self.ipd_eV is not None:
-            ipd = self.ipd_eV * eV_TO_J
+            state_ipds = np.full(len(self.states), self.ipd_eV * eV_TO_J)
             if self.verbose:
                 print(f"Applying user-defined input IPD: {self.ipd_eV}")
         else:
@@ -295,8 +295,7 @@ class xDave:
                 plasma=self, state=self.overlord_state, model=self.models.ipd_model,
                 user_defined_ipd=self.ipd_eV, crowley_force_constant=self.crowley_force_constant
                 )
-            if self.verbose:
-                print(f"Calculated IPD={ipd * J_TO_eV} eV")
+                
 
         ff = FreeFreeDSF(state=self.overlord_state)
         if self.overlord_state.charge_state > 0:
@@ -318,7 +317,8 @@ class xDave:
             x   = self.partial_densities[i]
             ipd = state_ipds[i]
             if self.verbose:
-                print(f"\nRunning state {i} with Z={state.charge_state} and x={x}\n")
+                print(f"\nRunning state {i} with Z={state.charge_state} and x={x}")
+                print(f"Calculated IPD for state {i}={ipd * J_TO_eV} eV\n")
             
             binding_energies = state.binding_energies * eV_TO_J
 
@@ -489,7 +489,7 @@ class xDave:
             print(f"Calculated LFC={lfc}")
 
         if self.ipd_eV is not None:
-            ipd = self.ipd_eV * eV_TO_J
+            state_ipds = np.full(len(self.states), self.ipd_eV * eV_TO_J)
             if self.verbose:
                 print(f"Applying user-defined input IPD: {self.ipd_eV}")
         else:
@@ -497,8 +497,6 @@ class xDave:
                 plasma=self, state=self.overlord_state, model=self.models.ipd_model,
                 user_defined_ipd=self.ipd_eV, crowley_force_constant=self.crowley_force_constant
                 )
-            if self.verbose:
-                print(f"Calculated IPD={ipd * J_TO_eV} eV")
 
         ff = FreeFreeDSF(state=self.overlord_state)
         ff_dsf = ff.get_dsf(k=k_SI, w=w_SI, lfc=lfc, model=self.models.polarisation_model)
@@ -517,6 +515,8 @@ class xDave:
             ipd = state_ipds[i]
             if self.verbose:
                 print(f"\nRunning state {i} with Z={state.charge_state} and x={x}\n")
+                print(f"Calculated IPD for state {i}={ipd * J_TO_eV} eV\n")
+
             binding_energies = state.binding_energies * eV_TO_J
 
             ff_i[i] = x * ff_dsf
