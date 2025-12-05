@@ -326,7 +326,7 @@ class xDave:
 
             Eb = binding_energies - ipd
 
-            if np.any(np.abs(ipd) > (np.abs(binding_energies[binding_energies < 0.0]))):
+            if np.any(ipd < binding_energies[binding_energies < 0.0]):
                 warnings.warn(
                     f"IPD {ipd * J_TO_eV} is larger than the binding energy of state {i}: {binding_energies[binding_energies < 0.]* J_TO_eV}. Consider increasing your ionization degree. The bound-free feature is being set to zero."
                 )
@@ -523,7 +523,7 @@ class xDave:
 
             Eb = binding_energies - ipd
 
-            if np.any(np.abs(ipd) > (np.abs(binding_energies[binding_energies < 0.0]))):
+            if np.any(ipd < binding_energies[binding_energies < 0.0]):
                 warnings.warn(
                     f"IPD {ipd * J_TO_eV} is larger than the binding energy of state {i}: {binding_energies[binding_energies < 0.]* J_TO_eV}. Consider increasing your ionization degree. The bound-free feature is being set to zero."
                 )
