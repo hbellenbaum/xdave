@@ -110,14 +110,18 @@ class ScreeningCloud:
         # return screening_cloud
 
     def _debye_huckel_screening_full(self, k, lfc, Uee, Uei):
-        kappa_e = self.overlord_state.screening_length(
+        kappa_e_full = self.overlord_state.screening_length(
             mass=ELECTRON_MASS,
             charge=1,
             temperature=self.overlord_state.electron_temperature,
-            number_density=self.overlord_state.total_electron_number_density,
+            number_density=self.overlord_state.free_electron_number_density,
         )
-        kappa_e = np.real(kappa_e)
-        screening_length = kappa_e**2
+        kappa_e = self.overlord_state.debye_screening_length(
+            1, self.overlord_state.free_electron_number_density, self.overlord_state.electron_temperature
+        )
+        # kappa_e = np.real(kappa_e)
+        # kappa_e = 28809906697.517681
+        screening_length = kappa_e_full**2
         ratio = Uei / Uee
         screening_cloud = -ratio * screening_length / (k**2 + (1 - lfc) * screening_length)
 
@@ -147,7 +151,8 @@ class ScreeningCloud:
         return screening_length
 
     def _finite_wavelength_screening_full(self, k, lfc, Uee, Uei):
-        pol_func = FreeFreeDSF(state=self.state).dandrea_fit(k=k, omega=0.0).real
+
+        pol_func = FreeFreeDSF(state=self.overlord_state).dandrea_fit(k=k, omega=0.0).real
         screening_length = -(k**2) * Uee * pol_func
         ratio = Uei / Uee
         screening_cloud = -ratio * screening_length / (k**2 + (1 - lfc) * screening_length)
