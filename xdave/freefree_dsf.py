@@ -3,6 +3,7 @@ from .unit_conversions import *
 from .maths import log1pexp
 from .plasma_state import PlasmaState
 from .fermi_integrals import fdi
+from .static_sf import OCPStaticStructureFactor
 
 from scipy import integrate
 
@@ -66,6 +67,14 @@ class FreeFreeDSF:
 
         return S_EG_LFC
 
+    def get_collision_frequency(self, k, w, lfc, model):
+        if model == "BORN":
+            return self._born_ei_collision_frequency(k, w, lfc)
+        elif model == "ZIMAN":
+            return self._ziman_ei_collision_frequency()
+        else:
+            raise NotImplementedError(f"Model {model} not recognized.")
+
     def dielectric_function(self, k, w, model):
         """
         Calculate the free electron dielectric function for a given model.
@@ -92,7 +101,7 @@ class FreeFreeDSF:
             warnings.warn(
                 f"Model {model} for the free-free component not yet working properly and should not be used."
             )
-            dielectric_func = self.mermin_dielectric_function_old(k=k, w=w)
+            dielectric_func = self.mermin_dielectric_function(k=k, w=w)
         else:
             dielectric_func = self.rpa_numerical_dielectric_func(k=k, w=w)
             warnings.warn(f"Model {model} for the free-free component not recognized. Overwriting using NUMERICAL.")
@@ -482,6 +491,43 @@ class FreeFreeDSF:
 
         return pol_func
 
+    def _ziman_ei_collision_frequency(self):
+        """
+        Calculate the Ziman collision frequency.
+        For details see Eqn. (12) in Fortmann et al., Phys. Rev. E 81 (2010).
+
+        Returns:
+            array: collision frequency in units of J
+        """
+        rs = self.state.rs
+        EF = self.state.fermi_energy(self.state.free_electron_number_density, ELECTRON_MASS)
+        a = 0.11523
+        b = 6.02921
+        collision_frequency = EF / DIRAC_CONSTANT * (a * rs**2 * (np.log(1 + b / rs) - 1 / (1 + rs / b)))
+        return collision_frequency
+
+    def _born_ei_collision_frequency(self, k, w, lfc):
+        k_temp = np.linspace(1.0e-3, 1.0e2, 1000) / BOHR_RADIUS
+        Siik = OCPStaticStructureFactor(state=self.state).get_ii_static_structure_factor(k=k_temp, sf_model="HNC")
+
+        Zi = self.state.charge_state
+        mi = self.state.atomic_mass
+        ni = self.state.ion_number_density
+        ne = self.state.free_electron_number_density
+        w_plasma = self.state.plasma_frequency(charge=Zi, number_density=ni, mass=mi)
+        w_freq = w / DIRAC_CONSTANT
+
+        def integral(q):
+            epsilon0 = self.dandrea_fit(k=q, omega=0)
+            epsilon = self.dandrea_fit(k=q, omega=w)
+            Sii = np.interp(q, xp=k_temp, fp=Siik)
+            return 1 / TWO_PI**3 * Sii / epsilon0 * (epsilon - epsilon0)
+
+        prefactor = FOUR_THIRDS_PI * w_plasma / w_freq * mi / ELECTRON_MASS * 1 / ne * 1.0j
+        int_term, _ = integrate.quad_vec(integral, 0, 1.0e14)
+        return prefactor * int_term
+        # interp_Sk = np.interp(k_temp, Siik, fill_value="extrapolate")
+
     def _real_dielectric_mermin(self, k, w, mu1, mu2):
         wtilde = w - mu2
         kappa = wtilde * ELECTRON_MASS / (DIRAC_CONSTANT * k)
@@ -491,24 +537,21 @@ class FreeFreeDSF:
         )
         # kF = self.state.fermi_wave_number(self.state.free_electron_number_density)
         beta = 1 / (BOLTZMANN_CONSTANT * self.state.electron_temperature)
-        KE = DIRAC_CONSTANT**2 * k**2 / (2 * ELECTRON_MASS)
-        w0 = 1
+        k_half = k / 2
 
         def real_integral(q):
-            q /= w0
-            x = np.tan(HALF_PI * q)
-            dx_dq = HALF_PI * (1 / np.cos(HALF_PI * q) ** 2)
-            fq = 1 / (np.exp((KE - mue) * beta) + 1)
-            numerator = (delta**2 + (kappa - k / 2 - x) ** 2) * (delta**2 + (kappa + k / 2 + x))
-            denominator = (delta**2 + (kappa - k / 2 + x) ** 2) * (delta**2 + (kappa + k / 2 - x) ** 2)
+            KEq = DIRAC_CONSTANT_SQR * q**2 / (2 * ELECTRON_MASS)
+            fq = 1 / (np.exp((KEq - mue) * beta) + 1)
+            numerator = (delta**2 + (kappa - k_half - q) ** 2) * (delta**2 + (kappa + k_half + q))
+            denominator = (delta**2 + (kappa - k_half + q) ** 2) * (delta**2 + (kappa + k_half - q) ** 2)
             log_term = np.log(numerator / denominator)
-            I = 1 / TWO_PI**3 * x * fq * log_term * dx_dq
+            I = 1 / TWO_PI**3 * q * fq * log_term
             return I
 
         # units: kg * C^2 / (C^2 * kg ^(-1) * m ^ (-3) * s^2 * (J *s) ^ 2 * m^(-3))
         prefactor = TWO_PI * ELECTRON_MASS * ELEMENTARY_CHARGE_SQR / (VACUUM_PERMITTIVITY * DIRAC_CONSTANT_SQR * k**3)
-        int_term, _ = integrate.quad_vec(real_integral, 0, 1.0)
-        return 1 + prefactor * int_term * w0
+        int_term, _ = integrate.quad_vec(real_integral, 0, 1.12)
+        return 1 + prefactor * int_term
 
     def _im_dielectric_mermin(self, k, w, mu1, mu2):
         # TODO(HB): get this working
@@ -520,46 +563,35 @@ class FreeFreeDSF:
             self.state.electron_temperature, self.state.free_electron_number_density, ELECTRON_MASS
         )
         beta = 1 / (BOLTZMANN_CONSTANT * self.state.electron_temperature)
-        KE = DIRAC_CONSTANT**2 * k**2 / (2 * ELECTRON_MASS)
         w0 = 1
+        k_half = k / 2
 
         def imag_integral(q):
-            q /= w0
-            x = np.tan(HALF_PI * q)
-            dx_dq = HALF_PI * (1 / np.cos(HALF_PI * q) ** 2)
-            fq = 1 / (np.exp((KE - mue) * beta) + 1)
+            KEq = DIRAC_CONSTANT_SQR * q**2 / (2 * ELECTRON_MASS)
+            fq = 1 / (np.exp((KEq - mue) * beta) + 1)
             I = (
                 1
                 / TWO_PI**3
                 * fq
-                * x
+                * q
                 * (
-                    np.arctan((kappa - k / 2 - x) / delta)
-                    + np.arctan((kappa + k / 2 + x) / delta)
-                    - np.arctan((kappa - k / 2 + x) / delta)
-                    - np.arctan((kappa + k / 2 - x) / delta)
+                    np.arctan((kappa - k_half - q) / delta)
+                    + np.arctan((kappa + k_half + q) / delta)
+                    - np.arctan((kappa - k_half + q) / delta)
+                    - np.arctan((kappa + k_half - q) / delta)
                 )
             )
-            return I * dx_dq
+            return I  # * dx_dq
 
         prefactor = (
             -FOUR_PI * ELECTRON_MASS * ELEMENTARY_CHARGE_SQR / (VACUUM_PERMITTIVITY * DIRAC_CONSTANT_SQR * k**3)
         )
-        # prefactor = (
-        #     2
-        #     * ELECTRON_MASS**2
-        #     * ELEMENTARY_CHARGE**2
-        #     / VACUUM_PERMITTIVITY
-        #     * DIRAC_CONSTANT
-        #     * w
-        #     / (DIRAC_CONSTANT * k) ** 3
-        # )
-        int_term, _ = integrate.quad_vec(imag_integral, 0, 1.0)
+        int_term, _ = integrate.quad_vec(imag_integral, 0, 1.0e12)
         imag_part = prefactor * int_term * w0
 
         return imag_part
 
-    def mermin_dielectric_function_old(
+    def mermin_dielectric_function(
         self, k, w, lfc=0, collision_frequency_model="BORN", input_collision_frequency=None
     ):
         """
@@ -575,11 +607,12 @@ class FreeFreeDSF:
         Returns:
             array: polarisation, non-dimensional
         """
-        wp = self.state.plasma_frequency(
-            -1, self.state.free_electron_number_density, ELECTRON_MASS
-        )  # * DIRAC_CONSTANT
+        wp = self.state.plasma_frequency(-1, self.state.free_electron_number_density, ELECTRON_MASS)
         w_freq = w / DIRAC_CONSTANT
-        mu_ei = 1.0e-2 * wp * (1.0 + 0.0j)
+        if input_collision_frequency is not None:
+            mu_ei = input_collision_frequency * wp * (1.0 + 1.0j)
+        else:
+            mu_ei = self.get_collision_frequency(k=k, w=w, lfc=lfc, model=collision_frequency_model)
         mu1 = mu_ei.real
         mu2 = mu_ei.imag
         real_part = self._real_dielectric_mermin(k=k, w=w_freq, mu1=mu1, mu2=mu2)
@@ -591,407 +624,3 @@ class FreeFreeDSF:
             1 + 1.0j * mu_ei / w_freq * (dielectric_function - 1) / (dielectric_rpa0 - 1)
         )
         return mermin_dielectric
-
-    def mermin_dielectric_function(
-        self, k, w, lfc=0, collision_frequency_model="BORN", input_collision_frequency=None
-    ):
-        nu = 1.0e-2  # Ha, will need to replace this using the Born model e.g.
-        kb = 3.166811563e-6  # Boltzmann constant in units of Ha / K
-        me = 1.0  # electron mass in atomic units
-        Te = self.state.electron_temperature  # * eV_TO_Ha / kb
-        ne = self.state.free_electron_number_density * 1.0e-2 / BOHR_RADIUS**3
-        q = k * BOHR_RADIUS
-        mue = (
-            self.state.chemical_potential_ichimaru(
-                self.state.electron_temperature, self.state.free_electron_number_density, ELECTRON_MASS
-            )
-            * J_TO_Ha
-        )
-
-        w_vals = np.array(w) * J_TO_Ha
-
-        eps = 1.0e-6  # integration error
-
-        renu = nu.real
-        imnu = nu.imag
-
-        Uee = 8.0 * PI / q**2
-        w0 = 0.0
-        renu_saved = renu
-        imnu_saved = imnu
-        # temporarily set renu -> small, imnu -> 0
-        renu_tmp = 1e-8
-        imnu_tmp = 0.0
-
-        polem = np.abs(0.5 * q - 0.5 * me / q * (w0 - imnu_tmp))
-        polep = 0.5 * q + 0.5 * me / q * (w0 - imnu_tmp)
-        klim = me * (kb * Te * np.log(1.0 / 1e-4 - 1.0) + mue)
-
-        def repi_int(ks, Te, mu, q, w, imnu, renu):
-            """Finite-k real-part integrand"""
-            k = ks  # [1/a0]
-            beta = 1.0 / (kb * Te)  # [1/Ha]
-            fk = 1.0 / (np.exp(beta * (k * k / me - mu)) + 1.0)  # [ ]
-            sa = 0.5 * me / q  # [ 1/a0]
-
-            ln1 = np.log((k - 0.5 * q - sa * (w - imnu)) ** 2 + (sa * sa) * (renu * renu))
-            ln2 = np.log((k - 0.5 * q + sa * (w - imnu)) ** 2 + (sa * sa) * (renu * renu))
-            repi_int1 = 0.5 * k * fk * (ln1 + ln2)
-
-            kneg = -k
-            ln1 = np.log((kneg - 0.5 * q - sa * (w - imnu)) ** 2 + (sa * sa) * (renu * renu))
-            ln2 = np.log((kneg - 0.5 * q + sa * (w - imnu)) ** 2 + (sa * sa) * (renu * renu))
-            repi_int2 = 0.5 * kneg * fk * (ln1 + ln2)
-
-            if abs(repi_int2) > 0.0:
-                ratio_test = abs(abs(repi_int1 / repi_int2) - 1.0)
-            else:
-                ratio_test = np.inf
-
-            if ratio_test < 1e-10:
-                return 0.0
-            else:
-                return repi_int1 + repi_int2
-
-        def repi_int_inf(ks, Te, mu, q, w, imnu, renu):
-            """Infinite-domain mapped real-part integrand via k = tan(ks)"""
-            k = np.tan(ks)
-            beta = 1.0 / (kb * Te)
-            fk = 1.0 / (np.exp(beta * (k * k / me - mu)) + 1.0)
-            sa = 0.5 * me / q
-
-            ln1 = np.log((k - 0.5 * q - sa * (w - imnu)) ** 2 + (sa * sa) * (renu * renu))
-            ln2 = np.log((k - 0.5 * q + sa * (w - imnu)) ** 2 + (sa * sa) * (renu * renu))
-            val = 0.5 * k * fk * (ln1 + ln2)
-
-            kneg = -k
-            ln1 = np.log((kneg - 0.5 * q - sa * (w - imnu)) ** 2 + (sa * sa) * (renu * renu))
-            ln2 = np.log((kneg - 0.5 * q + sa * (w - imnu)) ** 2 + (sa * sa) * (renu * renu))
-            val += 0.5 * kneg * fk * (ln1 + ln2)
-
-            return val / (np.cos(ks) ** 2)
-
-        def impi_int(ks, Te, mu, q, w, imnu, renu):
-            """Finite-k imaginary-part integrand"""
-            k = ks
-            beta = 1.0 / (kb * Te)
-            fk = 1.0 / (np.exp(beta * (k * k / me - mu)) + 1.0)
-            sa = 0.5 * me / q
-
-            den1 = k - 0.5 * q - sa * (w - imnu)
-            if den1 < 0.0:
-                at1 = -np.arctan(sa * renu / den1)
-            else:
-                at1 = -np.arctan(sa * renu / den1) + PI
-
-            den2 = k - 0.5 * q + sa * (w - imnu)
-            if den2 < 0.0:
-                at2 = np.arctan(sa * renu / den2) + PI
-            else:
-                at2 = np.arctan(sa * renu / den2)
-
-            impi_int1 = k * fk * (at1 + at2)
-
-            kneg = -k
-            den1 = kneg - 0.5 * q - sa * (w - imnu)
-            if den1 < 0.0:
-                at1 = -np.arctan(sa * renu / den1)
-            else:
-                at1 = -np.arctan(sa * renu / den1) + PI
-
-            den2 = kneg - 0.5 * q + sa * (w - imnu)
-            if den2 < 0.0:
-                at2 = np.arctan(sa * renu / den2) + PI
-            else:
-                at2 = np.arctan(sa * renu / den2)
-
-            impi_int2 = kneg * fk * (at1 + at2)
-
-            if abs(impi_int2) > 0.0:
-                ratio_test = abs(abs(impi_int1 / impi_int2) - 1.0)
-            else:
-                ratio_test = np.inf
-
-            if ratio_test < 1e-10:
-                return 0.0
-            else:
-                return impi_int1 + impi_int2
-
-        def impi_int_inf(ks, Te, mu, q, w, imnu, renu):
-            """Infinite-domain mapped imaginary-part integrand via k = tan(ks)"""
-            k = np.tan(ks)
-            beta = 1.0 / (kb * Te)
-            fk = 1.0 / (np.exp(beta * (k * k / me - mu)) + 1.0)
-            sa = 0.5 * me / q
-
-            den1 = k - 0.5 * q - sa * (w - imnu)
-            if den1 < 0.0:
-                at1 = -np.arctan(sa * renu / den1)
-            else:
-                at1 = -np.arctan(sa * renu / den1) + PI
-
-            den2 = k - 0.5 * q + sa * (w - imnu)
-            if den2 < 0.0:
-                at2 = np.arctan(sa * renu / den2) + PI
-            else:
-                at2 = np.arctan(sa * renu / den2)
-
-            val = k * fk * (at1 + at2)
-
-            kneg = -k
-            den1 = kneg - 0.5 * q - sa * (w - imnu)
-            if den1 < 0.0:
-                at1 = -np.arctan(sa * renu / den1)
-            else:
-                at1 = -np.arctan(sa * renu / den1) + PI
-
-            den2 = kneg - 0.5 * q + sa * (w - imnu)
-            if den2 < 0.0:
-                at2 = np.arctan(sa * renu / den2) + PI
-            else:
-                at2 = np.arctan(sa * renu / den2)
-
-            val += kneg * fk * (at1 + at2)
-            return val / (np.cos(ks) ** 2)
-
-        # ---------------------------
-        # Integrators: rcauch and rgauss using scipy.integrate.quad
-        # ---------------------------
-
-        def rcauch(func, a, b, c, eps, args=()):
-            """
-            Cauchy-type integrator: splits the integral at the pole location c and integrates
-            from [a, c-eps] and [c+eps, b]. 'func' should be callable with signature func(k, *args).
-            """
-            if not (a < c < b):
-                # no pole inside interval, integrate directly
-                val, err = integrate.quad(lambda x: func(x, *args), a, b, limit=200)
-                return val
-            left, el = integrate.quad(lambda x: func(x, *args), a, c - eps, limit=200)
-            right, er = integrate.quad(lambda x: func(x, *args), c + eps, b, limit=200)
-            return left + right
-
-        def rgauss(func, a, b, eps, args=()):
-            """
-            Gaussian-mapped integrator (here: simple integrate.quad over [a,b]) where func accepts (ks, *args)
-            """
-            val, err = integrate.quad(lambda x: func(x, *args), a, b, limit=200)
-            return val
-
-        if (polep < klim) and (polep != polem):
-            kum = 0.5 * (polep + klim)
-            k0 = 0.5 * (polem + polep)
-            repik0 = rcauch(
-                lambda k, Te_, mu_, q_, w_, imnu_, renu_: repi_int(k, Te_, mu_, q_, w_, imnu_, renu_),
-                0.0,
-                k0,
-                polem,
-                eps,
-                args=(Te, mue, q, w0, imnu_tmp, renu_tmp),
-            )
-            repik0 += rcauch(
-                lambda k, Te_, mu_, q_, w_, imnu_, renu_: repi_int(k, Te_, mu_, q_, w_, imnu_, renu_),
-                k0,
-                kum,
-                polep,
-                eps,
-                args=(Te, mue, q, w0, imnu_tmp, renu_tmp),
-            )
-            kum_ang = np.arctan(kum)
-            klim_ang = np.arctan(klim)
-            repik0 += rgauss(
-                lambda ks, Te_, mu_, q_, w_, imnu_, renu_: repi_int_inf(ks, Te_, mu_, q_, w_, imnu_, renu_),
-                kum_ang,
-                klim_ang,
-                eps,
-                args=(Te, mue, q, w0, imnu_tmp, renu_tmp),
-            )
-        else:
-            if polem < klim:
-                kum = 0.5 * (polem + klim)
-                repik0 = rcauch(
-                    lambda k, Te_, mu_, q_, w_, imnu_, renu_: repi_int(k, Te_, mu_, q_, w_, imnu_, renu_),
-                    0.0,
-                    kum,
-                    polem,
-                    eps,
-                    args=(Te, mue, q, w0, imnu_tmp, renu_tmp),
-                )
-                kum_ang = np.arctan(kum)
-                klim_ang = np.arctan(klim)
-                repik0 += rgauss(
-                    lambda ks, Te_, mu_, q_, w_, imnu_, renu_: repi_int_inf(ks, Te_, mu_, q_, w_, imnu_, renu_),
-                    kum_ang,
-                    klim_ang,
-                    eps,
-                    args=(Te, mue, q, w0, imnu_tmp, renu_tmp),
-                )
-            else:
-                klim_ang = np.arctan(klim)
-                repik0 = rgauss(
-                    lambda ks, Te_, mu_, q_, w_, imnu_, renu_: repi_int_inf(ks, Te_, mu_, q_, w_, imnu_, renu_),
-                    0.0,
-                    klim_ang,
-                    eps,
-                    args=(Te, mue, q, w0, imnu_tmp, renu_tmp),
-                )
-
-        repik0 = repik0 * 0.25 * me / (PI * PI * q)
-
-        # restore renu/imnu
-        renu = renu_saved
-        imnu = imnu_saved
-        real_part = np.zeros_like(w_vals)
-        imag_part = np.zeros_like(w_vals)
-
-        # Main loop over frequencies
-        # for w in w_vals:
-        for i in range(0, len(w_vals)):
-            w = w_vals[i]
-            polem = abs(0.5 * q - 0.5 * me / q * (w - imnu))
-            polep = 0.5 * q + 0.5 * me / q * (w - imnu)
-            klim = np.sqrt(me * (kb * Te * np.log(1.0 / 1e-4 - 1.0) + mue))
-
-            # compute repi and impi with same branching
-            if (polep < klim) and (polem != polep):
-                kum = 0.5 * (polep + klim)
-                k0 = 0.5 * (polem + polep)
-
-                impi = rcauch(
-                    lambda k, Te_, mu_, q_, w_, imnu_, renu_: impi_int(k, Te_, mu_, q_, w_, imnu_, renu_),
-                    0.0,
-                    k0,
-                    polem,
-                    eps,
-                    args=(Te, mue, q, w, imnu, renu),
-                )
-                impi += rcauch(
-                    lambda k, Te_, mu_, q_, w_, imnu_, renu_: impi_int(k, Te_, mu_, q_, w_, imnu_, renu_),
-                    k0,
-                    kum,
-                    polep,
-                    eps,
-                    args=(Te, mue, q, w, imnu, renu),
-                )
-
-                repi = rcauch(
-                    lambda k, Te_, mu_, q_, w_, imnu_, renu_: repi_int(k, Te_, mu_, q_, w_, imnu_, renu_),
-                    0.0,
-                    k0,
-                    polem,
-                    eps,
-                    args=(Te, mue, q, w, imnu, renu),
-                )
-                repi += rcauch(
-                    lambda k, Te_, mu_, q_, w_, imnu_, renu_: repi_int(k, Te_, mu_, q_, w_, imnu_, renu_),
-                    k0,
-                    kum,
-                    polep,
-                    eps,
-                    args=(Te, mue, q, w, imnu, renu),
-                )
-
-                kum_ang = np.arctan(kum)
-                klim_ang = np.arctan(klim)
-                impi += rgauss(
-                    lambda ks, Te_, mu_, q_, w_, imnu_, renu_: impi_int_inf(ks, Te_, mu_, q_, w_, imnu_, renu_),
-                    kum_ang,
-                    klim_ang,
-                    eps,
-                    args=(Te, mue, q, w, imnu, renu),
-                )
-                repi += rgauss(
-                    lambda ks, Te_, mu_, q_, w_, imnu_, renu_: repi_int_inf(ks, Te_, mu_, q_, w_, imnu_, renu_),
-                    kum_ang,
-                    klim_ang,
-                    eps,
-                    args=(Te, mue, q, w, imnu, renu),
-                )
-
-            else:
-                if polem < klim:
-                    kum = 0.5 * (polem + klim)
-
-                    impi = rcauch(
-                        lambda k, Te_, mu_, q_, w_, imnu_, renu_: impi_int(k, Te_, mu_, q_, w_, imnu_, renu_),
-                        0.0,
-                        kum,
-                        polem,
-                        eps,
-                        args=(Te, mue, q, w, imnu, renu),
-                    )
-                    repi = rcauch(
-                        lambda k, Te_, mu_, q_, w_, imnu_, renu_: repi_int(k, Te_, mu_, q_, w_, imnu_, renu_),
-                        0.0,
-                        kum,
-                        polem,
-                        eps,
-                        args=(Te, mue, q, w, imnu, renu),
-                    )
-
-                    kum_ang = np.arctan(kum)
-                    klim_ang = np.arctan(klim)
-
-                    impi += rgauss(
-                        lambda ks, Te_, mu_, q_, w_, imnu_, renu_: impi_int_inf(ks, Te_, mu_, q_, w_, imnu_, renu_),
-                        kum_ang,
-                        klim_ang,
-                        eps,
-                        args=(Te, mue, q, w, imnu, renu),
-                    )
-                    repi += rgauss(
-                        lambda ks, Te_, mu_, q_, w_, imnu_, renu_: repi_int_inf(ks, Te_, mu_, q_, w_, imnu_, renu_),
-                        kum_ang,
-                        klim_ang,
-                        eps,
-                        args=(Te, mue, q, w, imnu, renu),
-                    )
-                else:
-                    klim_ang = np.arctan(klim)
-                    impi = rgauss(
-                        lambda ks, Te_, mu_, q_, w_, imnu_, renu_: impi_int_inf(ks, Te_, mu_, q_, w_, imnu_, renu_),
-                        0.0,
-                        klim_ang,
-                        eps,
-                        args=(Te, mue, q, w, imnu, renu),
-                    )
-                    repi = rgauss(
-                        lambda ks, Te_, mu_, q_, w_, imnu_, renu_: repi_int_inf(ks, Te_, mu_, q_, w_, imnu_, renu_),
-                        0.0,
-                        klim_ang,
-                        eps,
-                        args=(Te, mue, q, w, imnu, renu),
-                    )
-
-            repi = repi * 0.25 * me / (PI * PI * q)
-            impi = impi * 0.25 * me / (PI * PI * q)
-
-            # Mermin formulas
-            a = w * repik0 - renu * impi - imnu * repi
-            b = renu * repi - imnu * impi
-
-            repim = a * ((w - imnu) * repi - renu * impi) + b * ((w - imnu) * impi + renu * repi)
-            repim = repim * repik0 * (1 - lfc) / (a * a + b * b)
-
-            impim = a * ((w - imnu) * impi + renu * repi) - b * ((w - imnu) * repi - renu * impi)
-            impim = impim * repik0 * (1 - lfc) / (a * a + b * b)
-
-            reeps = 1.0 - Uee * repim
-            imeps = -Uee * impim
-
-            a2 = (
-                w * repik0
-                - w * Uee * (1 - lfc) * repik0 * repi
-                - (1.0 - Uee * (1 - lfc) * repik0) * (renu * impi + imnu * repi)
-            )
-            b2 = -w * Uee * (1 - lfc) * repik0 * impi + (1.0 - Uee * (1 - lfc) * repik0) * (renu * repi - imnu * impi)
-
-            iml = a2 * ((w - imnu) * impi + renu * repi) - b2 * ((w - imnu) * repi - renu * impi)
-            iml = iml * repik0 / (a2 * a2 + b2 * b2)
-            iminveps = Uee * iml
-
-            real_part[i] = reeps
-            imag_part[i] = imeps
-
-        dielectric_function = real_part + 1.0j * imag_part
-        return dielectric_function

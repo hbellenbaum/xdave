@@ -103,7 +103,7 @@ def test_mermin_ff():
     atomic_number = 1.0
     lfc = 0.0
 
-    omega_array = np.linspace(-200, 250, 5000) * eV_TO_J
+    omega_array = np.linspace(-1000, 1250, 500) * eV_TO_J
     state = PlasmaState(
         electron_temperature=Te,
         ion_temperature=Te,
@@ -240,6 +240,6 @@ def test_version():
 
 
 if __name__ == "__main__":
-    test_ff()
-    # test_mermin_ff()
+    # test_ff()
+    test_mermin_ff()
     # test_version()
