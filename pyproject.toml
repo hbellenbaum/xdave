@@ -21,7 +21,7 @@ dependencies = [
 ]
 
 [tool.setuptools]
-packages = ["xdave"]
+packages = ["xdave", "xdave.data"]
 
 [tool.setuptools.package-data]
 xdave = ["data/*.csv"]
