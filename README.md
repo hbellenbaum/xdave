@@ -24,7 +24,6 @@ For now, the following python packages need to be installed outside of the stand
 
 ``scipy`` -->
 
-``plasmapy``: for details on installation see [here](https://pypi.org/project/plasmapy/).
 
 ## Usage
 

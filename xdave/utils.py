@@ -1,5 +1,6 @@
 from .constants import DIRAC_CONSTANT, SPEED_OF_LIGHT, BOHR_RADIUS, PI, ATOMIC_MASS_UNIT
 from .unit_conversions import eV_TO_J
+from .data.binding_energies import binding_energies
 
 from scipy.fft import dst
 import pandas as pd
@@ -230,13 +231,12 @@ def get_atomic_data_for_all_elements(elements):
 
 def get_atomic_mass_for_element(e):
     """
-    Load data from atomic data in folder xdave/data. 
+    Load data from atomic data in folder xdave/data.
     """
     data_path = files("xdave") / "data" / "atomic_data.csv"
 
     ANs, elements, amus, _ = np.genfromtxt(
         data_path,
-
         delimiter=",",
         skip_header=1,
         dtype=None,
@@ -248,20 +248,35 @@ def get_atomic_mass_for_element(e):
     return atomic_weight, atomic_number
 
 
-def get_binding_energies_from_element(AN):
-    # TODO(Hannah): this is a temporary fix until I get the file structure sorted out
-    dat_file = os.path.dirname(__file__) + f"/data/binding_energies_xrdb.csv"
-    df = pd.read_csv(dat_file)
+def get_binding_energies_from_element(AN, Z):
 
-    AN_col = df.columns[0]
-    # Filter row for the given atomic number
-    row = df[df[AN_col] == AN]
+    N_bind_enes = 12
 
-    if row.empty:
-        return {}
+    if Z == AN:
+        return -np.zeros(N_bind_enes, dtype=np.float64)
 
-    # Drop the AN column and any NaNs
-    values = row.iloc[0].drop(labels=[AN_col]).fillna(0)
+    try:
+        these_bind_enes = binding_energies[AN][Z]
+        bind_enes = np.zeros(N_bind_enes, dtype=np.float64)
+        bind_enes[: these_bind_enes.size] = these_bind_enes
+        bind_enes[:] = -bind_enes[:]
+        return bind_enes
+
+    except:
+        # TODO(Hannah): this is a temporary fix until I get the file structure sorted out
+        dat_file = os.path.dirname(__file__) + f"/data/binding_energies_xrdb.csv"
+        df = pd.read_csv(dat_file)
+
+        AN_col = df.columns[0]
+        # Filter row for the given atomic number
+        row = df[df[AN_col] == AN]
+
+        if row.empty:
+            return {}
+
+        # Drop the AN column and any NaNs
+        values = row.iloc[0].drop(labels=[AN_col]).fillna(0)
+
     return values.to_numpy() * (-1)
 
 
