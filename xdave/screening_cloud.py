@@ -11,6 +11,8 @@ import matplotlib.pyplot as plt
 
 from .fermi_integrals import fdi
 
+import warnings
+
 
 class ScreeningCloud:
     """
@@ -56,7 +58,11 @@ class ScreeningCloud:
         elif ee_potential == "YUKAWA":
             Uee = yukawa_k(Qa=1, Qb=1, k=k, alpha=alpha)
         else:
-            raise NotImplementedError(f"Cannot recognize ee-potential {ee_potential} in the screening cloud.")
+            # raise NotImplementedError(f"Cannot recognize ee-potential {ee_potential} in the screening cloud.")
+            warnings.warn(
+                f"Model {ee_potential} not recognized for the electron-electron potential. Overwriting using COULOMB."
+            )
+            Uee = coulomb_k(Qa=1, Qb=1, k=k)
 
         if ei_potential == "COULOMB":
             Uei = ei_coulomb_k(Qa=Zi, k=k)
@@ -67,7 +73,11 @@ class ScreeningCloud:
         elif ei_potential == "SOFT_CORE":
             Uei = soft_core_ei_k(Qa=-1, Qb=Zi, k=k, rcore=self.state.ion_core_radius, n=self.state.sec_power)
         else:
-            raise NotImplementedError(f"Cannot recognize ei-potential {ei_potential} in the screening cloud.")
+            Uei = ei_yukawa_k(Qa=Zi, k=k, alpha=alpha)
+            # raise NotImplementedError(f"Cannot recognize ei-potential {ei_potential} in the screening cloud.")
+            warnings.warn(
+                f"Model {ei_potential} not recognized for the electron-ion potential. Overwriting using YUKAWA."
+            )
 
         if screening_model == "DEBYE_HUCKEL":
             screening_cloud = self._debye_huckel_screening_full(k=k, lfc=lfc, Uee=Uee, Uei=Uei)
@@ -76,7 +86,11 @@ class ScreeningCloud:
         elif screening_model == "NONE":
             screening_cloud = np.zeros_like(k)
         else:
-            raise NotImplementedError(f" Model for the screening cloud: {screening_model} not recognised.")
+            warnings.warn(
+                f"Model {screening_model} for the screening cloud not regocnized. Overwriting using FINITE_WAVELENGTH."
+            )
+            screening_cloud = self._finite_wavelength_screening_full(k=k, lfc=lfc, Uee=Uee, Uei=Uei)
+            # raise NotImplementedError(f" Model for the screening cloud: {screening_model} not recognised.")
 
         return screening_cloud
 
@@ -95,14 +109,18 @@ class ScreeningCloud:
         # return screening_cloud
 
     def _debye_huckel_screening_full(self, k, lfc, Uee, Uei):
-        kappa_e = self.overlord_state.screening_length(
+        kappa_e_full = self.overlord_state.screening_length(
             mass=ELECTRON_MASS,
             charge=1,
             temperature=self.overlord_state.electron_temperature,
-            number_density=self.overlord_state.total_electron_number_density,
+            number_density=self.overlord_state.free_electron_number_density,
         )
-        kappa_e = np.real(kappa_e)
-        screening_length = kappa_e**2
+        kappa_e = self.overlord_state.debye_screening_length(
+            1, self.overlord_state.free_electron_number_density, self.overlord_state.electron_temperature
+        )
+        # kappa_e = np.real(kappa_e)
+        # kappa_e = 28809906697.517681
+        screening_length = kappa_e_full**2
         ratio = Uei / Uee
         screening_cloud = -ratio * screening_length / (k**2 + (1 - lfc) * screening_length)
 
@@ -132,7 +150,8 @@ class ScreeningCloud:
         return screening_length
 
     def _finite_wavelength_screening_full(self, k, lfc, Uee, Uei):
-        pol_func = FreeFreeDSF(state=self.state).dandrea_fit(k=k, omega=0.0).real
+
+        pol_func = FreeFreeDSF(state=self.overlord_state).dandrea_fit(k=k, omega=0.0).real
         screening_length = -(k**2) * Uee * pol_func
         ratio = Uei / Uee
         screening_cloud = -ratio * screening_length / (k**2 + (1 - lfc) * screening_length)
