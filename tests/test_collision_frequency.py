@@ -13,6 +13,7 @@ from xdave import *
 
 import numpy as np
 import matplotlib.pyplot as plt
+import os
 
 
 def test():
@@ -54,15 +55,55 @@ def test():
     # plt.figure()
     fig, ax = plt.subplots(1, 1)
     # ax = axes[0]
-    ax.plot(w * J_TO_eV, mu_ei_born.real * DIRAC_CONSTANT / EF, label="real", c="navy", ls="-.")
-    # ax.axhline(mu_ei_ziman / plasma_freq, label="Ziman", c="purple")
-    ax.plot(w * J_TO_eV, mu_ei_born.imag * DIRAC_CONSTANT / EF, label="imag", c="crimson")
+    ax.plot(
+        w * J_TO_eV, mu_ei_born.real / DIRAC_CONSTANT, label="Re[Born]", c="navy", ls="-."
+    )  #  * DIRAC_CONSTANT / EF
+    ax.axhline(mu_ei_ziman, label="Ziman", c="gray", ls="-.")
+    ax.axhline(plasma_freq, label=r"$\omega_p$", c="black", ls="-.")
+    ax.plot(
+        w * J_TO_eV, mu_ei_born.imag / DIRAC_CONSTANT, label="Im[Born]", c="crimson", ls="-."
+    )  #  * DIRAC_CONSTANT / EF
     # ax.legend()
     # ax = axes[1]
+    ax.set_xlim(0, 200)
     ax.legend()
     plt.tight_layout()
     plt.show()
 
 
+def test_fortmann_2010_Fig1():
+    T = 0  # K
+    Zi = 1
+    rss = np.array([1, 5])
+
+    fn = os.path.join(os.path.dirname(__file__), "comparison_data/collision_frequency/")
+
+    dat1_re = np.genfromtxt(fn + f"Fortmann_2010_Fig1_rs_1_re.csv", delimiter=",")
+    dat1_im = np.genfromtxt(fn + f"Fortmann_2010_Fig1_rs_1_im.csv", delimiter=",")
+    dat2_re = np.genfromtxt(fn + f"Fortmann_2010_Fig1_rs_5_re.csv", delimiter=",")
+    dat2_im = np.genfromtxt(fn + f"Fortmann_2010_Fig1_rs_5_im.csv", delimiter=",")
+
+    def fermi_energy(rs):
+        ne = 3 / FOUR_PI * 1 / (BOHR_RADIUS * rs) ** 3
+        kF = (3 * PI_SQR * ne) ** (1 / 2)
+        EF = DIRAC_CONSTANT_SQR * kF**2 / (2 * ELECTRON_MASS)
+        return EF
+
+    norm1 = 1  # DIRAC_CONSTANT / fermi_energy(1)
+    norm5 = 1  # DIRAC_CONSTANT / fermi_energy(5)
+
+    plt.figure()
+    plt.xscale("log")
+    plt.scatter(dat1_re[:, 0] * norm1, dat1_re[:, 1] * norm1, label=f"rs=1, Re", marker="x", c="navy")
+    plt.scatter(dat1_im[:, 0] * norm1, dat1_im[:, 1] * norm1, label=f"rs=1, Im", marker="<", c="navy")
+    plt.scatter(dat2_re[:, 0] * norm5, dat2_re[:, 1] * norm5, label=f"rs=5, Re", marker="x", c="crimson")
+    plt.scatter(dat2_im[:, 0] * norm5, dat2_im[:, 1] * norm5, label=f"rs=5, Im", marker="<", c="crimson")
+    plt.legend()
+    plt.xlabel(r"$\omega$ [$E_F/\hbar$]")
+    plt.ylabel(r"$\nu_{ei}$ [$E_F/\hbar$]")
+    plt.show()
+
+
 if __name__ == "__main__":
+    # test_fortmann_2010_Fig1()
     test()

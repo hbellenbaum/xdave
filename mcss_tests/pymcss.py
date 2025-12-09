@@ -611,7 +611,7 @@ def xrts_code_single_ar(params: MCSSParameters):
             T=params.Te,
             probe_energy=params.probe_energy,
             angle=params.angle,
-            n_points=10000,  # hard-coded for now
+            n_points=1000,  # hard-coded for now
             k_min=params.min_wave_number,
             k_max=params.max_wave_number,
             ee_pol_func_model=params.ee_pol_func_model,  # NUMERICAL_RPA, DANDREA_RPA_FIT, LINDHARD_RPA, TSYTOVICH_RPA, BORN_MERMIN, LANGDON_MATTE, FOURKAL_MATTE, GEN_LORENTZIAN
