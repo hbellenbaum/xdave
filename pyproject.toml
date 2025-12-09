@@ -15,7 +15,7 @@ authors = [
     { name = "Thomas Gawne", email = "t.gawne@hzdr.de" },
 ]
 dependencies = [
-    "numpy>=2.3",
+    "numpy>=1.26",
     "matplotlib>=3.10",
     "scipy>=1.16.2",
 ]
