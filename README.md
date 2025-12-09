@@ -2,7 +2,7 @@
 
 X-Ray Diagnostics, Analysis, Verification and Exploration Code
 
-xDave is an open-source Python code for analyisng of x-ray Thomson scattering spectra and obtaining quick estimates of the dynamic structure factor in the chemical picture.
+xDave is an open-source Python code for analysing of x-ray Thomson scattering spectra and obtaining quick estimates of the dynamic structure factor in the chemical picture.
 
 The code uses the Chihara decomposition [1] to split the elastic scattering into bound-free/free-bound and free-free scattering contributions.
 
@@ -14,15 +14,11 @@ More detail to be added.
 
 The code was written using Python (Version 3.12.8) using mostly standard library packages.
 
-For now, the following python packages need to be installed outside of the standard distribution (e.g. conda):
-
-<!-- ``numpy``
-
-``matplotlib``
-
-``pandas``
-
-``scipy`` -->
+The code can be installed by cloning this repo and using the command:
+```
+cd /path/to/xdave
+pip install -e .
+```
 
 
 ## Usage
