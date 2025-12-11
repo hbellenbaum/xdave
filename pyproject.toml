@@ -14,14 +14,13 @@ authors = [
     { name = "Maximilian P. Boehme", email = "boehme4@llnl.gov" },
     { name = "Thomas Gawne", email = "t.gawne@hzdr.de" },
 ]
-dependencies = [
-    "numpy>=1.26",
-    "matplotlib>=3.10",
-    "scipy>=1.16.2",
-]
+dependencies = ["numpy>=1.26", "matplotlib>=3.10", "scipy>=1.16.2"]
 
 [tool.setuptools]
 packages = ["xdave", "xdave.data"]
 
 [tool.setuptools.package-data]
 xdave = ["data/*.csv"]
+
+[project.optional-dependencies]
+docs = ["sphinx", "myst-parser"]
