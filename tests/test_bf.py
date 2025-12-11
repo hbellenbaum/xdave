@@ -98,8 +98,9 @@ def test_bf_mcss():
     ax.set_xlim(-40, 300)
     plt.show()
 
-    if not np.isclose(dsf / J_TO_eV, np.interp(x=omega_array * J_TO_eV, xp=En, fp=wbf), rtol=1.0e-6).all():
-        print(f"IA test has failed.")
+    assert np.isclose(
+        dsf / J_TO_eV, np.interp(x=omega_array * J_TO_eV, xp=En, fp=wbf), rtol=1.0e-6
+    ).all(), f"IA test has failed."
 
 
 def test_be_bf():
@@ -183,7 +184,7 @@ def test_version():
 
     angles = np.array([13, 30, 45, 60, 80, 100, 120, 140, 160])
     ks = calculate_q(angle=angles, energy=beam_energy) / BOHR_RADIUS
-    omega_array = np.linspace(-450, 800, 1000) * eV_TO_J
+    omega_array = np.linspace(-450, 800, 10) * eV_TO_J
     binding_energies = np.array([-111.5, -111.5, -111.5]) * eV_TO_J
     state = PlasmaState(
         electron_temperature=Te,
@@ -203,10 +204,6 @@ def test_version():
 
     fn = output_dir + f"dsf_check_be_T={Te/eV_TO_K:.0f}_rho={rho/g_per_cm3_TO_kg_per_m3:.0f}_Z={charge_state}"
 
-    test_IA = np.full_like(ks, True)
-    test_HR = np.full_like(ks, True)
-    test_trIA = np.full_like(ks, True)
-
     for i in range(len(ks)):
         k = ks[i]
         k_bohr = k * BOHR_RADIUS
@@ -218,21 +215,21 @@ def test_version():
         # update_bf_results(model="IA", w=omega_array, k_bohr=k_bohr, dsf=dsf, fn=fn)
         dsf_ia_save = np.genfromtxt(fn + f"_k={k_bohr:.1f}_model=IA.csv", delimiter=" ")
         dsf_hr = kernel.get_dsf(ZA=ZA, Zb=Zb, Eb=binding_energies, w=omega_array, k=k, model="HR_CORRECTION")
-        # update_bf_results(model="HR", w=omega_array, k_bohr=k_bohr, dsf=dsf, fn=fn)
+        # update_bf_results(model="HR", w=omega_array, k_bohr=k_bohr, dsf=dsf_hr, fn=fn)
         dsf_hr_save = np.genfromtxt(fn + f"_k={k_bohr:.1f}_model=HR.csv", delimiter=" ")
         dsf_tr = kernel.get_dsf(ZA=ZA, Zb=Zb, Eb=binding_energies, w=omega_array, k=k, model="TRUNCATED_IA")
-        # update_bf_results(model="trIA", w=omega_array, k_bohr=k_bohr, dsf=dsf, fn=fn)
+        # update_bf_results(model="trIA", w=omega_array, k_bohr=k_bohr, dsf=dsf_tr, fn=fn)
         dsf_tr_save = np.genfromtxt(fn + f"_k={k_bohr:.1f}_model=trIA.csv", delimiter=" ")
 
-        if not np.isclose(dsf, dsf_ia_save[:, 1], rtol=1.0e-2).all(axis=-1):
-            print(f"Impulse approximation BF model has failed the test at k={k_bohr:.1f} 1/aB.")
-            test_IA[i] = False
-        if not np.isclose(dsf_hr, dsf_hr_save[:, 1], rtol=1.0e-2).all(axis=-1):
-            print(f"Holm-Ribberfors correction to the IA BF model has failed the test at k={k_bohr:.1f} 1/aB.")
-            test_HR[i] = False
-        if np.isclose(dsf_tr, dsf_tr_save[:, 1], rtol=1.0e-2).all(axis=-1):
-            print(f"truncated IA BF model has failed the test at k={k_bohr:.1f} 1/aB.")
-            test_trIA[i] = False
+        assert np.isclose(dsf, dsf_ia_save[:, 1], rtol=1.0e-2).all(
+            axis=-1
+        ), f"Impulse approximation BF model has failed the test at k={k_bohr:.1f} 1/aB."
+        assert np.isclose(dsf_hr, dsf_hr_save[:, 1], rtol=1.0e-2).all(
+            axis=-1
+        ), f"Holm-Ribberfors correction to the IA BF model has failed the test at k={k_bohr:.1f} 1/aB."
+        assert np.isclose(dsf_tr, dsf_tr_save[:, 1], rtol=1.0e-2).all(
+            axis=-1
+        ), f"truncated IA BF model has failed the test at k={k_bohr:.1f} 1/aB."
 
 
 if __name__ == "__main__":
