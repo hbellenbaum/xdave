@@ -25,3 +25,6 @@ packages = ["xdave", "xdave.data"]
 
 [tool.setuptools.package-data]
 xdave = ["data/*.csv"]
+
+[project.optional-dependencies]
+test = ["pytest", "coverage"]
