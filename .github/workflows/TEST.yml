@@ -1,0 +1,30 @@
+name: Unit Test
+
+on:
+  push:
+  pull_request:
+    branches: ["main"]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: ["3.11", "3.12"]
+
+    steps:
+      - uses: actions/checkout@v3
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v4
+        with:
+          python-version: ${{ matrix.python-version }}
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip  
+          pip install -e .[test]
+      - name: Test with pytest
+        run: |
+          coverage run -m pytest  -vvv -s tests
+      - name: Generate Coverage Report
+        run: |
+          coverage report -m

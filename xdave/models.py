@@ -13,7 +13,7 @@ class ModelOptions:
         ei_collision_frequency (str): electron-ion collision frequency, default is BORN
         polarisation_model (str): electron polarisation model for the free-free dsf, default is DANDREA_FIT
         sf_model (str): model for the ion-ion static structure factor, default is HNC
-        lfc_model (str): model for the local field correction, default is DORNEHIM_ESA
+        lfc_model (str): model for the local field correction, default is DORNHEIM_ESA
         bf_model (str): model for the bound-free dsf, default is SCHUMACHER
         ipd_model (str): ionization potential depression model, default is CROWLEY
         bridge_function (str): model for the bridge function used in the extended HNC, default and only current option is IYETOMI

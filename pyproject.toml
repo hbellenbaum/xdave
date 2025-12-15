@@ -15,14 +15,16 @@ authors = [
     { name = "Thomas Gawne", email = "t.gawne@hzdr.de" },
 ]
 dependencies = [
-    "numpy>=2.3",
+    "numpy>=1.26",
     "matplotlib>=3.10",
     "scipy>=1.16.2",
-    "plasmapy>=2025.8.0",
 ]
 
 [tool.setuptools]
-packages = ["xdave"]
+packages = ["xdave", "xdave.data"]
 
 [tool.setuptools.package-data]
 xdave = ["data/*.csv"]
+
+[project.optional-dependencies]
+test = ["pytest", "coverage"]
