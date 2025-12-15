@@ -644,14 +644,3 @@ def test_sf_version():
     assert np.isclose(
         Sab_CH[1, 1], Sab_CH_save[:, 3], rtol=rtol
     ).all(), f"OCP structure factor for CH failed for CC component."
-
-
-if __name__ == "__main__":
-    # test_ff_version()
-    # test_bf_version()
-    # test_formfactor_version()
-    # test_lfc_version()
-    # test_ii_version()
-    # test_ei_version()
-    # test_screening_cloud_version()
-    test_sf_version()
