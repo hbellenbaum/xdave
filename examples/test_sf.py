@@ -520,8 +520,8 @@ def test_version():
 
 
 if __name__ == "__main__":
-    test_version()
-    # test_ocp()
-    # test_mcp()
-    # test_wuensch_Fig616()
-    # test_wuensch_Fig617()
+    # test_version()
+    test_ocp()
+    test_mcp()
+    test_wuensch_Fig616()
+    test_wuensch_Fig617()
