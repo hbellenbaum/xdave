@@ -506,66 +506,6 @@ def test_gv():
     plt.show()
 
 
-def update_lfc_files(ks, fn, lfcs_dornheim, lfcs_interp, lfcs_ui, lfcs_gv, lfcs_farid):
-    arr = np.array([ks, lfcs_dornheim, lfcs_interp, lfcs_ui, lfcs_gv, lfcs_farid]).T
-    np.savetxt(fn, arr, header="ks Dornheim Interp UI GV Farid")
-    print(f"Updating LFC file {fn}")
-
-
-def test_version():
-    AN = 1
-    amu = 1
-
-    Ts = np.linspace(10, 150, 5) * eV_TO_K
-    rhos = np.linspace(1, 10, 5) * g_per_cm3_TO_kg_per_m3
-
-    Zi = 1
-
-    ks = np.linspace(0.01, 10, 100) / BOHR_RADIUS
-
-    for T in Ts:
-
-        for rho in rhos:
-            state = PlasmaState(
-                electron_temperature=T,
-                ion_temperature=T,
-                mass_density=rho,
-                charge_state=Zi,
-                atomic_mass=amu,
-                atomic_number=AN,
-                binding_energies=None,
-            )
-            kernel = LFC(state=state)
-            lfcs_dornheim = kernel.calculate_lfc(k=ks, w=0.0, model="DORNHEIM_ESA")
-            lfcs_interp = kernel.calculate_lfc(k=ks, w=0.0, model="PADE_INTERP")
-            lfcs_ui = kernel.calculate_lfc(k=ks, w=0.0, model="UI")
-            lfcs_gv = kernel.calculate_lfc(k=ks, w=0.0, model="GV")
-            lfcs_farid = kernel.calculate_lfc(k=ks, w=0.0, model="FARID")
-
-            output_dir = os.path.join(os.path.dirname(__file__), "xdave_results/lfc")
-            if not os.path.exists(output_dir):
-                os.mkdir(output_dir)
-
-            fn = os.path.join(output_dir, f"lfc_results_T={T/eV_TO_K:.0f}_rho={rho/g_per_cm3_TO_kg_per_m3:.1f}.csv")
-            # update_lfc_files(ks, fn, lfcs_dornheim, lfcs_interp, lfcs_ui, lfcs_gv, lfcs_farid)
-            res = np.genfromtxt(fn, delimiter=" ")
-
-            if not np.isclose(lfcs_dornheim, res[:, 1]).all():
-                print(f"Dornheim ESA has failed test for rho={rho/g_per_cm3_TO_kg_per_m3:.1f} and T={T/eV_TO_K:.1f}")
-            if not np.isclose(lfcs_interp, res[:, 2]).all():
-                print(f"Interp LFC has failed test for rho={rho/g_per_cm3_TO_kg_per_m3:.1f} and T={T/eV_TO_K:.1f}")
-            if not np.isclose(lfcs_ui, res[:, 3]).all():
-                print(
-                    f"Utsumi-Ichimaru LFC has failed test for rho={rho/g_per_cm3_TO_kg_per_m3:.1f} and T={T/eV_TO_K:.1f}"
-                )
-            if not np.isclose(lfcs_gv, res[:, 4]).all():
-                print(
-                    f"Geldart-Vosko LFC has failed test for rho={rho/g_per_cm3_TO_kg_per_m3:.1f} and T={T/eV_TO_K:.1f}"
-                )
-            if not np.isclose(lfcs_farid, res[:, 5]).all():
-                print(f"Farid LFC has failed test for rho={rho/g_per_cm3_TO_kg_per_m3:.1f} and T={T/eV_TO_K:.1f}")
-
-
 if __name__ == "__main__":
     # test()
     # test_ui_gv_mcss()
@@ -575,4 +515,3 @@ if __name__ == "__main__":
     test_dornheim_2021()
     # test_farid()
     # test_ui()
-    test_version()

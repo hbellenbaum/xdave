@@ -167,12 +167,6 @@ def test_mermin_ff():
     # fig.savefig(f"ff_test_mermin.pdf", dpi=200)
 
 
-def update_ff_results(model, w, k_bohr, dsf, fn):
-    file = fn + f"_k={k_bohr:.1f}_model={model}.csv"
-    np.savetxt(file, np.array([w, dsf]).T)
-    print(f"Updating FF test for model = {model}: \nfile = {file}")
-
-
 if __name__ == "__main__":
     test_ff()
     # test_mermin_ff()

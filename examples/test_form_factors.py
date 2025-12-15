@@ -64,39 +64,5 @@ def test_carbon_ff():
         print(f"Form factor test failed for C5.")
 
 
-def update_ff_file(fn, ks, ff, element, Z_b):
-    arr = np.array([ks, ff]).T
-    file = fn + f"form_factor_{element}{Z_b}.txt"
-    np.savetxt(file, arr, header="k ff")
-    print(f"Updating form factor results: file = {file}")
-
-
-def test_version():
-
-    ks = np.linspace(0.01, 10, 100) / BOHR_RADIUS
-
-    ff_C3 = PaulingShermanIonicFormFactor().calculate_form_factor(Z=6, Z_b=3, k=ks)
-    ff_B2 = PaulingShermanIonicFormFactor().calculate_form_factor(Z=4, Z_b=2, k=ks)
-    ff_H0 = PaulingShermanIonicFormFactor().calculate_form_factor(Z=1, Z_b=1, k=ks)
-
-    fn = os.path.join(os.path.dirname(__file__), "xdave_results/form_factors/")
-    if not os.path.exists(fn):
-        os.mkdir(fn)
-    # update_ff_file(fn, ks, ff_H0, element="H", Z_b=1 - 1)
-    # update_ff_file(fn, ks, ff_B2, element="B", Z_b=4 - 2)
-    # update_ff_file(fn, ks, ff_C3, element="C", Z_b=6 - 3)
-    res_H0 = np.genfromtxt(fn + f"form_factor_H0.txt", skip_header=1)
-    res_B2 = np.genfromtxt(fn + f"form_factor_B2.txt", skip_header=1)
-    res_C3 = np.genfromtxt(fn + f"form_factor_C3.txt", skip_header=1)
-
-    if not np.isclose(ff_H0, res_H0[:, 1]).all():
-        print(f"Form factor model failed for H0.")
-    if not np.isclose(ff_B2, res_B2[:, 1]).all():
-        print(f"Form factor model failed for B2.")
-    if not np.isclose(ff_C3, res_C3[:, 1]).all():
-        print(f"Form factor model failed for C3.")
-
-
 if __name__ == "__main__":
     test_carbon_ff()
-    test_version()
