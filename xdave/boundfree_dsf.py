@@ -1,12 +1,10 @@
 from .ii_ff import PaulingShermanIonicFormFactor, ScreeningConstants
-from .ipd import get_ipd
 from .plasma_state import PlasmaState
-from .models import ModelOptions
 from .unit_conversions import *
 from .constants import *
-from .utils import read_mcss_output
 from scipy.special import gamma
 import numpy as np
+import warnings
 
 
 class BoundFreeDSF:
@@ -50,7 +48,8 @@ class BoundFreeDSF:
         elif model == "TRUNCATED_IA":
             Sce = self.truncated_IA(ZA, Zb, k, w, Eb)
         else:
-            raise NotImplementedError(f"Model {model} for the bound-free component not recognised. Try SCHUMACHER :)")
+            warnings.warn(f"Bound-free model {model} not recognized. Overwriting using the default SCHUMACHER.")
+            Sce = self.schuhmacher_ia(ZA, Zb, k, w, Eb)
         return Sce / DIRAC_CONSTANT
 
     def _shell_amplitude(self, Znl, n, l):
@@ -77,7 +76,7 @@ class BoundFreeDSF:
         """
 
         Sce = 0.0
-        J = np.zeros_like(w)
+        J = np.zeros(w.shape, dtype=np.float64)
 
         if Zb > 0:
             c1s = 0
@@ -112,7 +111,8 @@ class BoundFreeDSF:
             # dimensionless scattering wave number
             q = (w_freq - wC) / (SPEED_OF_LIGHT * k)
 
-            if c1s > 0:
+
+            if (c1s > 0) and (Eb[0] <= 0):
 
                 n = 1
                 l = 0
@@ -121,14 +121,11 @@ class BoundFreeDSF:
                 xnl = 1.0 / (1.0 + (n * q / (Znl * FINE_STRUCTURE_CONSTANT)) ** 2.0)  # [xnl] =
 
                 Jnl = self._shell_amplitude(Znl, n, l) * xnl**3 / 3
-                # Jnl10 = Jnl
-                for i in range(c1s):
-                    if Eb[i] > 0:
-                        continue
-                    J += Jnl * np.heaviside(E + Eb[i], 1)  # np.heaviside(E, Eb[i])
-                    # Jnl10 *= np.heaviside(E + Eb[i], 1)
+                
+                J += c1s * Jnl * np.heaviside(E + Eb[0], 1)
 
-            if c2s > 0:
+
+            if (c2s > 0) and (Eb[1] <= 0):
 
                 n = 2
                 l = 0
@@ -137,14 +134,11 @@ class BoundFreeDSF:
                 xnl = 1.0 / (1.0 + (n * q / (Znl * FINE_STRUCTURE_CONSTANT)) ** 2.0)
 
                 Jnl = self._shell_amplitude(Znl, n, l) * 4.0 * (xnl**3.0 / 3.0 - xnl**4.0 + 4.0 * xnl**5.0 / 5.0)
-                # Jnl20 = Jnl
-                for i in range(c2s):
-                    if Eb[i + 2] > 0:
-                        continue
-                    J += Jnl * np.heaviside(E + Eb[i + 2], 1)
-                    # Jnl20 *= np.heaviside(E + Eb[i + 2], 1)
+                
+                J += c2s * Jnl * np.heaviside(E + Eb[1], 1)
+                
 
-            if c2p > 0:
+            if (c2p > 0) and ((Eb[2] <= 0) or (Eb[3] <= 0)):
 
                 n = 2
                 l = 1
@@ -153,14 +147,22 @@ class BoundFreeDSF:
                 xnl = 1.0 / (1.0 + (n * q / (Znl * FINE_STRUCTURE_CONSTANT)) ** 2.0)
 
                 Jnl = self._shell_amplitude(Znl, n, l) * (xnl**4.0 / 4.0 - xnl**5.0 / 5.0)
-                # Jnl21 = Jnl
-                for i in range(c2p):
-                    if Eb[i + 4] > 0:
-                        continue
-                    J += Jnl * np.heaviside(E + Eb[i + 4], 1)
-                    # Jnl21 *= np.heaviside(E + Eb[i + 4], 1)
+                
+                # Divide c2p between the states
+                c_12 = 0
+                c_32 = 0
+                while c2p > 0:
+                    if (c_12 < 2) and (Eb[2] <= 0):
+                        c_12 += 1
+                    elif (c_32 < 4) and (Eb[3] <= 0):
+                        c_32 += 1
+                    c2p -= 1
+                
+                J += c_12 * Jnl * np.heaviside(E + Eb[2], 1)
+                J += c_32 * Jnl * np.heaviside(E + Eb[3], 1)
 
-            if c3s > 0:
+
+            if (c3s > 0) and (Eb[4] <= 0):
 
                 n = 3
                 l = 0
@@ -175,12 +177,10 @@ class BoundFreeDSF:
                     + 2.56e2 * xnl**7.0 / 7.0
                 )
 
-                for i in range(c3s):
-                    if Eb[i + 10] >= 0:
-                        continue
-                    J += Jnl * np.heaviside(E + Eb[i + 10], 1)
+                J += c3s * Jnl * np.heaviside(E + Eb[4], 1)
 
-            if c3p > 0:
+
+            if (c3p > 0) and ((Eb[5] <= 0) or (Eb[6] <= 0)):
 
                 n = 3
                 l = 1
@@ -193,12 +193,21 @@ class BoundFreeDSF:
                     * (xnl**4.0 / 4.0 - xnl**5.0 + 4.0 * xnl**6.0 / 3.0 - 4.0 * xnl**7.0 / 7.0)
                 )
 
-                for i in range(c3p):
-                    if Eb[i + 12] >= 0:
-                        continue
-                    J += Jnl * np.heaviside(E + Eb[i + 12], 1)
+                # Divide c3p between the states
+                c_12 = 0
+                c_32 = 0
+                while c3p > 0:
+                    if (c_12 < 2) and (Eb[5] <= 0):
+                        c_12 += 1
+                    elif (c_32 < 4) and (Eb[6] <= 0):
+                        c_32 += 1
+                    c3p -= 1
 
-            if c4s > 0:
+                J += c_12 * Jnl * np.heaviside(E + Eb[5], 1)
+                J += c_32 * Jnl * np.heaviside(E + Eb[6], 1)
+
+
+            if (c4s > 0) and (Eb[9] <= 0):
                 n = 4
                 l = 0
                 Znl = self.ff_model.calculate_effective_charge_state(ZA, Zb, n, l)
@@ -218,12 +227,10 @@ class BoundFreeDSF:
                     )
                 )
 
-                for i in range(c4s):
-                    if Eb[i + 18] >= 0:
-                        continue
-                    J += Jnl * np.heaviside(E + Eb[i + 18], 1)
+                J += c4s * Jnl * np.heaviside(E + Eb[9], 1)
 
-            if c3d > 0:
+
+            if (c3d > 0) and ((Eb[7] <= 0) or (Eb[8] <= 0)):
 
                 n = 3
                 l = 2
@@ -232,10 +239,20 @@ class BoundFreeDSF:
                 xnl = 1.0 / (1.0 + (n * q / (Znl * FINE_STRUCTURE_CONSTANT)) ** 2.0)
                 Jnl = self._shell_amplitude(Znl, n, l) * (xnl**5.0 / 5.0 - xnl**6.0 / 3.0 + xnl**7.0 / 7.0)
 
-                for i in range(c3d):
-                    if Eb[i + 20] >= 0:
-                        continue
-                    J += Jnl * np.heaviside(E + Eb[i + 20], 1)
+
+                # Divide c3d between the states
+                c_32 = 0
+                c_52 = 0
+                while c3d > 0:
+                    if (c_32 < 4) and (Eb[7] <= 0):
+                        c_32 += 1
+                    elif (c_52 < 6) and (Eb[8] <= 0):
+                        c_52 += 1
+                    c3d -= 1
+                
+                J += c_32 * Jnl * np.heaviside(E + Eb[7], 1)
+                J += c_52 * Jnl * np.heaviside(E + Eb[8], 1)
+            
 
             # Sce = (c1s * Jnl10 + c2s * Jnl20 + c2p * Jnl21) / (SPEED_OF_LIGHT * k)
             Sce = J / (SPEED_OF_LIGHT * k)
@@ -244,6 +261,7 @@ class BoundFreeDSF:
             Sce = np.where(w < 0, np.exp(-E / (BOLTZMANN_CONSTANT * self.state.electron_temperature)) * Sce, Sce)
 
         return Sce
+
 
     def schumacher_ia_correction(self, ZA, Zb, k, w, Eb):
         """
@@ -261,6 +279,7 @@ class BoundFreeDSF:
         """
 
         Sce = 0.0
+        J = np.zeros(w.shape, dtype=np.float64)
 
         if Zb > 0:
             c1s = 0
@@ -295,9 +314,7 @@ class BoundFreeDSF:
             # dimensionless scattering wave number
             q = (w_freq - wC) / (SPEED_OF_LIGHT * k)
 
-            J = 0.0
-
-            if c1s > 0:
+            if (c1s > 0) and (Eb[0] <= 0):
                 n = 1
                 l = 0
 
@@ -307,12 +324,9 @@ class BoundFreeDSF:
                 Jnl0 = self._shell_amplitude(Znl, n, l) * xnl**3 / 3
                 Jnl1 = Jnl0 * (1.5 * xnl - 2.0 * np.arctan(xnl)) / (k * BOHR_RADIUS / (Znl * FINE_STRUCTURE_CONSTANT))
 
-                for i in range(c1s):
-                    if Eb[i] >= 0:
-                        continue
-                    J = J + (Jnl0 + Jnl1) * np.heaviside(E + Eb[i], 1)  # np.heaviside(E, Eb[i])
+                J += c1s * (Jnl0 + Jnl1) * np.heaviside(E + Eb[0], 1)
 
-            if c2s > 0:
+            if (c2s > 0) and (Eb[1] <= 0):
 
                 n = 2
                 l = 0
@@ -338,13 +352,10 @@ class BoundFreeDSF:
                     / (k * BOHR_RADIUS / (Znl * FINE_STRUCTURE_CONSTANT))
                 )
 
-                for i in range(c2s):
-                    if Eb[i + 2] >= 0:
-                        continue
-                    # J = J + Jnl * np.heaviside(E, Eb[i + 2 - 1])
-                    J = J + (Jnl0 + Jnl1) * np.heaviside(E + Eb[i + 2], 1)
+                J += c2s * (Jnl0 + Jnl1) * np.heaviside(E + Eb[1], 1)
 
-            if c2p > 0:
+
+            if (c2p > 0) and ((Eb[2] <= 0) or (Eb[3] <= 0)):
 
                 n = 2
                 l = 1
@@ -365,11 +376,19 @@ class BoundFreeDSF:
                     / (k * BOHR_RADIUS / (Znl * FINE_STRUCTURE_CONSTANT))
                 )
 
-                for i in range(c2p):
-                    if Eb[i + 4] >= 0:
-                        continue
-                    # J = J + Jnl * np.heaviside(E, Eb[i + 4 - 1])
-                    J = J + (Jnl0 + Jnl1) * np.heaviside(E + Eb[i + 4], 1)
+                # Divide c2p between the states
+                c_12 = 0
+                c_32 = 0
+                while c2p > 0:
+                    if (c_12 < 2) and (Eb[2] <= 0):
+                        c_12 += 1
+                    elif (c_32 < 4) and (Eb[3] <= 0):
+                        c_32 += 1
+                    c2p -= 1
+                
+                J += c_12 * (Jnl0 + Jnl1) * np.heaviside(E + Eb[2], 1)
+                J += c_32 * (Jnl0 + Jnl1) * np.heaviside(E + Eb[3], 1)
+
 
         Sce = J / (SPEED_OF_LIGHT * k)
 
@@ -393,6 +412,6 @@ class BoundFreeDSF:
         """
         Sce = self.schuhmacher_ia(ZA, Zb, k, w, Eb)
         beta = 1 / (BOLTZMANN_CONSTANT * self.state.electron_temperature)
-        exp_term = np.exp(beta * (w - Eb)) + 1
+        exp_term = np.exp(beta * (w - Eb[0])) + 1
         Sce_trunc = Sce * (1 - 1 / exp_term)
         return Sce_trunc

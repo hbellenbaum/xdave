@@ -1,5 +1,6 @@
 from .constants import DIRAC_CONSTANT, SPEED_OF_LIGHT, BOHR_RADIUS, PI, ATOMIC_MASS_UNIT
 from .unit_conversions import eV_TO_J
+from .data.binding_energies import binding_energies
 
 from scipy.fft import dst
 import pandas as pd
@@ -59,6 +60,15 @@ def calculate_q(angle, energy):
     return q
 
 
+def calculate_q_SI(angle, energy):
+    # angle *= np.pi / 180.0
+    angle_rad = angle * PI / 180
+    E0 = energy * eV_TO_J
+    q = 2 * E0 / (DIRAC_CONSTANT * SPEED_OF_LIGHT) * np.sin(angle_rad / 2)
+    q *= BOHR_RADIUS
+    return q
+
+
 def calculate_angle(q, energy):
     """
     Calculates an angle for the relevant q value.
@@ -91,6 +101,31 @@ def calculate_angle(q, energy):
 def load_mcss_result(filename):
     En, Es, lambda_s, wff, wbf, ff, bf, el, tot = np.genfromtxt(filename, skip_header=1, delimiter=",", unpack=True)
     return En[::-1], wff[::-1], wbf[::-1], ff, bf, el
+
+
+def load_mcss_result_ar(filename, use_lfc_model=False):
+    # Note: this only works for two-component systems
+    if use_lfc_model:
+        _, k, _, WR, f1, f2, q1, q2, S11, S12, S22, lfc = np.genfromtxt(
+            filename, skip_header=1, delimiter=",", unpack=True
+        )
+    else:
+        _, k, _, WR, f1, f2, q1, q2, S11, S12, S22 = np.genfromtxt(filename, skip_header=1, delimiter=",", unpack=True)
+        lfc = np.zeros_like(k)
+    return k, WR, f1, f2, q1, q2, S11, S12, S22, lfc
+
+
+def load_mcss_result_ar_3species(filename, use_lfc_model=False):
+    if use_lfc_model:
+        _, k, _, WR, f1, f2, f3, q1, q2, q3, S11, S13, S12, S22, S23, S33, lfc = np.genfromtxt(
+            filename, skip_header=1, delimiter=",", unpack=True
+        )
+    else:
+        _, k, _, WR, f1, f2, f3, q1, q2, q3, S11, S13, S12, S22, S23, S33 = np.genfromtxt(
+            filename, skip_header=1, delimiter=",", unpack=True
+        )
+        lfc = np.zeros_like(k)
+    return k, WR, f1, f2, f3, q1, q2, q3, S11, S13, S12, S22, S23, S33, lfc
 
 
 def get_mcss_wr_from_status_file(status_file):
@@ -230,13 +265,12 @@ def get_atomic_data_for_all_elements(elements):
 
 def get_atomic_mass_for_element(e):
     """
-    Load data from atomic data in folder xdave/data. 
+    Load data from atomic data in folder xdave/data.
     """
     data_path = files("xdave") / "data" / "atomic_data.csv"
 
     ANs, elements, amus, _ = np.genfromtxt(
         data_path,
-
         delimiter=",",
         skip_header=1,
         dtype=None,
@@ -248,20 +282,35 @@ def get_atomic_mass_for_element(e):
     return atomic_weight, atomic_number
 
 
-def get_binding_energies_from_element(AN):
-    # TODO(Hannah): this is a temporary fix until I get the file structure sorted out
-    dat_file = os.path.dirname(__file__) + f"/data/binding_energies_xrdb.csv"
-    df = pd.read_csv(dat_file)
+def get_binding_energies_from_element(AN, Z):
 
-    AN_col = df.columns[0]
-    # Filter row for the given atomic number
-    row = df[df[AN_col] == AN]
+    N_bind_enes = 12
 
-    if row.empty:
-        return {}
+    if Z == AN:
+        return -np.zeros(N_bind_enes, dtype=np.float64)
 
-    # Drop the AN column and any NaNs
-    values = row.iloc[0].drop(labels=[AN_col]).fillna(0)
+    try:
+        these_bind_enes = binding_energies[AN][Z]
+        bind_enes = np.zeros(N_bind_enes, dtype=np.float64)
+        bind_enes[: these_bind_enes.size] = these_bind_enes
+        bind_enes[:] = -bind_enes[:]
+        return bind_enes
+
+    except:
+        # TODO(Hannah): this is a temporary fix until I get the file structure sorted out
+        dat_file = os.path.dirname(__file__) + f"/data/binding_energies_xrdb.csv"
+        df = pd.read_csv(dat_file)
+
+        AN_col = df.columns[0]
+        # Filter row for the given atomic number
+        row = df[df[AN_col] == AN]
+
+        if row.empty:
+            return {}
+
+        # Drop the AN column and any NaNs
+        values = row.iloc[0].drop(labels=[AN_col]).fillna(0)
+
     return values.to_numpy() * (-1)
 
 
@@ -385,51 +434,3 @@ def spectral_convolution(spec_ene, omega, dsf, source_ene, source, Wr):
     spectrum += new_source * Wr / (spec_ene[1] - spec_ene[0])
 
     return spectrum
-
-
-def print_error_message():
-    print(f"You done messed up!")
-    error_msg = r"""                          
-                         #####.                                     
-                           #*****#.                                  
-                           #********#.                               
-                          -***********#.                             
-                         #**************#.                           
-                        .***************###                          
-                        #**************#####.                        
-                        +************#######%                        
-                       ##**********##########.                       
-                    #***********#############                        
-                  #**********###############%-.                      
-                 #********#################******#.                  
-                ##***##################%#*********##                 
-               .####################%#***********####                
-                #####----*######%##*********----#####+               
-                %#-::::::::-##***********-:::..:::-##                
-              ..#::...+@....:***********::...%#...::%                
-           .#***::..@@@@@@...:*********:...@@@@@@...:***#.           
-          #*****:..+@@@@@@@...:****###+:..@@@@@@@@..:****##.         
-         #******:..@@@@@@@@...:#######:...@@@@@@@@...+***###.        
-        .#******:..=@@@@@@@...:#######*...@@@@@@@@..:**######        
-        ###*****:...@@@@@@...:######%#*:...@@@@@@...:########        
-        -########:.....:....:##%##******:..........:#########        
-         #########+:..  ...:*************:.......::##########        
-          =%%%####***=:::******************#-::-###########*##.      
-    .#**********************************#################******##    
-  .#******************++=====================++########********####  
- :#*******************=-:::::::::::::::::::::-#######********####### 
-.##*********************-:.................:*#####*********##########
-###########################-:..........::######**********###########%
-###########################################************#############%
-.######################################*************################.
- .################################****************################%. 
-   -%#########################****************##################%#   
-      ..%%%####%%%%+..  .. ....-+########################%%%%.  
-    """
-    print(error_msg)
-
-
-if __name__ == "__main__":
-    # amu = get_atomic_mass_for_element(e="He")
-    # print(amu)
-    print_error_message()

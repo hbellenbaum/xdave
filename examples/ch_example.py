@@ -10,11 +10,12 @@ import time
 
 
 def ch_example():
-    T = 50  # eV
+    start_time = time.time()
+    T = 100  # eV
     rho = 2 * 1.845  # two times solid density [g/cc]
-    Z_C = 2.5
+    Z_C = 4.5
 
-    xH = 0.2
+    xH = 0.5
     ZH = 1.0
 
     Zmin, Zmax, xmin, xmax = get_fractions_from_Z_partial(Z=Z_C, x0=xH)
@@ -41,10 +42,31 @@ def ch_example():
         models=models,
         enforce_fsum=False,
         user_defined_inputs=None,
+        verbose=True,
+        hnc_max_iterations=10000,
+        hnc_mix_fraction=0.99,
+        hnc_delta=1.0e-7,
     )
 
-    w = np.linspace(-1000, 1000, 10000)
-    bf_tot, ff_tot, dsf, rayleigh_weight, ff_i, bf_i = kernel.run(w=w, angle=75, beam_energy=8.0e3, mode="DYNAMIC")
+    w = np.linspace(-1000, 1500, 10000)
+    bf_tot, ff_tot, dsf, rayleigh_weight, ff_i, bf_i = kernel.run(w=w, angle=130, beam_energy=9.0e3, mode="DYNAMIC")
+
+    # this will convolve the dsf with a Gaussian sif of 10 eV fwhm
+    # if you want to use your own, you can add it as an input to the sif input option
+    # note that for now this will have to be centered around 0
+    spec_energy, inelastic, elastic, spectrum = kernel.convolve_with_sif(
+        omega=w,
+        bf=bf_tot,
+        ff=ff_tot,
+        dsf=(bf_tot + ff_tot),
+        Wr=rayleigh_weight,
+        beam_energy=9.0e3,
+        type="GAUSSIAN",
+        fwhm=10,
+    )
+
+    end_time = time.time()
+    print(f"Code took {end_time - start_time} s to run.")
     # plot results
     fig, axes = plt.subplots(2, 3, figsize=(16, 16))
 
@@ -87,20 +109,6 @@ def ch_example():
     ax.legend()
     plt.tight_layout()
     plt.show()
-
-    # this will convolve the dsf with a Gaussian sif of 10 eV fwhm
-    # if you want to use your own, you can add it as an input to the sif input option
-    # note that for now this will have to be centered around 0
-    spec_energy, inelastic, elastic, spectrum = kernel.convolve_with_sif(
-        omega=w,
-        bf=bf_tot,
-        ff=ff_tot,
-        dsf=(bf_tot + ff_tot),
-        Wr=rayleigh_weight,
-        beam_energy=9.0e3,
-        type="GAUSSIAN",
-        fwhm=10,
-    )
 
     plt.figure()
     # plt.plot(w, inelastic, label="inel")

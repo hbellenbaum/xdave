@@ -13,3 +13,6 @@ __pycache__/
 build/
 xdave.egg-info/
 TESTING/
+
+.python-version
+.coverage

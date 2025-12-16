@@ -62,7 +62,7 @@ class xDave:
         user_defined_inputs: dict = None,
         verbose: bool = False,
     ):
-        assert np.sum(partial_densities) == 1.0, f"Fractional densities do not add up 1. Try again sucker."
+        assert np.sum(partial_densities) == 1.0, f"Fractional densities do not add up 1."
         self.number_of_states = len(partial_densities)
         self.mass_density = mass_density * g_per_cm3_TO_kg_per_m3
         self.electron_temperature = electron_temperature * eV_TO_K
@@ -81,7 +81,7 @@ class xDave:
             self.ipd_eV = user_defined_inputs["ipd"] if "ipd" in keys else None
             self.user_defined_lfc = user_defined_inputs["lfc"] if "lfc" in keys else None
             self.ion_core_radii = (
-                user_defined_inputs["ion_core_radii"] * BOHR_RADIUS
+                np.array(user_defined_inputs["ion_core_radii"]) * BOHR_RADIUS
                 if "ion_core_radii" in keys
                 else np.full(self.number_of_states, None)
             )
@@ -99,6 +99,30 @@ class xDave:
             self.srr_sigma_parameter = (
                 user_defined_inputs["srr_sigma_parameter"] if "srr_sigma_parameter" in keys else None
             )
+            
+            # Few options to check here for the Crowley constant
+            crowley_force_constant = user_defined_inputs["crowley_force_constant"] if "crowley_force_constant" in keys else None
+            if crowley_force_constant is None:
+                self.crowley_force_constant = 0.9
+            else:
+                if isinstance(crowley_force_constant, (float, int)):
+                    self.crowley_force_constant = crowley_force_constant
+                else:
+                    if crowley_force_constant.upper() in ["FLUID", "ION_SPHERE"]:
+                        self.crowley_force_constant = 0.9
+                    elif crowley_force_constant.upper() in ["FCC", "HCP"]:
+                        self.crowley_force_constant = 0.99025
+                    elif crowley_force_constant.upper() == "BCC":
+                        self.crowley_force_constant = 1.01875
+                    elif crowley_force_constant.upper() == "SC":
+                        self.crowley_force_constant = 1.09189
+                    else:
+                        self.crowley_force_constant = 0.9
+                        warnings.warn(
+                            f"crowley_force_structure = {crowley_force_constant} not known!\n"
+                           +f"Should be a number or \'FLUID\', \'ION_SPHERE\', \'FCC\', \'HCP\', \'BCC\', or \'SC\' "
+                           +f"Treating as ion sphere (constant = 0.9)"
+                        )
 
             assert hasattr(self.ion_core_radii, "__len__")
             assert hasattr(self.csd_core_charges, "__len__")
@@ -111,6 +135,7 @@ class xDave:
             self.csd_core_charges = np.full(self.number_of_states, None)
             self.sec_core_power = None
             self.srr_sigma_parameter = None
+            self.crowley_force_constant = 0.9
 
         self.states, self.overlord_state = self.get_mean_and_all_states(elements)
 
@@ -167,7 +192,8 @@ class xDave:
             AN_mean += x * AN
             amu = atomic_masses[i] / ATOMIC_MASS_UNIT  # this is also dumb!
             amu_mean += x * amu
-            binding_energies = get_binding_energies_from_element(AN)
+            binding_energies = get_binding_energies_from_element(AN, Z)
+            
             state = PlasmaState(
                 electron_temperature=self.electron_temperature,
                 ion_temperature=self.ion_temperature,
@@ -214,9 +240,7 @@ class xDave:
             angle = calculate_angle(q=k, energy=beam_energy)
         elif k is None:
             assert angle is not None, f"You have to set either the angle or the scattering wave number."
-            assert (
-                beam_energy is not None
-            ), f"If you set an angle, you also need to specify the beam energy. I can't read your fucking mind."
+            assert beam_energy is not None, f"If you set an angle, you also need to specify the beam energy."
             k = calculate_q(angle=angle, energy=beam_energy)
 
         k_SI = k / BOHR_RADIUS
@@ -261,20 +285,22 @@ class xDave:
         print(f"Calculated LFC={lfc}") if self.verbose else None
 
         if self.ipd_eV is not None:
-            ipd = self.ipd_eV * eV_TO_J
+            state_ipds = np.full(len(self.states), self.ipd_eV * eV_TO_J)
             if self.verbose:
                 print(f"Applying user-defined input IPD: {self.ipd_eV}")
         else:
-            ipd = get_ipd(state=self.overlord_state, model=self.models.ipd_model, user_defined_ipd=self.ipd_eV)
-            if self.verbose:
-                print(f"Calculated IPD={ipd * J_TO_eV} eV")
+            state_ipds = get_ipd(
+                plasma=self, state=self.overlord_state, model=self.models.ipd_model,
+                user_defined_ipd=self.ipd_eV, crowley_force_constant=self.crowley_force_constant
+                )
+                
 
         ff = FreeFreeDSF(state=self.overlord_state)
         if self.overlord_state.charge_state > 0:
             ff_dsf = ff.get_dsf(k=k, w=w, lfc=lfc, model=self.models.polarisation_model)
         else:
             ff_dsf = np.zeros_like(w)
-        # the factor of Z/AN is needed to match MCSS results, I will need to figure out where it comes from
+
         ff_tot = ff_dsf * self.overlord_state.charge_state
 
         bf_tot = np.zeros_like(w)
@@ -285,17 +311,20 @@ class xDave:
             print(f"Mean charge state = {self.overlord_state.charge_state}.")
 
         for i in range(0, len(self.states)):
-            state = self.states[i]
-            x = self.partial_densities[i]
+            state: PlasmaState = self.states[i]
+            x   = self.partial_densities[i]
+            ipd = state_ipds[i]
             if self.verbose:
-                print(f"\nRunning state {i} with Z={state.charge_state} and x={x}\n")
+                print(f"\nRunning state {i} with Z={state.charge_state} and x={x}")
+                print(f"Calculated IPD for state {i}={ipd * J_TO_eV} eV\n")
+            
             binding_energies = state.binding_energies * eV_TO_J
 
             ff_i[i] = x * ff_dsf
 
             Eb = binding_energies - ipd
 
-            if np.any(np.abs(ipd) > (np.abs(binding_energies[binding_energies < 0.0]))):
+            if np.any(ipd < binding_energies[binding_energies < 0.0]):
                 warnings.warn(
                     f"IPD {ipd * J_TO_eV} is larger than the binding energy of state {i}: {binding_energies[binding_energies < 0.]* J_TO_eV}. Consider increasing your ionization degree. The bound-free feature is being set to zero."
                 )
@@ -340,15 +369,11 @@ class xDave:
                 return_full=False,
             )
 
-        # if self.enforce_fsum:
-        #     bf *= self._bf_norm(w=w, ff=ff, bf=bf, k=k)
-
-        # Divide by the atomic number to be consistent with the ff component
-        # bf_tot /= self.overlord_state.atomic_number
         dsf = ff_tot + bf_tot
 
         if self.enforce_fsum:
-            # print(f"You are currently enforcing a normalization based on the f-sum rule.")
+            if self.verbose:
+                print(f"You are currently enforcing a normalization based on the f-sum rule.")
             bf_i /= self.overlord_state.Zb
             bf_tot /= self.overlord_state.Zb
             ff_i /= self.overlord_state.charge_state
@@ -362,7 +387,6 @@ class xDave:
         ff_i /= J_TO_eV
         bf_i /= J_TO_eV
 
-        # self.output_dict = dict({"w": w, "ff": ff_tot, "bf": bf_tot, "dsf": dsf})
         return (bf_tot, ff_tot, dsf, rayleigh_weight, ff_i, bf_i)
 
     def _run_static_mode(self, k):
@@ -430,54 +454,76 @@ class xDave:
         # Return outputs in cgs
         return k * BOHR_RADIUS, Sab, Sab_tot, rayleigh_weight, qs, fs, lfc
 
-    def run_inelastic(self, k, w):
-        k_value = k / BOHR_RADIUS
-        omega_array = w.copy() * eV_TO_J
+    def run_inelastic(self, w, k=None, angle=None, beam_energy=None):
+
+        if self.verbose:
+            self._print_logo()
+
+        if angle is None:
+            assert k is not None, f"You have to set either the angle or the scattering wave number."
+            if beam_energy is None:
+                beam_energy = 8.0e3
+                print(f"Assuming beam energy of 8 keV.") if self.verbose else None
+            angle = calculate_angle(q=k, energy=beam_energy)
+        elif k is None:
+            assert angle is not None, f"You have to set either the angle or the scattering wave number."
+            assert (
+                beam_energy is not None
+            ), f"If you set an angle, you also need to specify the beam energy. I can't read your fucking mind."
+            k = calculate_q(angle=angle, energy=beam_energy)
+
+
+        k_SI = k / BOHR_RADIUS
+        w_SI = w * eV_TO_J
 
         lfc_kernel = LFC(state=self.overlord_state)
-        lfc = lfc_kernel.calculate_lfc(k=k_value, w=omega_array, model=self.models.lfc_model)
+        lfc = lfc_kernel.calculate_lfc(k=k_SI, w=w_SI, model=self.models.lfc_model)
         if self.verbose:
             print(f"Calculated LFC={lfc}")
 
         if self.ipd_eV is not None:
-            ipd = self.ipd_eV * eV_TO_J
+            state_ipds = np.full(len(self.states), self.ipd_eV * eV_TO_J)
             if self.verbose:
                 print(f"Applying user-defined input IPD: {self.ipd_eV}")
         else:
-            ipd = get_ipd(state=self.overlord_state, model=self.models.ipd_model, user_defined_ipd=self.ipd_eV)
-            if self.verbose:
-                print(f"Calculated IPD={ipd * J_TO_eV} eV")
+            state_ipds = get_ipd(
+                plasma=self, state=self.overlord_state, model=self.models.ipd_model,
+                user_defined_ipd=self.ipd_eV, crowley_force_constant=self.crowley_force_constant
+                )
 
         ff = FreeFreeDSF(state=self.overlord_state)
-        ff_dsf = ff.get_dsf(k=k_value, w=omega_array, lfc=lfc, model=self.models.polarisation_model)
+        ff_dsf = ff.get_dsf(k=k_SI, w=w_SI, lfc=lfc, model=self.models.polarisation_model)
         ff_tot = ff_dsf * self.overlord_state.charge_state
 
-        bf_tot = np.zeros_like(omega_array)
-        ff_i = np.zeros((len(self.states), len(omega_array)))
-        bf_i = np.zeros((len(self.states), len(omega_array)))
+        bf_tot = np.zeros_like(w_SI)
+        ff_i = np.zeros((len(self.states), len(w_SI)))
+        bf_i = np.zeros((len(self.states), len(w_SI)))
 
         if self.verbose:
             print(f"Mean charge state = {self.overlord_state.charge_state}.")
 
         for i in range(0, len(self.states)):
-            state = self.states[i]
-            x = self.partial_densities[i]
+            state: PlasmaState = self.states[i]
+            x   = self.partial_densities[i]
+            ipd = state_ipds[i]
             if self.verbose:
                 print(f"\nRunning state {i} with Z={state.charge_state} and x={x}\n")
+                print(f"Calculated IPD for state {i}={ipd * J_TO_eV} eV\n")
+
             binding_energies = state.binding_energies * eV_TO_J
 
             ff_i[i] = x * ff_dsf
 
             Eb = binding_energies - ipd
 
-            if np.any(np.abs(ipd) > (np.abs(binding_energies[binding_energies < 0.0]))):
+            if np.any(ipd < binding_energies[binding_energies < 0.0]):
                 warnings.warn(
                     f"IPD {ipd * J_TO_eV} is larger than the binding energy of state {i}: {binding_energies[binding_energies < 0.]* J_TO_eV}. Consider increasing your ionization degree. The bound-free feature is being set to zero."
                 )
 
             bf = BoundFreeDSF(state=state)
             bf_dsf = bf.get_dsf(
-                ZA=state.atomic_number, Zb=state.Zb, k=k_value, w=omega_array, Eb=Eb, model=self.models.bf_model
+                ZA=state.atomic_number, Zb=state.Zb, k=k_SI, w=w_SI, Eb=Eb, model=self.models.bf_model
             )
             bf_tot += x * bf_dsf
             bf_i[i] = x * bf_dsf
@@ -490,12 +536,10 @@ class xDave:
 
     def run_elastic(self, k, w):
         k_value = k / BOHR_RADIUS
-        # w *= eV_TO_J
         omega_array = w.copy() * eV_TO_J
 
         lfc_kernel = LFC(state=self.overlord_state)
         lfc = lfc_kernel.calculate_lfc(k=k_value, w=omega_array, model=self.models.lfc_model)
-        # print(f"Calculated LFC={lfc}")
 
         # Calculate the Rayleigh weight
         if self.ocp_flag:
@@ -552,7 +596,7 @@ class xDave:
             array: convolved spectrum in arbitrary units
         """
 
-        spec_energy = beam_energy - omega  # np.linspace(beam_energy - 1000, beam_energy + 1000, 500)
+        spec_energy = beam_energy - omega
 
         if type == "GAUSSIAN":
             assert fwhm is not None
@@ -598,7 +642,6 @@ class xDave:
             spectrum += np.interp(x=spec_energy, xp=scttr_ene, fp=scttr_spc) * Bi
             inelastic += np.interp(x=spec_energy, xp=scttr_ene, fp=scttr_spc_inel) * Bi
 
-        # new_source = np.interp(x=spec_energy, xp=source_energy, fp=source)
         new_source = np.interp(x=spec_energy, xp=source_energy, fp=source_spectrum)
         new_source /= np.sum(new_source)
 
@@ -640,10 +683,6 @@ class xDave:
                 data["ff"],
                 data["bf"],
                 data["dsf"],
-                # data["tau"],
-                # data["F_inel"],
-                # data["F_bf"],
-                # data["F_ff"],
                 mode=save_mode,
             )
         elif run_mode == "STATIC":

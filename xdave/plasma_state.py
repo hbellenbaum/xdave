@@ -4,7 +4,6 @@ from .unit_conversions import *
 import numpy as np
 
 # from fermi_integrals import
-from plasmapy.formulary.mathematics import Fermi_integral as fdi
 from .fermi_integrals import fdi as xdave_fdi
 
 from scipy.integrate import quad
@@ -222,14 +221,21 @@ class PlasmaState:
         return mass * SPEED_OF_LIGHT_SQR / DIRAC_CONSTANT
 
     def screening_length(self, mass, charge, temperature, number_density):
-        kappa_D = self.debye_screening_length(charge=charge, number_density=number_density, temperature=temperature)
         eta = self.chemical_potential_ichimaru(temperature=temperature, number_density=number_density, mass=mass)
-        # f = fdi(j=-0.5, x=eta).real
-        f_xdave = xdave_fdi(j=-0.5, eta=eta, normalize=False)
-        # print(f"\nPlasmapy fdi: {f}")
-        # print(f"\nxDave fdi: {f_xdave}")
-        # print(f"Diff between plasmapy and own fermi-dirac integrals: {np.abs(f - f_xdave)}")
-        return kappa_D * np.sqrt(f_xdave)
+        beta = 1 / (BOLTZMANN_CONSTANT * temperature)
+        f = xdave_fdi(j=-0.5, eta=eta * beta, normalize=True)
+        degeneracy_parameter = (
+            number_density * (TWO_PI * DIRAC_CONSTANT_SQR / (mass * BOLTZMANN_CONSTANT * temperature)) ** 1.5
+        )
+        kappa = np.sqrt(
+            2.0
+            * charge**2
+            * number_density
+            * ELEMENTARY_CHARGE**2
+            * f
+            / (VACUUM_PERMITTIVITY * BOLTZMANN_CONSTANT * temperature * degeneracy_parameter)
+        )
+        return kappa
 
     def debye_screening_length(self, charge, number_density, temperature):
         return np.sqrt(

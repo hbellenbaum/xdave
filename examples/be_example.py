@@ -12,14 +12,14 @@ import os
 
 def be_example():
     T = 20  # eV
-    rho = 2 * 1.845  # two times solid density [g/cc]
+    rho = 3.5  # two times solid density [g/cc]
     Z_Be = 3.5
 
     Zmin, Zmax, xmin, xmax = get_fractions_from_Z(Z=Z_Be)
 
     models = ModelOptions(
-        ei_potential="YUKAWA",
-        ii_potential="YUKAWA",
+        ei_potential="DEBYE_HUCKEL",
+        ii_potential="DEBYE_HUCKEL",
         ee_potential="COULOMB",
         polarisation_model="NUMERICAL",
         sf_model="HNC",
@@ -33,17 +33,20 @@ def be_example():
         mass_density=rho,
         electron_temperature=T,
         ion_temperature=T,
-        elements=np.array(["Be", "Be"]),
+        elements=np.array(["C", "C"]),
         charge_states=np.array([Zmin, Zmax]),
         partial_densities=np.array([xmin, xmax]),
         models=models,
         enforce_fsum=False,
         user_defined_inputs=None,
         verbose=True,
+        hnc_delta=1.0e-7,
+        hnc_max_iterations=10000,
+        hnc_mix_fraction=0.999,
     )
 
     w = np.linspace(-1000, 1000, 10000)
-    bf_tot, ff_tot, dsf, rayleigh_weight, ff_i, bf_i = kernel.run(w=w, angle=75, beam_energy=8.0e3, mode="DYNAMIC")
+    bf_tot, ff_tot, dsf, rayleigh_weight, ff_i, bf_i = kernel.run(w=w, angle=75, beam_energy=9.0e3, mode="DYNAMIC")
 
     # this will convolve the dsf with a Gaussian sif of 10 eV fwhm
     # if you want to use your own, you can add it as an input to the sif input option
