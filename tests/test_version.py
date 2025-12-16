@@ -75,11 +75,6 @@ def test_ff_version():
         # update_ff_results(model="Fit", w=omega_array, k_bohr=k_bohr, dsf=dsf_fit, fn=fn)
         dsf_fit_save = np.genfromtxt(fn + f"_k={k_bohr:.1f}_model=Fit.csv", delimiter=" ")
 
-        # plt.figure()
-        # plt.scatter(omega_array, dsf_fit, c="red")
-        # plt.scatter(dsf_fit_save[:, 0], dsf_fit_save[:, 1], c="orange")
-        # plt.show()
-
         if False:
             # I am currently ignoring Mermin because it is not working yet
             dsf_mermin = kernel.get_dsf(k=k, w=omega_array, lfc=0.0, model="MERMIN")
@@ -235,8 +230,8 @@ def test_lfc_version():
             lfcs_farid = kernel.calculate_lfc(k=ks, w=0.0, model="FARID")
 
             output_dir = os.path.join(os.path.dirname(__file__), "xdave_results/lfc")
-            # if not os.path.exists(output_dir):
-            #     os.mkdir(output_dir)
+            if not os.path.exists(output_dir):
+                os.mkdir(output_dir)
 
             fn = os.path.join(output_dir, f"lfc_results_T={T/eV_TO_K:.0f}_rho={rho/g_per_cm3_TO_kg_per_m3:.1f}.csv")
             # update_lfc_files(ks, fn, lfcs_dornheim, lfcs_interp, lfcs_ui, lfcs_gv, lfcs_farid)

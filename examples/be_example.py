@@ -46,74 +46,73 @@ def be_example():
     )
 
     w = np.linspace(-1000, 1000, 10000)
-    # bf_tot, ff_tot, dsf, rayleigh_weight, ff_i, bf_i = kernel.run(w=w, angle=75, beam_energy=9.0e3, mode="DYNAMIC")
+    bf_tot, ff_tot, dsf, rayleigh_weight, ff_i, bf_i = kernel.run(w=w, angle=75, beam_energy=9.0e3, mode="DYNAMIC")
 
-    # # this will convolve the dsf with a Gaussian sif of 10 eV fwhm
-    # # if you want to use your own, you can add it as an input to the sif input option
-    # # note that for now this will have to be centered around 0
-    # spec_energy, inelastic, elastic, spectrum = kernel.convolve_with_sif(
-    #     omega=w,
-    #     bf=bf_tot,
-    #     ff=ff_tot,
-    #     dsf=(bf_tot + ff_tot),
-    #     Wr=rayleigh_weight,
-    #     beam_energy=9.0e3,
-    #     type="GAUSSIAN",
-    #     fwhm=10,
-    # )
+    # this will convolve the dsf with a Gaussian sif of 10 eV fwhm
+    # if you want to use your own, you can add it as an input to the sif input option
+    # note that for now this will have to be centered around 0
+    spec_energy, inelastic, elastic, spectrum = kernel.convolve_with_sif(
+        omega=w,
+        bf=bf_tot,
+        ff=ff_tot,
+        dsf=(bf_tot + ff_tot),
+        Wr=rayleigh_weight,
+        beam_energy=9.0e3,
+        type="GAUSSIAN",
+        fwhm=10,
+    )
 
-    # tau_array, F_tot_inel, F_wff, F_wbf = kernel.get_itcf(w=w, ff=ff_tot, bf=bf_tot)
-    # # plot results
-    # fig, axes = plt.subplots(2, 3, figsize=(16, 16))
+    tau_array, F_tot_inel, F_wff, F_wbf = kernel.get_itcf(w=w, ff=ff_tot, bf=bf_tot)
+    # plot results
+    fig, axes = plt.subplots(2, 3, figsize=(16, 16))
 
-    # ax = axes[0, 0]
-    # ax.set_title("Total DSF")
-    # ax.plot(w, dsf, label="Inel", ls="-.", c="magenta")
-    # ax.set_xlabel(r"$\omega$ [eV]")
-    # ax.legend()
+    ax = axes[0, 0]
+    ax.set_title("Total DSF")
+    ax.plot(w, dsf, label="Inel", ls="-.", c="magenta")
+    ax.set_xlabel(r"$\omega$ [eV]")
+    ax.legend()
 
-    # ax = axes[0, 1]
-    # ax.set_title("FF DSF")
-    # ax.plot(w, ff_tot, label="FF", ls="--", c="orange")
-    # ax.set_xlabel(r"$\omega$ [eV]")
-    # ax.legend()
+    ax = axes[0, 1]
+    ax.set_title("FF DSF")
+    ax.plot(w, ff_tot, label="FF", ls="--", c="orange")
+    ax.set_xlabel(r"$\omega$ [eV]")
+    ax.legend()
 
-    # ax = axes[0, 2]
-    # ax.set_title("BF DSF")
-    # ax.plot(w, bf_tot, label="BF", ls="solid", c="dodgerblue")
-    # ax.set_xlabel(r"$\omega$ [eV]")
-    # ax.legend()
+    ax = axes[0, 2]
+    ax.set_title("BF DSF")
+    ax.plot(w, bf_tot, label="BF", ls="solid", c="dodgerblue")
+    ax.set_xlabel(r"$\omega$ [eV]")
+    ax.legend()
 
-    # tau_array, F_tot_inel, F_wff, F_wbf = kernel.get_itcf(w=w, ff=ff_tot, bf=bf_tot)
+    tau_array, F_tot_inel, F_wff, F_wbf = kernel.get_itcf(w=w, ff=ff_tot, bf=bf_tot)
 
-    # ax = axes[1, 0]
-    # ax.set_title("ITCF")
-    # ax.plot(tau_array, F_tot_inel, label="xDave inel", ls="dashed", c="magenta")
-    # ax.set_xlabel(r"$\tau$ [1/eV]")
-    # ax.legend()
+    ax = axes[1, 0]
+    ax.set_title("ITCF")
+    ax.plot(tau_array, F_tot_inel, label="xDave inel", ls="dashed", c="magenta")
+    ax.set_xlabel(r"$\tau$ [1/eV]")
+    ax.legend()
 
-    # ax = axes[1, 1]
-    # ax.set_title("FF ITCF")
-    # ax.plot(tau_array, F_wff, label="xDave ff", ls="dashed", c="dodgerblue")
-    # ax.set_xlabel(r"$\tau$ [1/eV]")
-    # ax.legend()
+    ax = axes[1, 1]
+    ax.set_title("FF ITCF")
+    ax.plot(tau_array, F_wff, label="xDave ff", ls="dashed", c="dodgerblue")
+    ax.set_xlabel(r"$\tau$ [1/eV]")
+    ax.legend()
 
-    # ax = axes[1, 2]
-    # ax.set_title("BF ITCF")
-    # ax.plot(tau_array, F_wbf, label="xDave bf", ls="dashed", c="orange")
-    # ax.set_xlabel(r"$\tau$ [1/eV]")
-    # ax.legend()
-    # plt.tight_layout()
-    # plt.show()
+    ax = axes[1, 2]
+    ax.set_title("BF ITCF")
+    ax.plot(tau_array, F_wbf, label="xDave bf", ls="dashed", c="orange")
+    ax.set_xlabel(r"$\tau$ [1/eV]")
+    ax.legend()
+    plt.tight_layout()
+    plt.show()
 
-    # plt.figure()
-    # plt.plot(spec_energy, spectrum, label="inel")
-    # plt.legend()
-    # plt.xlabel(r"$\omega$ [eV]")
-    # plt.xlabel("Intensity [a.u.]")
-    # plt.show()
+    plt.figure()
+    plt.plot(spec_energy, spectrum, label="inel")
+    plt.legend()
+    plt.xlabel(r"$\omega$ [eV]")
+    plt.xlabel("Intensity [a.u.]")
+    plt.show()
 
-    # exit()
     start_time = time.time()
     k = np.linspace(0.5, 10, 1000)
     k, Sab, _, Wr, qs, fs, lfc = kernel.run(w=w, k=k, beam_energy=8.0e3, mode="STATIC")

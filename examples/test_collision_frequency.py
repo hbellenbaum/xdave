@@ -4,7 +4,6 @@ from xdave.plasma_state import PlasmaState, get_rho_T_from_rs_theta
 from xdave.models import ModelOptions
 from xdave.freefree_dsf import FreeFreeDSF
 
-# from xdave.collision_frequency import CollisionFrequency
 from xdave.constants import *
 from xdave.utils import calculate_q
 from xdave.plasma_state import get_fractions_from_Z
@@ -49,12 +48,8 @@ def test():
     mu_ei_born = ff_kernel.get_collision_frequency(k=k, w=w, lfc=lfc, model="BORN")
     mu_ei_ziman = ff_kernel.get_collision_frequency(k=k, w=w, lfc=lfc, model="ZIMAN")
     print(mu_ei_ziman)
-    # print(omega)
-    # print(mu_ei)
 
-    # plt.figure()
     fig, ax = plt.subplots(1, 1)
-    # ax = axes[0]
     ax.plot(
         w * J_TO_eV, mu_ei_born.real / DIRAC_CONSTANT, label="Re[Born]", c="navy", ls="-."
     )  #  * DIRAC_CONSTANT / EF
@@ -63,8 +58,7 @@ def test():
     ax.plot(
         w * J_TO_eV, mu_ei_born.imag / DIRAC_CONSTANT, label="Im[Born]", c="crimson", ls="-."
     )  #  * DIRAC_CONSTANT / EF
-    # ax.legend()
-    # ax = axes[1]
+
     ax.set_xlim(0, 200)
     ax.legend()
     plt.tight_layout()
