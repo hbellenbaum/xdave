@@ -1,12 +1,13 @@
-import sys
-
-# sys.path.insert(1, "./xdave")
-sys.path.insert(1, "./mcss_tests")
-
 from xdave import *
-from xdave.plasma_state import get_fractions_from_Z_partial
-from xdave.utils import calculate_q
-from run_mcss_sim import run_be_sr_mode, run_ch_sr_mode, run_c_sr_mode, run_ch_ar_mode, run_ch_ar_mode3
+from xdave.plasma_state import get_fractions_from_Z_partial, get_fractions_from_Z
+from xdave.utils import (
+    calculate_q,
+    load_mcss_result,
+    get_mcss_wr_from_status_file,
+    load_mcss_result_ar,
+    load_mcss_result_ar_3species,
+)
+from xdave.unit_conversions import K_TO_eV, kg_per_m3_TO_g_per_cm3
 
 import numpy as np
 import matplotlib.pyplot as plt
@@ -17,25 +18,26 @@ from datetime import datetime
 
 THIS_DIR = os.path.dirname(__file__)
 
-mcss_dir = "~/code/mcss/mcss_ndtt/pro/mcss"
-mcss_executable = "mcss_60"  # "mcss_ndtt"  'mcss_51'
-
 
 def compare_mcss_xdave_be():
     T = 155.5  # eV
     rho = 30.0  # g/cc
-    Z = 3.5
-    angle = 75  # degrees
+    Z = 3.5  #
+    angle = 75  # degrees, also can run 120
     beam_energy = 20.0e3  # eV
     q = calculate_q(angle=angle, energy=beam_energy)
     print(f"Running at q={q:.3f}")
 
-    En_mcss, wff_mcss, wbf_mcss, ff_mcss, bf_mcss, el_mcss, WR_mcss = run_be_sr_mode(
-        T=T, rho=rho, Z=Z, angle=angle, user_defined_ipd=0.0, user_defined_lfc=0.0, plot=False
+    fn = os.path.join(
+        os.path.dirname(__file__),
+        f"comparison_data/mcss_comparisons/be_runs_T={T:.2f}_rho={rho:.2f}/mcss_run_be_T={T:.2f}_rho={rho:.2f}_Z={Z}_angle={angle:.0f}.csv",
     )
+    En_mcss, wff_mcss, wbf_mcss, ff_mcss, bf_mcss, el_mcss = load_mcss_result(filename=fn)
+    # WR_mcss =
 
-    mcss_norm = 4
+    mcss_norm = 1
 
+    # hard-coded for Z=3.5
     elements = np.array(["Be", "Be"])
     partial_densities = np.array([0.5, 0.5])
     charge_states = np.array([3, 4])
@@ -53,6 +55,7 @@ def compare_mcss_xdave_be():
         charge_states=charge_states,
         partial_densities=partial_densities,
         user_defined_inputs=None,
+        enforce_fsum=False,
     )
 
     bf_tot, ff_tot, dsf, WR, ff_i, bf_i = kernel.run(k=k, w=omega_array)
@@ -108,15 +111,22 @@ def compare_mcss_xdave_be():
 def compare_mcss_xdave_c():
     T = 80.0  # eV
     rho = 4.0  # g/cc
-    Z = 0.5
+    Z = 4.0  # also Z = 0.5, 1.5, 2.5, 3.5, 4.5
     angle = 90  # degrees
     beam_energy = 20.0e3  # eV
     q = calculate_q(angle=angle, energy=beam_energy)
     print(f"Running at q={q:.3f}")
 
-    En_mcss, wff_mcss, wbf_mcss, ff_mcss, bf_mcss, el_mcss, WR_mcss = run_c_sr_mode(
-        T=T, rho=rho, Z=Z, angle=angle, user_defined_ipd=0.0, user_defined_lfc=0.0, plot=False
+    fn = os.path.join(
+        os.path.dirname(__file__),
+        f"comparison_data/mcss_comparisons/c_runs_T={T:.2f}_rho={rho:.2f}/mcss_run_c_T={T:.2f}_rho={rho:.2f}_Z={Z}_angle={angle:.0f}.csv",
     )
+    status_fn = os.path.join(
+        os.path.dirname(__file__),
+        f"comparison_data/mcss_comparisons/c_runs_T={T:.2f}_rho={rho:.2f}/mcss_run_c_T={T:.2f}_rho={rho:.2f}_Z={Z}_angle={angle:.0f}_status.txt",
+    )
+    En_mcss, wff_mcss, wbf_mcss, ff_mcss, bf_mcss, el_mcss = load_mcss_result(filename=fn)
+    WR_mcss = get_mcss_wr_from_status_file(status_file=status_fn)
 
     Z_min, Z_max, x1, x2 = get_fractions_from_Z(Z)
 
@@ -143,7 +153,7 @@ def compare_mcss_xdave_c():
         user_defined_inputs=user_defined_inputs,
     )
 
-    mcss_norm = kernel.overlord_state.atomic_number
+    mcss_norm = 1  # kernel.overlord_state.atomic_number
 
     bf_tot, ff_tot, dsf, WR, ff_i, bf_i = kernel.run(k=k, w=omega_array)
     ff_tot[np.isnan(ff_tot)] = 0.0
@@ -201,18 +211,24 @@ def compare_mcss_xdave_c():
 def compare_mcss_xdave_ch():
     T = 80.0  # eV
     rho = 3.5  # g/cc
-    ZC = 3.0
+    ZC = 4.0  # also ZC=2.5, 3.5, 4.0, 4.5
     ZH = 1.0
     xH = 0.2
-    # q = 4.0
     angle = 75  # degrees
     beam_energy = 20.0e3  # eV
     q = calculate_q(angle=angle, energy=beam_energy)
     print(f"Running at q={q:.3f}")
 
-    En_mcss, wff_mcss, wbf_mcss, ff_mcss, bf_mcss, el_mcss, WR_mcss = run_ch_sr_mode(
-        T=T, rho=rho, xH=xH, ZH=ZH, ZC=ZC, angle=angle, user_defined_ipd=0.0, user_defined_lfc=0.0, plot=False
+    fn = os.path.join(
+        os.path.dirname(__file__),
+        f"comparison_data/mcss_comparisons/ch_runs_T={T:.2f}_rho={rho:.2f}/mcss_run_ch_T={T:.2f}_rho={rho:.2f}_ZC={ZC}_angle={angle:.0f}.csv",
     )
+    status_fn = os.path.join(
+        os.path.dirname(__file__),
+        f"comparison_data/mcss_comparisons/ch_runs_T={T:.2f}_rho={rho:.2f}/mcss_run_ch_T={T:.2f}_rho={rho:.2f}_ZC={ZC}_angle={angle:.0f}_status.txt",
+    )
+    En_mcss, wff_mcss, wbf_mcss, ff_mcss, bf_mcss, el_mcss = load_mcss_result(filename=fn)
+    WR_mcss = get_mcss_wr_from_status_file(status_file=status_fn)
 
     elements = np.array(["H", "C", "C"])
 
@@ -242,9 +258,10 @@ def compare_mcss_xdave_ch():
         elements=elements,
         partial_densities=partial_densities,
         user_defined_inputs=None,
+        enforce_fsum=False,
     )
 
-    mcss_norm = kernel.overlord_state.atomic_number
+    mcss_norm = 1  # kernel.overlord_state.atomic_number
 
     bf_tot, ff_tot, dsf, WR, ff_i, bf_i = kernel.run(k=k, w=omega_array)
     ff_tot[np.isnan(ff_tot)] = 0.0
@@ -309,47 +326,31 @@ def compare_mcss_xdave_ch():
     plt.show()
     fig.savefig(f"ch_test_T={T:.1f}_rho={rho:.1f}_ZC={ZC}_q={q:.2f}.pdf")
 
-    fname = f"xdave_ch_T={T:.1f}_rho={rho:.1f}_ZC={ZC}"
-    dirname = os.path.join(THIS_DIR, "xdave_results")
-    if not os.path.exists(dirname):
-        os.mkdir(dirname)
-    kernel.save_result(
-        fname=fname,
-        dirname=dirname,
-        w=omega_array,
-        tau=tau_array,
-        bf=bf_tot,
-        ff=ff_tot,
-        dsf=dsf,
-        F_inel=F_tot_inel,
-        F_bf=F_wbf,
-        F_ff=F_wff,
-    )
-
 
 def compare_mcss_xdave_ch_static():
 
-    T = 100.0  # eV
+    T = 95.0  # eV
     rho = 1.2  # g/cc
-    ZC = 3
+    ZC = 4.0
     ZH = 1.0
     xH = 0.2
     xC = 1 - xH
-    # q = 4.0
     angle = 75  # degrees
     beam_energy = 9.0e3  # eV
     q = calculate_q(angle=angle, energy=beam_energy)
-    Zmin, Zmax, xmin, xmax = get_fractions_from_Z_partial(Z=ZC, x0=xH)
-    # print(f"Running at q={q:.3f}")
 
-    k_mcss, WR_mcss, f1_mcss, f2_mcss, q1_mcss, q2_mcss, S11_mcss, S12_mcss, S22_mcss = run_ch_ar_mode(
-        T=T, rho=rho, xH=xH, ZH=ZH, ZC=ZC, angle=angle, user_defined_ipd=0.0, user_defined_lfc=0.0, plot=False
+    fn = os.path.join(
+        os.path.dirname(__file__),
+        f"comparison_data/mcss_comparisons/ch_ar_runs_T={T:.2f}_rho={rho:.2f}/mcss_ar_run_ch_T={T:.2f}_rho={rho:.2f}_ZC={ZC}.csv",
+    )
+    k_mcss, WR_mcss, f1_mcss, f2_mcss, q1_mcss, q2_mcss, S11_mcss, S12_mcss, S22_mcss, _ = load_mcss_result_ar(
+        filename=fn, use_lfc_model=False
     )
 
-    elements = np.array(["H", "C", "C"])
+    elements = np.array(["H", "C"])
 
-    partial_densities = np.array([xH, xmin, xmax])
-    charge_states = np.array([ZH, Zmin, Zmax])
+    partial_densities = np.array([xH, xC])
+    charge_states = np.array([ZH, ZC])
     user_defined_inputs = dict()
 
     models = ModelOptions(
@@ -357,8 +358,8 @@ def compare_mcss_xdave_ch_static():
         bf_model="SCHUMACHER",
         lfc_model="NONE",
         ipd_model="NONE",
-        ee_potential="YUKAWA",
-        ei_potential="YUKAWA",
+        ee_potential="COULOMB",
+        ei_potential="COULOMB",
         ii_potential="YUKAWA",
     )
 
@@ -374,8 +375,6 @@ def compare_mcss_xdave_ch_static():
         partial_densities=partial_densities,
         user_defined_inputs=user_defined_inputs,
     )
-
-    mcss_norm = kernel.overlord_state.atomic_number
 
     k = np.linspace(0.1, 15, 10000)
     k, Sab, _, WR, qs, fs, lfc = kernel.run(k=k, w=0.0, mode="STATIC")
@@ -398,8 +397,7 @@ def compare_mcss_xdave_ch_static():
     ax.plot(k, qs[0], label="H", c="crimson", ls="-.")
     ax.plot(k, qs[1], label="C", c="forestgreen", ls="-.")
     ax.plot(k_mcss, q1_mcss, label="MCSS: H", c="crimson", ls=":")
-    ax.plot(k_mcss, q2_mcss, label="MCSS: C3", c="forestgreen", ls=":")
-    ax.plot(k_mcss, q2_mcss, label="MCSS: C4", c="forestgreen", ls=":")
+    ax.plot(k_mcss, q2_mcss, label="MCSS: C", c="forestgreen", ls=":")
     ax.set_xlabel(r"$k$ [$a_B^{-1}$]")
     ax.set_ylabel(r"$q_{a}$ [ ]")
     ax.legend()
@@ -430,7 +428,7 @@ def compare_mcss_xdave_ch_static_partialZC():
 
     T = 100.0  # eV
     rho = 1.2  # g/cc
-    ZC = 4.5
+    ZC = 4.5  # also Z=3.5
     ZH = 1.0
     xH = 0.2
     xC = 1 - xH
@@ -439,8 +437,11 @@ def compare_mcss_xdave_ch_static_partialZC():
     beam_energy = 9.0e3  # eV
     q = calculate_q(angle=angle, energy=beam_energy)
     ZC1, ZC2, xC1, xC2 = get_fractions_from_Z_partial(Z=ZC, x0=xH)
-    # print(f"Running at q={q:.3f}")
 
+    fn = os.path.join(
+        os.path.dirname(__file__),
+        f"comparison_data/mcss_comparisons/ch_ar_runs_T={T:.2f}_rho={rho:.2f}/mcss_ar_run_ch_T={T:.2f}_rho={rho:.2f}_ZC={ZC}.csv",
+    )
     (
         k_mcss,
         WR_mcss,
@@ -456,21 +457,8 @@ def compare_mcss_xdave_ch_static_partialZC():
         S22_mcss,
         S23_mcss,
         S33_mcss,
-    ) = run_ch_ar_mode3(
-        T=T,
-        rho=rho,
-        xH=xH,
-        xC1=xC1,
-        xC2=xC2,
-        ZH=ZH,
-        ZC=ZC,
-        ZC1=ZC1,
-        ZC2=ZC2,
-        angle=angle,
-        user_defined_ipd=0.0,
-        user_defined_lfc=0.0,
-        plot=False,
-    )
+        lfc_mcss,
+    ) = load_mcss_result_ar_3species(filename=fn, use_lfc_model=False)
 
     elements = np.array(["H", "C", "C"])
 
@@ -483,8 +471,8 @@ def compare_mcss_xdave_ch_static_partialZC():
         bf_model="SCHUMACHER",
         lfc_model="NONE",
         ipd_model="NONE",
-        ee_potential="YUKAWA",
-        ei_potential="YUKAWA",
+        ee_potential="COULOMB",
+        ei_potential="COULOMB",
         ii_potential="YUKAWA",
     )
 
@@ -500,8 +488,6 @@ def compare_mcss_xdave_ch_static_partialZC():
         partial_densities=partial_densities,
         user_defined_inputs=user_defined_inputs,
     )
-
-    mcss_norm = kernel.overlord_state.atomic_number
 
     k = np.linspace(0.1, 15, 10000)
     k, Sab, _, WR, qs, fs, lfc = kernel.run(k=k, w=0.0, mode="STATIC")

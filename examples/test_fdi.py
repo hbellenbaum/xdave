@@ -1,7 +1,3 @@
-import sys
-
-sys.path.insert(1, "./mcss_tests")
-
 from xdave.constants import ELECTRON_MASS
 from xdave.unit_conversions import eV_TO_K, g_per_cm3_TO_kg_per_m3, J_TO_eV
 from xdave.plasma_state import PlasmaState

@@ -85,9 +85,5 @@ def test_Fig1b():
         print(f"FWD Test failed for Hydrogen.")
 
 
-def test_version():
-    return
-
-
 if __name__ == "__main__":
     test_Fig1b()

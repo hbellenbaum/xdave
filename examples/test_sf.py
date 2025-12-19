@@ -427,6 +427,6 @@ def test_wuensch_Fig617():
 
 if __name__ == "__main__":
     test_ocp()
-    # test_mcp()
-    # test_wuensch_Fig616()
-    # test_wuensch_Fig617()
+    test_mcp()
+    test_wuensch_Fig616()
+    test_wuensch_Fig617()

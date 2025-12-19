@@ -75,6 +75,10 @@ class OCPRayleighWeight:
                 bridge_function=bridge_function,
                 return_full=False,
             )
+            if not sf.success:
+                warnings.warn(
+                    f"The static structure factor solver has failed. This will only occur for HNC, so check your inputs and try increasing your mix fraction."
+                )
         else:
             Siik = np.full_like(k, 1.0)
 

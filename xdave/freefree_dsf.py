@@ -3,6 +3,7 @@ from .unit_conversions import *
 from .maths import log1pexp
 from .plasma_state import PlasmaState
 from .fermi_integrals import fdi
+from .static_sf import OCPStaticStructureFactor
 
 from scipy import integrate
 
@@ -41,7 +42,7 @@ class FreeFreeDSF:
             array: calculated free-free dsf in units of 1/J
         """
 
-        # NOTE(HB): not sure I need this anymore since I'm controlling this from the main kernel
+        # This is a last-resort, in case checks in the main run function don't work as expected
         if self.state.free_electron_number_density == 0.0:
             return 0.0
 
@@ -65,6 +66,14 @@ class FreeFreeDSF:
         )
 
         return S_EG_LFC
+
+    def get_collision_frequency(self, k, w, lfc, model):
+        if model == "BORN":
+            return self._born_ei_collision_frequency(k, w, lfc)
+        elif model == "ZIMAN":
+            return self._ziman_ei_collision_frequency()
+        else:
+            raise NotImplementedError(f"Model {model} not recognized.")
 
     def dielectric_function(self, k, w, model):
         """
@@ -482,168 +491,134 @@ class FreeFreeDSF:
 
         return pol_func
 
-    def _real_dielectric_mermin(self, k, w, mu1, mu2):
-        # TODO(Hannah): get this working
-        Te = self.state.electron_temperature
+    def _ziman_ei_collision_frequency(self):
+        """
+        Calculate the Ziman collision frequency.
+        For details see Eqn. (12) in Fortmann et al., Phys. Rev. E 81 (2010).
+
+        Returns:
+            array: collision frequency in units of J
+        """
+        rs = self.state.rs
+        EF = self.state.fermi_energy(self.state.free_electron_number_density, ELECTRON_MASS)
+        a = 0.11523
+        b = 6.02921
+        collision_frequency = EF / DIRAC_CONSTANT * (a * rs**2 * (np.log(1 + b / rs) - 1 / (1 + rs / b)))
+        return collision_frequency
+
+    def _born_ei_collision_frequency_old(self, k, w, lfc):
+        k_temp = np.linspace(1.0e-3, 1.0e2, 1000) / BOHR_RADIUS
+        Siik = OCPStaticStructureFactor(state=self.state).get_ii_static_structure_factor(k=k_temp, sf_model="HNC")
+
+        Zi = self.state.charge_state
+        mi = self.state.atomic_mass
+        ni = self.state.ion_number_density
         ne = self.state.free_electron_number_density
-        EF = self.state.fermi_energy(ne, ELECTRON_MASS)
-        be = 1 / (ELEMENTARY_CHARGE * Te)
-        pe = np.sqrt(ELECTRON_MASS * ELEMENTARY_CHARGE * Te)
-        De = ne * (TWO_PI * DIRAC_CONSTANT**2 / (ELECTRON_MASS * ELEMENTARY_CHARGE * Te)) ** 1.5
-        xe = ELECTRON_MASS * (w / k) / (np.sqrt(2) * pe)
-        Ke = DIRAC_CONSTANT * (k / 2) / (np.sqrt(2) * pe)
-        Reze = ELECTRON_MASS * mu1 / (np.sqrt(2) * k * pe)
-        Imze = ELECTRON_MASS * mu2 / (np.sqrt(2) * k * pe)
-        alpha = self.state.chemical_potential_ichimaru(Te, ne, ELECTRON_MASS)  # / EF
+        w_plasma = self.state.plasma_frequency(charge=Zi, number_density=ni, mass=mi)
+        w_freq = w / DIRAC_CONSTANT
 
-        def integrand(u):
-            x = np.tan(HALF_PI * u)
-            xbar = xe - Imze
-            log_term = (1 + np.exp(alpha - (x + Ke) ** 2)) / (1 + np.exp(alpha - (x - Ke) ** 2))
-            f = (x - xbar) / ((x - xbar) ** 2 + Reze**2) + (x + xbar) / ((x + xbar) ** 2 + Reze**2) * np.log(log_term)
-            return f * HALF_PI * (1 + x**2)
+        def integral(q):
+            epsilon0 = self.dandrea_fit(k=q, omega=0)
+            epsilon = self.dandrea_fit(k=q, omega=w)
+            Sii = np.interp(q, xp=k_temp, fp=Siik)
+            return 1 / TWO_PI**3 * Sii / epsilon0 * (epsilon - epsilon0)
 
-        real_part = integrate.quad_vec(integrand, 0, 1)[0]
+        prefactor = FOUR_THIRDS_PI * w_plasma / w_freq * mi / ELECTRON_MASS * 1 / ne * 1.0j
+        int_term, _ = integrate.quad_vec(integral, 0, 1.0e14)
+        return prefactor * int_term
+        # interp_Sk = np.interp(k_temp, Siik, fill_value="extrapolate")
 
-        return real_part * 2 * ne * be / (2 * SQRT_PI * Ke * De)
+    def _born_ei_collision_frequency(self, k, w, lfc):
+        Zi = self.state.charge_state
+        ni = self.state.ion_number_density
+        ne = self.state.free_electron_number_density
 
-        # w_freq = w / DIRAC_CONSTANT
+        k_temp = np.linspace(1.0e-3, 1.0e2, 1000) / BOHR_RADIUS
+        Siik = OCPStaticStructureFactor(state=self.state, verbose=False).get_ii_static_structure_factor(
+            k=k_temp, sf_model="HNC"
+        )
 
-        # kF = self.state.fermi_wave_number(self.state.free_electron_number_density)  # 1/m
-        # EF = self.state.fermi_energy(self.state.free_electron_number_density, ELECTRON_MASS)  # J
-        # TF = self.state.fermi_temperature(ELECTRON_MASS, self.state.free_electron_number_density)  # K
-        # vF = DIRAC_CONSTANT * kF / ELECTRON_MASS  # m/s
-        # omega_p = self.state.plasma_frequency(-1, self.state.free_electron_number_density, ELECTRON_MASS)
-        # beta = 1 / (BOLTZMANN_CONSTANT * self.state.electron_temperature)
-        # mu = self.state.chemical_potential_ichimaru(
-        #     self.state.electron_temperature, self.state.free_electron_number_density, ELECTRON_MASS
-        # )  # Joule
+        prefactor = Zi**2 * ni * ELEMENTARY_CHARGE_SQR / (6 * PI_SQR * VACUUM_PERMITTIVITY * ne * ELECTRON_MASS)
 
-        # u = w_freq / (vF * k)  # [#]
-        # kappa = k / (2 * kF)  # [#]
+        def real_integrand(q):
+            Si = np.interp(q, k_temp, Siik)
+            Vee = 4 * np.pi * COULOMB_CONSTANT * ELEMENTARY_CHARGE**2 / q**2
+            epsilon = 1 - Vee * self.dandrea_fit(q, w)
+            epsilon0 = 1 - Vee * self.dandrea_fit(q, 0)
+            I = q**2 * Si * (epsilon - epsilon0) / (w * epsilon0)
+            return I
 
-        # D = EF * beta  # dimensionless
-        # alpha = mu / EF
-        # t = self.state.electron_temperature / TF  # [#]
+        integral, _ = integrate.quad_vec(real_integrand, 0, 1.0e16)
+        real_part = prefactor * integral
 
-        # def g_ancarni(lambda_val):
-        #     return np.where(lambda_val < 0.0, -g_t(-lambda_val), g_t(lambda_val))
+        def imag_integral(wdash):
+            return 1 / PI * real_part / (w - wdash)
 
-        # def g_t(lambda_val, eps=1.0e-9):
+        imag_part, _ = integrate.quad_vec(imag_integral, -1.0e6, 1.0e6)
+        return real_part + 1.0j * imag_part
 
-        #     A = lambda_val**2 / t
-        #     B = alpha / t
+    def _real_dielectric_mermin(self, k, w, mu1, mu2):
+        wtilde = w - mu2
+        kappa = wtilde * ELECTRON_MASS / (DIRAC_CONSTANT * k)
+        delta = ELECTRON_MASS * mu1 / (DIRAC_CONSTANT * k)
+        mue = self.state.chemical_potential_ichimaru(
+            self.state.electron_temperature, self.state.free_electron_number_density, ELECTRON_MASS
+        )
+        # kF = self.state.fermi_wave_number(self.state.free_electron_number_density)
+        beta = 1 / (BOLTZMANN_CONSTANT * self.state.electron_temperature)
+        k_half = k / 2
 
-        #     def f_prime(X):
-        #         y = A * X**2 - B
-        #         s = np.empty_like(y)
+        def real_integral(q):
+            KEq = DIRAC_CONSTANT_SQR * q**2 / (2 * ELECTRON_MASS)
+            fq = 1 / (np.exp((KEq - mue) * beta) + 1)
+            numerator = (delta**2 + (kappa - k_half - q) ** 2) * (delta**2 + (kappa + k_half + q))
+            denominator = (delta**2 + (kappa - k_half + q) ** 2) * (delta**2 + (kappa + k_half - q) ** 2)
+            log_term = np.log(numerator / denominator)
+            I = 1 / TWO_PI**3 * q * fq * log_term
+            return I
 
-        #         pos_mask = y >= 0.0
-        #         neg_mask = ~pos_mask
-
-        #         # y >= 0 branch
-        #         exp_neg = np.exp(-y[pos_mask])
-        #         s[pos_mask] = 1.0 / (1.0 + exp_neg)
-
-        #         # y < 0 branch
-        #         exp_pos = np.exp(y[neg_mask])
-        #         s[neg_mask] = exp_pos / (1.0 + exp_pos)
-
-        #         return -2.0 * A * X * (s * (1.0 - s))
-
-        #     def integrand_u(u):
-        #         X = np.tan(np.pi * u / 2)
-        #         log_term = np.log(abs((X + 1) / (X - 1)))
-        #         bracket_term = -X + 0.5 * (1 - X**2) * log_term
-        #         dX_du = (np.pi / 2) * (1 / np.cos(np.pi * u / 2) ** 2)
-        #         return f_prime(X) * bracket_term * dX_du
-
-        #     res1, _ = integrate.quad_vec(integrand_u, 0, 0.5 - eps, limit=300, points=[0.1, 0.2, 0.3, 0.4])
-        #     res2, _ = integrate.quad_vec(integrand_u, 0.5 + eps, 1, limit=300, points=[0.6, 0.7, 0.8, 0.9])
-
-        #     return (lambda_val**2) * (res1 + res2)
-
-        # chi02 = 1 / (PI * kF * BOHR_RADIUS)  # [#]
-        # lambda_neg = u - kappa  # [#]
-        # lambda_pos = u + kappa  # [#]
-        # g_t_pos = g_ancarni(lambda_pos)
-        # g_t_neg = g_ancarni(lambda_neg)
-        # real_part = 1.0e0 + chi02 / (4 * kappa**3) * (g_t_pos - g_t_neg)
-
-        # return real_part
+        # units: kg * C^2 / (C^2 * kg ^(-1) * m ^ (-3) * s^2 * (J *s) ^ 2 * m^(-3))
+        prefactor = TWO_PI * ELECTRON_MASS * ELEMENTARY_CHARGE_SQR / (VACUUM_PERMITTIVITY * DIRAC_CONSTANT_SQR * k**3)
+        int_term, _ = integrate.quad_vec(real_integral, 0, 1.12)
+        return 1 + prefactor * int_term
 
     def _im_dielectric_mermin(self, k, w, mu1, mu2):
         # TODO(HB): get this working
-        Te = self.state.electron_temperature
-        ne = self.state.free_electron_number_density
-        EF = self.state.fermi_energy(ne, ELECTRON_MASS)
-        be = 1 / (ELEMENTARY_CHARGE * Te)
-        pe = np.sqrt(ELECTRON_MASS * ELEMENTARY_CHARGE * Te)
-        De = ne * (TWO_PI * DIRAC_CONSTANT**2 / (ELECTRON_MASS * ELEMENTARY_CHARGE * Te)) ** 1.5
-        xe = ELECTRON_MASS * (w / k) / (np.sqrt(2) * pe)
-        Ke = DIRAC_CONSTANT * (k / 2) / (np.sqrt(2) * pe)
-        Reze = ELECTRON_MASS * mu1 / (np.sqrt(2) * k * pe)
-        Imze = ELECTRON_MASS * mu2 / (np.sqrt(2) * k * pe)
-        alpha = self.state.chemical_potential_ichimaru(Te, ne, ELECTRON_MASS)  # / EF
 
-        def integrand(u):
-            x = np.tan(HALF_PI * u)
-            xbar = xe - Imze
-            log_term = (1 + np.exp(alpha - (x + Ke) ** 2)) / (1 + np.exp(alpha - (x - Ke) ** 2))
-            f = 1 / ((x - xbar) ** 2 + Reze**2) - 1 / ((x + xbar) ** 2 + Reze**2) * Reze * np.log(log_term)
-            return f * HALF_PI * (1 + x**2)
+        wtilde = w - mu2
+        kappa = wtilde * ELECTRON_MASS / (DIRAC_CONSTANT * k)
+        delta = ELECTRON_MASS * mu1 / (DIRAC_CONSTANT * k)
+        mue = self.state.chemical_potential_ichimaru(
+            self.state.electron_temperature, self.state.free_electron_number_density, ELECTRON_MASS
+        )
+        beta = 1 / (BOLTZMANN_CONSTANT * self.state.electron_temperature)
+        w0 = 1
+        k_half = k / 2
 
-        imag_part = integrate.quad_vec(integrand, 0, 1)[0]
-        return imag_part * 2 * ne * be / (2 * SQRT_PI * Ke * De)
+        def imag_integral(q):
+            KEq = DIRAC_CONSTANT_SQR * q**2 / (2 * ELECTRON_MASS)
+            fq = 1 / (np.exp((KEq - mue) * beta) + 1)
+            I = (
+                1
+                / TWO_PI**3
+                * fq
+                * q
+                * (
+                    np.arctan((kappa - k_half - q) / delta)
+                    + np.arctan((kappa + k_half + q) / delta)
+                    - np.arctan((kappa - k_half + q) / delta)
+                    - np.arctan((kappa + k_half - q) / delta)
+                )
+            )
+            return I  # * dx_dq
 
-        # kF = self.state.fermi_wave_number(self.state.free_electron_number_density)  # 1/m
-        # EF = self.state.fermi_energy(self.state.free_electron_number_density, ELECTRON_MASS)  # J
-        # vF = DIRAC_CONSTANT * kF / ELECTRON_MASS  # m/s
-        # u = w / (k * vF * DIRAC_CONSTANT)  # dimensionless
-        # z = k / (2 * kF)  # dimensionless
+        prefactor = (
+            -FOUR_PI * ELECTRON_MASS * ELEMENTARY_CHARGE_SQR / (VACUUM_PERMITTIVITY * DIRAC_CONSTANT_SQR * k**3)
+        )
+        int_term, _ = integrate.quad_vec(imag_integral, 0, 1.0e12)
+        imag_part = prefactor * int_term * w0
 
-        # beta = 1 / (BOLTZMANN_CONSTANT * self.state.electron_temperature)
-        # mu = self.state.chemical_potential_ichimaru(
-        #     self.state.electron_temperature, self.state.free_electron_number_density, ELECTRON_MASS
-        # )  # Joule
-        # alpha = mu / EF
-
-        # D = EF * beta  # dimensionless
-        # eta = mu * beta  # dimensionless
-        # chi02 = 1 / (PI * kF * BOHR_RADIUS)  # dimensionless
-        # theta = 1 / D
-
-        # # def integrand(u):
-        # #     y = np.tan(HALF_PI * u)
-        # #     dydy = HALF_PI * (1 + y**2)
-        # #     fy = 1 / (np.exp(D * y**2 - alpha) + 1)
-        # #     tan_funcs =
-        # #     return tan_funcs * y / fy * dydy
-
-        # if z < 1.0e-2:
-        #     prefactor = (
-        #         2
-        #         * ELECTRON_MASS**2
-        #         * ELEMENTARY_CHARGE**2
-        #         / VACUUM_PERMITTIVITY
-        #         * DIRAC_CONSTANT
-        #         * w
-        #         / (DIRAC_CONSTANT * k) ** 3
-        #     )
-        #     exp_term = EF / (BOLTZMANN_CONSTANT * self.state.electron_temperature) * u**2 - eta**2
-        #     im_part = prefactor / (1 + np.exp(exp_term))
-
-        # else:
-        #     xpos = (u + z) ** 2  # Dimensionless
-        #     xneg = (u - z) ** 2  # Dimensionless
-
-        #     exp_neg = np.exp(eta - D * xneg)
-        #     exp_pos = np.exp(eta - D * xpos)
-
-        #     log_term = (1 + exp_neg) / (1 + exp_pos)  # [#]
-        #     idx = np.where(np.abs(log_term.imag) < 1.0e-2)
-        #     im_part = 1 * PI * chi02 / (8 * z**3) * theta * np.log(log_term)  # [#]
-        # return im_part
+        return imag_part
 
     def mermin_dielectric_function(
         self, k, w, lfc=0, collision_frequency_model="BORN", input_collision_frequency=None
@@ -661,21 +636,20 @@ class FreeFreeDSF:
         Returns:
             array: polarisation, non-dimensional
         """
-        omega_p = (
-            self.state.plasma_frequency(-1, self.state.free_electron_number_density, ELECTRON_MASS) * DIRAC_CONSTANT
-        )
-        mu_ei = np.array([0.5 * omega_p * (1.0 + 1.0j)])
-        Vee = 4 * np.pi * COULOMB_CONSTANT * ELEMENTARY_CHARGE**2 / k**2
-        # print(f"Plasma frequency = {omega_p * J_TO_eV} eV")
-        # print(f"Running with collision frequency: {mu_ei * J_TO_eV} eV")
-        # real_part = self._real_dielectric_mermin(k=k, w=w + mu_ei, mu1=np.real(mu_ei), mu2=np.imag(mu_ei))
-        # imag_part = self._im_dielectric_mermin(k=k, w=w + mu_ei, mu1=np.real(mu_ei), mu2=np.imag(mu_ei))
-        # dielectric_function = 1 - Vee * (real_part + 1.0j * imag_part)
+        wp = self.state.plasma_frequency(-1, self.state.free_electron_number_density, ELECTRON_MASS)
+        w_freq = w / DIRAC_CONSTANT
+        if input_collision_frequency is not None:
+            mu_ei = input_collision_frequency * wp * (1.0 + 1.0j)
+        else:
+            mu_ei = self.get_collision_frequency(k=k, w=w, lfc=lfc, model=collision_frequency_model)
+        mu1 = mu_ei.real
+        mu2 = mu_ei.imag
+        real_part = self._real_dielectric_mermin(k=k, w=w_freq, mu1=mu1, mu2=mu2)
+        imag_part = self._im_dielectric_mermin(k=k, w=w_freq, mu1=mu1, mu2=mu2)
+        dielectric_function = real_part + 1.0j * imag_part
 
-        # TODO(Hannah): replace this with the actual numerical integration
-        dielectric_function = self.dielectric_function(k=k, w=w + 1.0j * mu_ei, model="DANDREA_FIT")
         dielectric_rpa0 = self.dielectric_function(k=k, w=0, model="DANDREA_FIT")
-        mermin_dielectric = 1 + (1 + 1.0j * mu_ei / w) * (dielectric_function - 1) / (
-            1 + 1.0j * mu_ei / w * (dielectric_function - 1) / (dielectric_rpa0 - 1)
+        mermin_dielectric = 1 + (1 + 1.0j * mu_ei / w_freq) * (dielectric_function - 1) / (
+            1 + 1.0j * mu_ei / w_freq * (dielectric_function - 1) / (dielectric_rpa0 - 1)
         )
         return mermin_dielectric

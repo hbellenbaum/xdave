@@ -1,5 +1,5 @@
-from xdave.unit_conversions import ang_TO_m, eV_TO_K, g_per_cm3_TO_kg_per_m3, amu_TO_kg
-from xdave.constants import BOLTZMANN_CONSTANT, BOHR_RADIUS
+from xdave.unit_conversions import ang_TO_m, eV_TO_K, g_per_cm3_TO_kg_per_m3, amu_TO_kg, per_cm3_TO_per_m3, J_TO_Ryd
+from xdave.constants import BOLTZMANN_CONSTANT, BOHR_RADIUS, DIRAC_CONSTANT
 from xdave.potentials import *
 
 import numpy as np
@@ -105,19 +105,43 @@ def test_ii_potentials():
     plt.show()
 
 
-def test_ei_potentials():
-    test_dir = "comparison_data/potentials/Wuensch_Thesis"
-    dat_coulomb = np.genfromtxt(os.path.join(THIS_DIR, test_dir, f"Fig4-6_Coulomb.csv"), delimiter=",")
-    dat_deutsch = np.genfromtxt(os.path.join(THIS_DIR, test_dir, f"Fig4-6_Deutsch.csv"), delimiter=",")
-    dat_kelbg = np.genfromtxt(os.path.join(THIS_DIR, test_dir, f"Fig4-6_Kelbg.csv"), delimiter=",")
-    dat_kk = np.genfromtxt(os.path.join(THIS_DIR, test_dir, f"Fig4-6_KK.csv"), delimiter=",")
+def compare_ei_potentials():
+
+    T = 1.0e5  # K
+    ni = 1.23e23  # cm^{-3}
+    Zi = 2
+    ni *= per_cm3_TO_per_m3
+    Rii = (3 / (4 * np.pi * ni)) ** (1 / 3)
+    alpha = 2 / Rii
+    mi = 2 * amu_TO_kg
+    lambda_ei = DIRAC_CONSTANT / np.sqrt(BOLTZMANN_CONSTANT * T * mi)
+
+    n = 8192
+    r0 = 0.5e-1 * BOHR_RADIUS  # [m]
+    rf = 1.0e2 * BOHR_RADIUS  # [m]
+    dr = (rf - r0) / n
+    dk = np.pi / (n * dr)  # [1/m] as it should be [1/m],
+    kf = r0 + n * dk
+    rs = np.linspace(r0, rf, n)  # [m]
+    ks = np.linspace(r0, kf, n)  # [1/m]
+
+    coulomb_ei = ei_coulomb_r(Qa=Zi, r=rs) * J_TO_Ryd
+    yukawa_ei = ei_yukawa_r(Qa=Zi, r=rs, alpha=alpha) * J_TO_Ryd
+    deutsch_ei = deutsch_r(Qa=Zi, Qb=-1, r=rs, alpha=alpha) * J_TO_Ryd
+    kelbg_ei = kelbg_r(Qa=Zi, Qb=-1, r=rs, alpha=alpha) * J_TO_Ryd
+    kk_ei = klimontovich_kraeft_r(Qa=Zi, r=rs, T=T, lambda_ei=lambda_ei) * J_TO_Ryd
+
+    rs /= Rii
 
     plt.figure()
-    plt.scatter(dat_coulomb[:, 0], dat_coulomb[:, 1], marker="x", c="black", label="Coulomb")
-    plt.scatter(dat_deutsch[:, 0], dat_deutsch[:, 1], marker="x", c="blue", label="Deutsch")
-    plt.scatter(dat_kelbg[:, 0], dat_kelbg[:, 1], marker="x", c="red", label="Kelbg")
-    plt.scatter(dat_kk[:, 0], dat_kk[:, 1], marker="x", c="green", label="KK")
+    plt.plot(rs, np.abs(coulomb_ei), c="black", ls="-.", label="xDave: Coulomb")
+    plt.plot(rs, np.abs(yukawa_ei), c="blue", ls="-.", label="xDave: Yukawa")
+    plt.plot(rs, np.abs(kelbg_ei), c="red", ls="-.", label="xDave: Kelbg")
+    plt.plot(rs, np.abs(kk_ei), c="green", ls="-.", label="xDave: Klimontovich-Kraeft")
+    plt.plot(rs, np.abs(deutsch_ei), c="orange", ls="-.", label="xDave: Deutsch")
     plt.legend()
+    plt.xlim(0, 5)
+    plt.ylim(0, 10)
     plt.ylabel(r"$U_{ei}(r)$ [ryd]")
     plt.xlabel(r"$r$ [$d_i$]")
     plt.tight_layout()
@@ -126,4 +150,4 @@ def test_ei_potentials():
 
 if __name__ == "__main__":
     test_ii_potentials()
-    # test_ei_potentials()
+    compare_ei_potentials()

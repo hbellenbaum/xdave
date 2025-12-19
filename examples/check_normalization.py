@@ -1,12 +1,6 @@
-import sys
-
-# sys.path.insert(1, "./xdave")
-sys.path.insert(1, "./mcss_tests")
-
 from xdave.plasma_state import get_fractions_from_Z
 from xdave.utils import calculate_angle
 
-from run_mcss_sim import run_c_sr_mode, run_c_ar_mode
 from xdave import *
 
 import numpy as np
@@ -45,7 +39,7 @@ def check_inelastic():
         charge_states=charge_states,
         partial_densities=partial_densities,
         models=models,
-        enforce_fsum=True,
+        enforce_fsum=False,
         user_defined_inputs=None,
     )
 
@@ -78,6 +72,7 @@ def check_inelastic():
     plt.axhline(1.0, c="gray", ls="--", label="1.0")
     plt.xlabel(r"$k$ [$a_B^{-1}$]")
     plt.ylabel(r"SF")
+    plt.title(f"enforce_fsum={kernel.enforce_fsum}")
     plt.legend()
     plt.show()
 
@@ -119,40 +114,31 @@ def check_elastic():
     w = np.linspace(-500, 6000, 5000)
 
     beam_energy = 9.0e3
-    ks = np.linspace(0.1, 10, 1000)
+    ks = np.linspace(0.01, 10, 1000)
     angle = 75
     _, Sab, Sab_tot, rayleigh_weight, qs, fs, lfc = kernel.run(w=w, k=ks, beam_energy=beam_energy, mode="STATIC")
-    k_mcss, WR_mcss, f1, f2, q1, q2, S11_mcss, S12_mcss, S22_mcss, lfc = run_c_ar_mode(
-        T=T, rho=rho, Z=Z_C, angle=angle
-    )
-
-    mcss_norm = 1  # kernel.overlord_state.atomic_number
 
     fig, axes = plt.subplots(1, 4, figsize=(14, 10))
     ax = axes[0]
-    ax.plot(k_mcss, S11_mcss, label="MCSS: 11", ls="solid", c="navy")
-    ax.plot(k_mcss, S12_mcss, label="MCSS: 12", ls="solid", c="crimson")
-    ax.plot(k_mcss, S22_mcss, label="MCSS: 22", ls="solid", c="darkgreen")
     ax.plot(ks, Sab[0, 0, :], label="xDave: 11", ls="-.", c="dodgerblue")
     ax.plot(ks, Sab[0, 1, :], label="xDave: 12", ls="-.", c="magenta")
     ax.plot(ks, Sab[1, 1, :], label="xDave: 22", ls="-.", c="limegreen")
     ax.plot(ks, Sab_tot, label="xDave: tot", ls="-.", c="black")
     ax.legend()
     ax = axes[1]
-    ax.plot(k_mcss, WR_mcss / mcss_norm, label="MCSS", ls="-.", c="darkgreen")
     ax.plot(ks, rayleigh_weight, label="xDave", ls="-.", c="lightgreen")
+    ax.plot(ks, rayleigh_weight / kernel.overlord_state.charge_state, label="xDave / Zf", ls="-.", c="dodgerblue")
+    ax.plot(ks, rayleigh_weight / kernel.overlord_state.atomic_number, label="xDave  AN", ls="-.", c="magenta")
     ax.legend()
     ax = axes[2]
-    ax.plot(k_mcss, q1, label=r"MCSS: $q_1$", ls="--", c="darkgreen")
-    ax.plot(k_mcss, q2, label=r"MCSS: $q_2$", ls="--", c="navy")
     ax.plot(ks, qs[0], label=r"xDave $q_1$", ls="-.", c="lightgreen")
     ax.plot(ks, qs[1], label=r"xDave $q_2$", ls="-.", c="dodgerblue")
+    ax.axhline(kernel.overlord_state.charge_state, c="gray", ls=":")
     ax.legend()
     ax = axes[3]
-    ax.plot(k_mcss, f1, label=r"MCSS: $f_1$", ls="--", c="darkgreen")
-    ax.plot(k_mcss, f2, label=r"MCSS: $f_2$", ls="--", c="navy")
     ax.plot(ks, fs[0], label=r"xDave $f_1$", ls="-.", c="lightgreen")
     ax.plot(ks, fs[1], label=r"xDave $f_2$", ls="-.", c="dodgerblue")
+    ax.axhline(kernel.overlord_state.charge_state, c="gray", ls=":")
     ax.legend()
     plt.show()
 

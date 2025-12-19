@@ -1,12 +1,10 @@
 from .ii_ff import PaulingShermanIonicFormFactor, ScreeningConstants
-from .ipd import get_ipd
 from .plasma_state import PlasmaState
-from .models import ModelOptions
 from .unit_conversions import *
 from .constants import *
-from .utils import read_mcss_output
 from scipy.special import gamma
 import numpy as np
+import warnings
 
 
 class BoundFreeDSF:
@@ -50,7 +48,8 @@ class BoundFreeDSF:
         elif model == "TRUNCATED_IA":
             Sce = self.truncated_IA(ZA, Zb, k, w, Eb)
         else:
-            raise NotImplementedError(f"Model {model} for the bound-free component not recognised. Try SCHUMACHER :)")
+            warnings.warn(f"Bound-free model {model} not recognized. Overwriting using the default SCHUMACHER.")
+            Sce = self.schuhmacher_ia(ZA, Zb, k, w, Eb)
         return Sce / DIRAC_CONSTANT
 
     def _shell_amplitude(self, Znl, n, l):
@@ -413,6 +412,6 @@ class BoundFreeDSF:
         """
         Sce = self.schuhmacher_ia(ZA, Zb, k, w, Eb)
         beta = 1 / (BOLTZMANN_CONSTANT * self.state.electron_temperature)
-        exp_term = np.exp(beta * (w - Eb)) + 1
+        exp_term = np.exp(beta * (w - Eb[0])) + 1
         Sce_trunc = Sce * (1 - 1 / exp_term)
         return Sce_trunc

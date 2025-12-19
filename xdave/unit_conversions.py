@@ -41,6 +41,10 @@ Ryd_TO_eV = 13.605693122990  # eV
 eV_TO_Ryd = 1 / Ryd_TO_eV
 Ryd_TO_J = Ryd_TO_eV * eV_TO_J
 J_TO_Ryd = 1 / Ryd_TO_J
+eV_TO_Ha = 0.03674931812412685
+Ha_TO_eV = 1 / eV_TO_Ha
+J_TO_Ha = 229371044869059970
+Ha_TO_J = 1 / J_TO_Ha
 
 ################
 # -- Length -- #

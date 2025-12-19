@@ -60,6 +60,15 @@ def calculate_q(angle, energy):
     return q
 
 
+def calculate_q_SI(angle, energy):
+    # angle *= np.pi / 180.0
+    angle_rad = angle * PI / 180
+    E0 = energy * eV_TO_J
+    q = 2 * E0 / (DIRAC_CONSTANT * SPEED_OF_LIGHT) * np.sin(angle_rad / 2)
+    q *= BOHR_RADIUS
+    return q
+
+
 def calculate_angle(q, energy):
     """
     Calculates an angle for the relevant q value.
@@ -92,6 +101,31 @@ def calculate_angle(q, energy):
 def load_mcss_result(filename):
     En, Es, lambda_s, wff, wbf, ff, bf, el, tot = np.genfromtxt(filename, skip_header=1, delimiter=",", unpack=True)
     return En[::-1], wff[::-1], wbf[::-1], ff, bf, el
+
+
+def load_mcss_result_ar(filename, use_lfc_model=False):
+    # Note: this only works for two-component systems
+    if use_lfc_model:
+        _, k, _, WR, f1, f2, q1, q2, S11, S12, S22, lfc = np.genfromtxt(
+            filename, skip_header=1, delimiter=",", unpack=True
+        )
+    else:
+        _, k, _, WR, f1, f2, q1, q2, S11, S12, S22 = np.genfromtxt(filename, skip_header=1, delimiter=",", unpack=True)
+        lfc = np.zeros_like(k)
+    return k, WR, f1, f2, q1, q2, S11, S12, S22, lfc
+
+
+def load_mcss_result_ar_3species(filename, use_lfc_model=False):
+    if use_lfc_model:
+        _, k, _, WR, f1, f2, f3, q1, q2, q3, S11, S13, S12, S22, S23, S33, lfc = np.genfromtxt(
+            filename, skip_header=1, delimiter=",", unpack=True
+        )
+    else:
+        _, k, _, WR, f1, f2, f3, q1, q2, q3, S11, S13, S12, S22, S23, S33 = np.genfromtxt(
+            filename, skip_header=1, delimiter=",", unpack=True
+        )
+        lfc = np.zeros_like(k)
+    return k, WR, f1, f2, f3, q1, q2, q3, S11, S13, S12, S22, S23, S33, lfc
 
 
 def get_mcss_wr_from_status_file(status_file):
@@ -400,51 +434,3 @@ def spectral_convolution(spec_ene, omega, dsf, source_ene, source, Wr):
     spectrum += new_source * Wr / (spec_ene[1] - spec_ene[0])
 
     return spectrum
-
-
-def print_error_message():
-    print(f"You done messed up!")
-    error_msg = r"""                          
-                         #####.                                     
-                           #*****#.                                  
-                           #********#.                               
-                          -***********#.                             
-                         #**************#.                           
-                        .***************###                          
-                        #**************#####.                        
-                        +************#######%                        
-                       ##**********##########.                       
-                    #***********#############                        
-                  #**********###############%-.                      
-                 #********#################******#.                  
-                ##***##################%#*********##                 
-               .####################%#***********####                
-                #####----*######%##*********----#####+               
-                %#-::::::::-##***********-:::..:::-##                
-              ..#::...+@....:***********::...%#...::%                
-           .#***::..@@@@@@...:*********:...@@@@@@...:***#.           
-          #*****:..+@@@@@@@...:****###+:..@@@@@@@@..:****##.         
-         #******:..@@@@@@@@...:#######:...@@@@@@@@...+***###.        
-        .#******:..=@@@@@@@...:#######*...@@@@@@@@..:**######        
-        ###*****:...@@@@@@...:######%#*:...@@@@@@...:########        
-        -########:.....:....:##%##******:..........:#########        
-         #########+:..  ...:*************:.......::##########        
-          =%%%####***=:::******************#-::-###########*##.      
-    .#**********************************#################******##    
-  .#******************++=====================++########********####  
- :#*******************=-:::::::::::::::::::::-#######********####### 
-.##*********************-:.................:*#####*********##########
-###########################-:..........::######**********###########%
-###########################################************#############%
-.######################################*************################.
- .################################****************################%. 
-   -%#########################****************##################%#   
-      ..%%%####%%%%+..  .. ....-+########################%%%%.  
-    """
-    print(error_msg)
-
-
-if __name__ == "__main__":
-    # amu = get_atomic_mass_for_element(e="He")
-    # print(amu)
-    print_error_message()

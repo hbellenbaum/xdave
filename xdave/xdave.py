@@ -62,7 +62,7 @@ class xDave:
         user_defined_inputs: dict = None,
         verbose: bool = False,
     ):
-        assert np.sum(partial_densities) == 1.0, f"Fractional densities do not add up 1. Try again sucker."
+        assert np.sum(partial_densities) == 1.0, f"Fractional densities do not add up 1."
         self.number_of_states = len(partial_densities)
         self.mass_density = mass_density * g_per_cm3_TO_kg_per_m3
         self.electron_temperature = electron_temperature * eV_TO_K
@@ -81,7 +81,7 @@ class xDave:
             self.ipd_eV = user_defined_inputs["ipd"] if "ipd" in keys else None
             self.user_defined_lfc = user_defined_inputs["lfc"] if "lfc" in keys else None
             self.ion_core_radii = (
-                user_defined_inputs["ion_core_radii"] * BOHR_RADIUS
+                np.array(user_defined_inputs["ion_core_radii"]) * BOHR_RADIUS
                 if "ion_core_radii" in keys
                 else np.full(self.number_of_states, None)
             )
@@ -240,9 +240,7 @@ class xDave:
             angle = calculate_angle(q=k, energy=beam_energy)
         elif k is None:
             assert angle is not None, f"You have to set either the angle or the scattering wave number."
-            assert (
-                beam_energy is not None
-            ), f"If you set an angle, you also need to specify the beam energy. I can't read your fucking mind."
+            assert beam_energy is not None, f"If you set an angle, you also need to specify the beam energy."
             k = calculate_q(angle=angle, energy=beam_energy)
 
         k_SI = k / BOHR_RADIUS
@@ -302,7 +300,7 @@ class xDave:
             ff_dsf = ff.get_dsf(k=k, w=w, lfc=lfc, model=self.models.polarisation_model)
         else:
             ff_dsf = np.zeros_like(w)
-        # the factor of Z/AN is needed to match MCSS results, I will need to figure out where it comes from
+
         ff_tot = ff_dsf * self.overlord_state.charge_state
 
         bf_tot = np.zeros_like(w)
@@ -371,15 +369,11 @@ class xDave:
                 return_full=False,
             )
 
-        # if self.enforce_fsum:
-        #     bf *= self._bf_norm(w=w, ff=ff, bf=bf, k=k)
-
-        # Divide by the atomic number to be consistent with the ff component
-        # bf_tot /= self.overlord_state.atomic_number
         dsf = ff_tot + bf_tot
 
         if self.enforce_fsum:
-            # print(f"You are currently enforcing a normalization based on the f-sum rule.")
+            if self.verbose:
+                print(f"You are currently enforcing a normalization based on the f-sum rule.")
             bf_i /= self.overlord_state.Zb
             bf_tot /= self.overlord_state.Zb
             ff_i /= self.overlord_state.charge_state
@@ -393,7 +387,6 @@ class xDave:
         ff_i /= J_TO_eV
         bf_i /= J_TO_eV
 
-        # self.output_dict = dict({"w": w, "ff": ff_tot, "bf": bf_tot, "dsf": dsf})
         return (bf_tot, ff_tot, dsf, rayleigh_weight, ff_i, bf_i)
 
     def _run_static_mode(self, k):
@@ -543,12 +536,10 @@ class xDave:
 
     def run_elastic(self, k, w):
         k_value = k / BOHR_RADIUS
-        # w *= eV_TO_J
         omega_array = w.copy() * eV_TO_J
 
         lfc_kernel = LFC(state=self.overlord_state)
         lfc = lfc_kernel.calculate_lfc(k=k_value, w=omega_array, model=self.models.lfc_model)
-        # print(f"Calculated LFC={lfc}")
 
         # Calculate the Rayleigh weight
         if self.ocp_flag:
@@ -605,7 +596,7 @@ class xDave:
             array: convolved spectrum in arbitrary units
         """
 
-        spec_energy = beam_energy - omega  # np.linspace(beam_energy - 1000, beam_energy + 1000, 500)
+        spec_energy = beam_energy - omega
 
         if type == "GAUSSIAN":
             assert fwhm is not None
@@ -651,7 +642,6 @@ class xDave:
             spectrum += np.interp(x=spec_energy, xp=scttr_ene, fp=scttr_spc) * Bi
             inelastic += np.interp(x=spec_energy, xp=scttr_ene, fp=scttr_spc_inel) * Bi
 
-        # new_source = np.interp(x=spec_energy, xp=source_energy, fp=source)
         new_source = np.interp(x=spec_energy, xp=source_energy, fp=source_spectrum)
         new_source /= np.sum(new_source)
 
@@ -693,10 +683,6 @@ class xDave:
                 data["ff"],
                 data["bf"],
                 data["dsf"],
-                # data["tau"],
-                # data["F_inel"],
-                # data["F_bf"],
-                # data["F_ff"],
                 mode=save_mode,
             )
         elif run_mode == "STATIC":

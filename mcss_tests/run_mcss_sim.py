@@ -175,7 +175,21 @@ def run_ch_sr_mode(T, rho, xH, ZH, ZC, angle, user_defined_ipd=0.0, user_defined
 
 
 def run_ch_ar_mode3(
-    T, rho, xH, xC1, xC2, ZH, ZC, ZC1, ZC2, angle, user_defined_ipd=0.0, user_defined_lfc=0.0, plot=False
+    T,
+    rho,
+    xH,
+    xC1,
+    xC2,
+    ZH,
+    ZC,
+    ZC1,
+    ZC2,
+    angle,
+    ii_potential_model,
+    ei_potential_model,
+    user_defined_ipd=0.0,
+    user_defined_lfc=0.0,
+    plot=False,
 ):
     THIS_DIR = os.path.dirname(__file__)
     mcss_dir = "~/code/mcss/mcss_ndtt/pro/mcss"
@@ -214,9 +228,9 @@ def run_ch_ar_mode3(
         ee_pol_func_model="NUMERICAL_RPA",
         ee_lfc_model="NONE",
         deltaE=4000,
-        ii_potential_model="EFFECTIVE_COULOMB",
+        ii_potential_model=ii_potential_model,
         screen_cloud_model="FINITE_WAVELENGTH",
-        ei_potential_model="EFFECTIVE_COULOMB",
+        ei_potential_model=ei_potential_model,
         source_func_shape="GAUSSIAN",
         source_func_fwhm_ev=1.0,
         resolution=0.5,
@@ -228,10 +242,23 @@ def run_ch_ar_mode3(
     return k, WR, f1, f2, f3, q1, q2, q3, S11, S13, S12, S22, S23, S33
 
 
-def run_ch_ar_mode(T, rho, xH, ZH, ZC, angle, user_defined_ipd=0.0, user_defined_lfc=0.0, plot=False):
+def run_ch_ar_mode(
+    T,
+    rho,
+    xH,
+    ZH,
+    ZC,
+    angle,
+    ii_potential_model,
+    ei_potential_model,
+    screen_cloud_model,
+    user_defined_ipd=0.0,
+    user_defined_lfc=0.0,
+    plot=False,
+):
     THIS_DIR = os.path.dirname(__file__)
     mcss_dir = "~/code/mcss/mcss_ndtt/pro/mcss"
-    mcss_executable = "mcss_60"  # "mcss_ndtt"  'mcss_51'
+    mcss_executable = "mcss_debug"  # "mcss_ndtt"  'mcss_51'
 
     Eb = 20e3
     # angle = calculate_angle(q=q, energy=Eb)
@@ -251,8 +278,10 @@ def run_ch_ar_mode(T, rho, xH, ZH, ZC, angle, user_defined_ipd=0.0, user_defined
         mode_of_operation="XRTS_ANGULAR",
         mcss_executable=mcss_executable,
         mcss_dir=mcss_dir,
-        deck_file=f"mcss_ar_run_ch_T={T:.2f}_rho={rho:.2f}_ZC={ZC}",
-        output_file=os.path.join(results_dir, f"mcss_ar_run_ch_T={T:.2f}_rho={rho:.2f}_ZC={ZC}"),
+        deck_file=f"mcss_ar_run_ch_T={T:.2f}_rho={rho:.2f}_ZC={ZC}_screening={screen_cloud_model}",
+        output_file=os.path.join(
+            results_dir, f"mcss_ar_run_ch_T={T:.2f}_rho={rho:.2f}_ZC={ZC}_screening={screen_cloud_model}"
+        ),
         mass_density=rho,
         temperature=T,
         Zfs=np.array([ZH, ZC]),
@@ -266,9 +295,9 @@ def run_ch_ar_mode(T, rho, xH, ZH, ZC, angle, user_defined_ipd=0.0, user_defined
         ee_pol_func_model="NUMERICAL_RPA",
         ee_lfc_model="NONE",
         deltaE=4000,
-        ii_potential_model="EFFECTIVE_COULOMB",
-        screen_cloud_model="FINITE_WAVELENGTH",
-        ei_potential_model="EFFECTIVE_COULOMB",
+        ii_potential_model=ii_potential_model,
+        screen_cloud_model=screen_cloud_model,
+        ei_potential_model=ei_potential_model,
         source_func_shape="GAUSSIAN",
         source_func_fwhm_ev=1.0,
         resolution=0.5,
