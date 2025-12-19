@@ -128,6 +128,8 @@ def test_mermin_ff():
         u_mermin = (w + 1.0j * mu_ei) / (k * vF * DIRAC_CONSTANT)
         z = k / (2 * kF)  # dimensionless
         kernel = FreeFreeDSF(state=state)
+
+        nu_ei = 0.5 # [w_p
         dsfs_rpa = kernel.get_dsf(k=k, w=w, lfc=lfc, model="NUMERICAL")
         dsfs_mermin = kernel.get_dsf(k=k, w=w, lfc=lfc, model="MERMIN")
         # print(dsfs_mermin)
@@ -167,5 +169,5 @@ def test_mermin_ff():
 
 
 if __name__ == "__main__":
-    test_ff()
-    # test_mermin_ff()
+    # test_ff()
+    test_mermin_ff()

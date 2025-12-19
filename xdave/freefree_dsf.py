@@ -75,7 +75,7 @@ class FreeFreeDSF:
         else:
             raise NotImplementedError(f"Model {model} not recognized.")
 
-    def dielectric_function(self, k, w, model):
+    def dielectric_function(self, k, w, model, collision_frequency_model="BORN", input_collision_frequency=None):
         """
         Calculate the free electron dielectric function for a given model.
 
@@ -101,14 +101,19 @@ class FreeFreeDSF:
             warnings.warn(
                 f"Model {model} for the free-free component not yet working properly and should not be used."
             )
-            dielectric_func = self.mermin_dielectric_function(k=k, w=w)
+            dielectric_func = self.mermin_dielectric_function(
+                k=k,
+                w=w,
+                collision_frequency_model=collision_frequency_model,
+                input_collision_frequency=input_collision_frequency,
+            )
         else:
             dielectric_func = self.rpa_numerical_dielectric_func(k=k, w=w)
             warnings.warn(f"Model {model} for the free-free component not recognized. Overwriting using NUMERICAL.")
 
         return dielectric_func
 
-    def susceptibility_function(self, k, w, model):
+    def susceptibility_function(self, k, w, model, collision_frequency_model="BORN", input_collision_frequency=None):
         """
         Calculate the free electron susceptibility (polarisation) function for a given model.
 
@@ -132,7 +137,12 @@ class FreeFreeDSF:
             susceptibility_func = (1 - dielectric_func) / potential_func
         elif model == "MERMIN":
             potential_func = 4 * np.pi * COULOMB_CONSTANT * ELEMENTARY_CHARGE**2 / k**2
-            dielectric_func = self.mermin_dielectric_function(k=k, w=w)  # * potential_func
+            dielectric_func = self.mermin_dielectric_function(
+                k=k,
+                w=w,
+                collision_frequency_model=collision_frequency_model,
+                input_collision_frequency=input_collision_frequency,
+            )
             susceptibility_func = (1 - dielectric_func) / potential_func
         else:
             potential_func = 4 * np.pi * COULOMB_CONSTANT * ELEMENTARY_CHARGE**2 / k**2
