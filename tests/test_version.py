@@ -26,7 +26,7 @@ def update_ff_results(model, w, k_bohr, dsf, fn):
     print(f"Updating FF test for model = {model}: \nfile = {file}")
 
 
-def test_ff_version():
+def test_ff():
     print(f"\n Testing FF")
     Te = 50 * eV_TO_K
     rho = 10.0 * g_per_cm3_TO_kg_per_m3
@@ -102,7 +102,7 @@ def update_bf_results(model, w, k_bohr, dsf, fn):
     print(f"Updating BF test for model = {model}: \nfile = {file}")
 
 
-def test_bf_version():
+def test_bf():
     Te = 110 * eV_TO_K
     rho = 10.0 * g_per_cm3_TO_kg_per_m3
     atomic_number = 4
@@ -170,7 +170,7 @@ def update_ff_file(fn, ks, ff, element, Z_b):
     print(f"Updating form factor results: file = {file}")
 
 
-def test_formfactor_version():
+def test_formfactor():
 
     ks = np.linspace(0.01, 10, 10) / BOHR_RADIUS
 
@@ -199,7 +199,7 @@ def update_lfc_files(ks, fn, lfcs_dornheim, lfcs_interp, lfcs_ui, lfcs_gv, lfcs_
     print(f"Updating LFC file {fn}")
 
 
-def test_lfc_version():
+def test_lfc():
     AN = 1
     amu = 1
 
@@ -272,7 +272,7 @@ def update_ii_files_r(rs, coulomb, yukawa, dh, srr, csd, kelbg, deutsch, fn):
     print(f"Updating ii potentials in r-space: file={fn}")
 
 
-def test_ii_version():
+def test_ii():
     """
     Comparing the ion-ion potentials against a previous version to track changes.
     """
@@ -397,7 +397,7 @@ def update_ei_files_r(rs, coulomb, yukawa, fn):
     print(f"Updating ei potentials in r-space: file={fn}")
 
 
-def test_ei_version():
+def test_ei():
     """
     Comparing the electron-ion potentials against a previous version to track changes.
     """
@@ -472,7 +472,7 @@ def update_screening_file(fn, element, ks, qs, model):
     print(f"Updating screening file for {element} for model: {model}")
 
 
-def test_screening_cloud_version():
+def test_screening_cloud():
     ZH = 1
     ZC = 4
     T = 10.0  # eV
@@ -558,7 +558,7 @@ def update_sf_file_mcp(fn, material, ks, S):
     np.savetxt(file, arr, header="ks S11 S12 S22")
 
 
-def test_sf_version():
+def test_sf():
     ni = 5.0e22 * per_cm3_TO_per_m3
     ZC = 2
     ZH = 1
