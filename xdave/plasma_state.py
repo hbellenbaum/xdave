@@ -99,6 +99,9 @@ def get_rs_theta_from_rho_T(rho, T, atomic_mass=1.00784):
 
 
 def get_rs_theta_from_rho_T_SI(rho, T, atomic_mass):
+
+    if rho == 0:
+        print(f"Density is set to zero. This function should not be called.")
     m_atm = atomic_mass  # * 1.6605e-27
     rs = (m_atm * 3 / (4 * np.pi * rho)) ** (1 / 3) * 1 / BOHR_RADIUS
 
@@ -163,6 +166,10 @@ class PlasmaState:
 
         self.bound_electron_number_density = self.total_electron_number_density - self.free_electron_number_density
         self.binding_energies = binding_energies
+
+        # print(
+        #     f"Initializing state at:\n rho={mass_density * kg_per_m3_TO_g_per_cm3} g/cc\n T={electron_temperature * K_TO_eV}eV\n Z={charge_state}\n"
+        # )
 
         self.rs, self.theta = get_rs_theta_from_rho_T_SI(
             rho=self.mass_density, T=self.electron_temperature, atomic_mass=self.atomic_mass

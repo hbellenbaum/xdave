@@ -99,9 +99,11 @@ class xDave:
             self.srr_sigma_parameter = (
                 user_defined_inputs["srr_sigma_parameter"] if "srr_sigma_parameter" in keys else None
             )
-            
+
             # Few options to check here for the Crowley constant
-            crowley_force_constant = user_defined_inputs["crowley_force_constant"] if "crowley_force_constant" in keys else None
+            crowley_force_constant = (
+                user_defined_inputs["crowley_force_constant"] if "crowley_force_constant" in keys else None
+            )
             if crowley_force_constant is None:
                 self.crowley_force_constant = 0.9
             else:
@@ -120,8 +122,8 @@ class xDave:
                         self.crowley_force_constant = 0.9
                         warnings.warn(
                             f"crowley_force_structure = {crowley_force_constant} not known!\n"
-                           +f"Should be a number or \'FLUID\', \'ION_SPHERE\', \'FCC\', \'HCP\', \'BCC\', or \'SC\' "
-                           +f"Treating as ion sphere (constant = 0.9)"
+                            + f"Should be a number or 'FLUID', 'ION_SPHERE', 'FCC', 'HCP', 'BCC', or 'SC' "
+                            + f"Treating as ion sphere (constant = 0.9)"
                         )
 
             assert hasattr(self.ion_core_radii, "__len__")
@@ -184,7 +186,12 @@ class xDave:
 
         sum_term = np.sum(self.partial_densities * atomic_masses)
         for i in range(0, self.number_of_states):
+
             x = self.partial_densities[i]
+            if x == 0:
+                warnings.warn(f"Trying to initialize state with zero fractional density. Skipping this one!")
+                continue
+
             Z = self.charge_states[i]
             Z_mean += x * Z
             ni = x * self.mass_density / sum_term
@@ -193,7 +200,7 @@ class xDave:
             amu = atomic_masses[i] / ATOMIC_MASS_UNIT  # this is also dumb!
             amu_mean += x * amu
             binding_energies = get_binding_energies_from_element(AN, Z)
-            
+
             state = PlasmaState(
                 electron_temperature=self.electron_temperature,
                 ion_temperature=self.ion_temperature,
@@ -290,10 +297,12 @@ class xDave:
                 print(f"Applying user-defined input IPD: {self.ipd_eV}")
         else:
             state_ipds = get_ipd(
-                plasma=self, state=self.overlord_state, model=self.models.ipd_model,
-                user_defined_ipd=self.ipd_eV, crowley_force_constant=self.crowley_force_constant
-                )
-                
+                plasma=self,
+                state=self.overlord_state,
+                model=self.models.ipd_model,
+                user_defined_ipd=self.ipd_eV,
+                crowley_force_constant=self.crowley_force_constant,
+            )
 
         ff = FreeFreeDSF(state=self.overlord_state)
         if self.overlord_state.charge_state > 0:
@@ -312,12 +321,12 @@ class xDave:
 
         for i in range(0, len(self.states)):
             state: PlasmaState = self.states[i]
-            x   = self.partial_densities[i]
+            x = self.partial_densities[i]
             ipd = state_ipds[i]
             if self.verbose:
                 print(f"\nRunning state {i} with Z={state.charge_state} and x={x}")
                 print(f"Calculated IPD for state {i}={ipd * J_TO_eV} eV\n")
-            
+
             binding_energies = state.binding_energies * eV_TO_J
 
             ff_i[i] = x * ff_dsf
@@ -472,7 +481,6 @@ class xDave:
             ), f"If you set an angle, you also need to specify the beam energy. I can't read your fucking mind."
             k = calculate_q(angle=angle, energy=beam_energy)
 
-
         k_SI = k / BOHR_RADIUS
         w_SI = w * eV_TO_J
 
@@ -487,9 +495,12 @@ class xDave:
                 print(f"Applying user-defined input IPD: {self.ipd_eV}")
         else:
             state_ipds = get_ipd(
-                plasma=self, state=self.overlord_state, model=self.models.ipd_model,
-                user_defined_ipd=self.ipd_eV, crowley_force_constant=self.crowley_force_constant
-                )
+                plasma=self,
+                state=self.overlord_state,
+                model=self.models.ipd_model,
+                user_defined_ipd=self.ipd_eV,
+                crowley_force_constant=self.crowley_force_constant,
+            )
 
         ff = FreeFreeDSF(state=self.overlord_state)
         ff_dsf = ff.get_dsf(k=k_SI, w=w_SI, lfc=lfc, model=self.models.polarisation_model)
@@ -504,7 +515,7 @@ class xDave:
 
         for i in range(0, len(self.states)):
             state: PlasmaState = self.states[i]
-            x   = self.partial_densities[i]
+            x = self.partial_densities[i]
             ipd = state_ipds[i]
             if self.verbose:
                 print(f"\nRunning state {i} with Z={state.charge_state} and x={x}\n")
@@ -522,9 +533,7 @@ class xDave:
                 )
 
             bf = BoundFreeDSF(state=state)
-            bf_dsf = bf.get_dsf(
-                ZA=state.atomic_number, Zb=state.Zb, k=k_SI, w=w_SI, Eb=Eb, model=self.models.bf_model
-            )
+            bf_dsf = bf.get_dsf(ZA=state.atomic_number, Zb=state.Zb, k=k_SI, w=w_SI, Eb=Eb, model=self.models.bf_model)
             bf_tot += x * bf_dsf
             bf_i[i] = x * bf_dsf
 
@@ -637,14 +646,14 @@ class xDave:
         for i, Ei in enumerate(source_energy):
             Bi = source_spectrum[i]
             scttr_spc = S * (1.0 - om / Ei) ** 2
-            scttr_spc_inel = S_inel * (1.0 - om / Ei) ** 2
+            # scttr_spc_inel = S_inel * (1.0 - om / Ei) ** 2
             scttr_ene = Ei - om
             spectrum += np.interp(x=spec_energy, xp=scttr_ene, fp=scttr_spc) * Bi
-            inelastic += np.interp(x=spec_energy, xp=scttr_ene, fp=scttr_spc_inel) * Bi
+            # inelastic += np.interp(x=spec_energy, xp=scttr_ene, fp=scttr_spc_inel) * Bi
 
         new_source = np.interp(x=spec_energy, xp=source_energy, fp=source_spectrum)
         new_source /= np.sum(new_source)
-
+        inelastic = spectrum.copy()
         elastic = new_source * Wr / (source_energy[1] - source_energy[0])
         spectrum += elastic
         if flip_spec_ene:

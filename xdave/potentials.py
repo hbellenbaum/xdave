@@ -80,6 +80,7 @@ def short_range_screening_r(Qa, Qb, r, Ti, srr_core_power, ion_core_radius, srr_
 
 
 def debye_huckel_r(Qa, Qb, r, alpha, kappa_e):
+    # TODO (HB): check this, the +alpha in there doesn't seem right
     return coulomb_r(Qa=Qa, Qb=Qb, r=r) * np.exp(-(kappa_e + alpha) * r)
 
 

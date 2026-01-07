@@ -27,7 +27,7 @@ class FreeFreeDSF:
     def __init__(self, state: PlasmaState) -> None:
         self.state = state
 
-    def get_dsf(self, k, w, lfc, model="NUMERICAL_RPA"):
+    def get_dsf(self, k, w, lfc, model="NUMERICAL_RPA", input_collision_frequency=None):
         """
         Main function to call the dynamic structure factor for a given model.
         This internally calculates the electron susceptibility and applies a local field correction.
@@ -46,8 +46,12 @@ class FreeFreeDSF:
         if self.state.free_electron_number_density == 0.0:
             return 0.0
 
+        w0_idx = np.where(w == 0.0)
+        if len(w0_idx) is not None:
+            w = np.delete(w, w0_idx)
+
         # Call the susceptibility function for a given model
-        chi0 = self.susceptibility_function(k=k, w=w, model=model)
+        chi0 = self.susceptibility_function(k=k, w=w, model=model, input_collision_frequency=input_collision_frequency)
 
         # coulomb potential for the electron-electron interactions
         Vee = 4 * np.pi * COULOMB_CONSTANT * ELEMENTARY_CHARGE**2 / k**2
@@ -64,6 +68,11 @@ class FreeFreeDSF:
             / (1 - np.exp(-w / (BOLTZMANN_CONSTANT * self.state.electron_temperature)))
             * im_suspectibility
         )
+
+        # This feels really lazy, but seems to get the job done.
+        if len(w0_idx) is not None:
+            S_w0 = 0.5 * (S_EG_LFC[w0_idx[0]] + S_EG_LFC[w0_idx[0] - 1])
+            S_EG_LFC = np.insert(S_EG_LFC, w0_idx[0], S_w0)
 
         return S_EG_LFC
 
@@ -649,17 +658,26 @@ class FreeFreeDSF:
         wp = self.state.plasma_frequency(-1, self.state.free_electron_number_density, ELECTRON_MASS)
         w_freq = w / DIRAC_CONSTANT
         if input_collision_frequency is not None:
-            mu_ei = input_collision_frequency * wp * (1.0 + 1.0j)
+            mu_ei = input_collision_frequency * wp * (1.0 + 0.0j)
         else:
             mu_ei = self.get_collision_frequency(k=k, w=w, lfc=lfc, model=collision_frequency_model)
-        mu1 = mu_ei.real
-        mu2 = mu_ei.imag
-        real_part = self._real_dielectric_mermin(k=k, w=w_freq, mu1=mu1, mu2=mu2)
-        imag_part = self._im_dielectric_mermin(k=k, w=w_freq, mu1=mu1, mu2=mu2)
-        dielectric_function = real_part + 1.0j * imag_part
+        # mu1 = mu_ei.real
+        # mu2 = mu_ei.imag
+        # real_part = self._real_dielectric_mermin(k=k, w=w_freq, mu1=mu1, mu2=mu2)
+        # imag_part = self._im_dielectric_mermin(k=k, w=w_freq, mu1=mu1, mu2=mu2)
+        # dielectric_function = real_part + 1.0j * imag_part
 
-        dielectric_rpa0 = self.dielectric_function(k=k, w=0, model="DANDREA_FIT")
-        mermin_dielectric = 1 + (1 + 1.0j * mu_ei / w_freq) * (dielectric_function - 1) / (
-            1 + 1.0j * mu_ei / w_freq * (dielectric_function - 1) / (dielectric_rpa0 - 1)
+        # dielectric_rpa0 = self.dielectric_function(k=k, w=0, model="DANDREA_FIT")
+        # mermin_dielectric = 1 + (1 + 1.0j * mu_ei / w_freq) * (dielectric_function - 1) / (
+        #     1 + 1.0j * mu_ei / w_freq * (dielectric_function - 1) / (dielectric_rpa0 - 1)
+        # )
+        Vee = 4 * np.pi * COULOMB_CONSTANT * ELEMENTARY_CHARGE**2 / k**2
+        mu_ei_energy = mu_ei * DIRAC_CONSTANT
+        ratio = 1.0j * mu_ei / w_freq
+        factor = 1 + ratio
+        rpa_dielectric = 1 - self.dandrea_fit(k=k, omega=w + 1.0j * mu_ei_energy) * Vee
+        rpa_dielectric0 = 1 - self.dandrea_fit(k=k, omega=0) * Vee
+        mermin_dielectric = 1 + (factor * (rpa_dielectric - 1)) / (
+            1 + ratio * (rpa_dielectric - 1) / (rpa_dielectric0 - 1)
         )
         return mermin_dielectric

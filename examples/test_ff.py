@@ -102,7 +102,7 @@ def test_mermin_ff():
     atomic_number = 1.0
     lfc = 0.0
 
-    omega_array = np.linspace(-1000, 1250, 500) * eV_TO_J
+    omega_array = np.linspace(-120, 250, 500) * eV_TO_J
     state = PlasmaState(
         electron_temperature=Te,
         ion_temperature=Te,
@@ -118,51 +118,54 @@ def test_mermin_ff():
 
     for k, cs in zip(ks, colors):
         omega_p = state.plasma_frequency(-1, state.free_electron_number_density, ELECTRON_MASS) * DIRAC_CONSTANT
-        mu_ei = 0.5 * omega_p * (1.0 + 1.0j)
+        mu_ei = 1.5 * omega_p * (1.0 + 1.0j)
+        input_collision_frequency = 2.0
         q = k * BOHR_RADIUS
         w = omega_array
-        kF = state.fermi_wave_number(state.free_electron_number_density)  # 1/m
-        EF = state.fermi_energy(state.free_electron_number_density, ELECTRON_MASS)  # J
-        vF = DIRAC_CONSTANT * kF / ELECTRON_MASS  # m/s
-        u = w / (k * vF * DIRAC_CONSTANT)  # dimensionless
-        u_mermin = (w + 1.0j * mu_ei) / (k * vF * DIRAC_CONSTANT)
-        z = k / (2 * kF)  # dimensionless
+        # kF = state.fermi_wave_number(state.free_electron_number_density)  # 1/m
+        # EF = state.fermi_energy(state.free_electron_number_density, ELECTRON_MASS)  # J
+        # vF = DIRAC_CONSTANT * kF / ELECTRON_MASS  # m/s
+        # u = w / (k * vF * DIRAC_CONSTANT)  # dimensionless
+        # u_mermin = (w + 1.0j * mu_ei) / (k * vF * DIRAC_CONSTANT)
+        # z = k / (2 * kF)  # dimensionless
         kernel = FreeFreeDSF(state=state)
 
-        nu_ei = 0.5 # [w_p
+        nu_ei = 0.5  # [w_p
         dsfs_rpa = kernel.get_dsf(k=k, w=w, lfc=lfc, model="NUMERICAL")
-        dsfs_mermin = kernel.get_dsf(k=k, w=w, lfc=lfc, model="MERMIN")
+        dsfs_born_mermin = kernel.get_dsf(k=k, w=w, lfc=lfc, model="MERMIN")
+        dsfs_static_mermin = kernel.get_dsf(
+            k=k, w=w, lfc=lfc, model="MERMIN", input_collision_frequency=input_collision_frequency
+        )
         # print(dsfs_mermin)
         dielectric_rpa = kernel.dielectric_function(k=k, w=w, model="NUMERICAL")
-        dielectric_mermin = kernel.dielectric_function(k=k, w=w, model="MERMIN")
-        # twinx0 = axes[0].twinx()
-        # twinx1 = axes[1].twinx()
-        # twinx2 = axes[2].twinx()
+        dielectric_born_mermin = kernel.dielectric_function(k=k, w=w, model="MERMIN")
+        dielectric_static_mermin = kernel.dielectric_function(
+            k=k, w=w, model="MERMIN", input_collision_frequency=input_collision_frequency
+        )
 
-        axes[0].plot(omega_array * J_TO_eV, dsfs_mermin / J_TO_eV, label=f"Mermin: q={q}", c=cs, ls=":")
+        axes[0].plot(omega_array * J_TO_eV, dsfs_born_mermin / J_TO_eV, label=f"BM: q={q}", c=cs, ls=":")
         axes[0].plot(omega_array * J_TO_eV, dsfs_rpa / J_TO_eV, label=f"RPA: q={q}", c=cs, ls="--")
-        axes[1].plot(omega_array * J_TO_eV, dielectric_mermin.real, label=f"Re[Mermin]: q={q}", c=cs, ls=":")
+        axes[0].plot(
+            omega_array * J_TO_eV, dsfs_static_mermin / J_TO_eV, label=f"Static M: q={q}", c=cs, ls="-.", alpha=0.7
+        )
+        # axes[1].plot(omega_array * J_TO_eV, dielectric_born_mermin.real, label=f"Re[BM]: q={q}", c=cs, ls=":")
         axes[1].plot(omega_array * J_TO_eV, dielectric_rpa.real, label=f"Re[RPA]: q={q}", c=cs, ls="--")
-        axes[1].plot(omega_array * J_TO_eV, dielectric_mermin.imag, label=f"Im[Mermin]: q={q}", c="navy", ls=":")
+        # axes[1].plot(omega_array * J_TO_eV, dielectric_born_mermin.imag, label=f"Im[BM]: q={q}", c="navy", ls=":")
         axes[1].plot(omega_array * J_TO_eV, dielectric_rpa.imag, label=f"Im[RPA]: q={q}", c="navy", ls="--")
-
-        # twinx2.plot(u, dielectric_mermin.real, label=f"Re[Mermin]: q={q}", c=cs, ls=":")
-        # axes[2].plot(u, dielectric_rpa.real, label=f"Re[RPA]: q={q}", c=cs, ls="--")
-        # twinx2.plot(u_mermin, dielectric_mermin.imag, label=f"Im[Mermin]: q={q}", c="navy", ls=":")
-        # axes[2].plot(u_mermin, dielectric_rpa.imag, label=f"Im[RPA]: q={q}", c="navy", ls="--")
+        axes[1].plot(
+            omega_array * J_TO_eV, dielectric_static_mermin.real, label=f"Re[M]: q={q}", c=cs, ls="-.", alpha=0.7
+        )
+        axes[1].plot(
+            omega_array * J_TO_eV, dielectric_static_mermin.imag, label=f"Im[M]: q={q}", c="navy", ls="-.", alpha=0.7
+        )
 
     axes[0].set_xlabel(r"$\omega$ [eV]")
     axes[0].set_ylabel(r"DSF [1/eV]")
     axes[0].legend()
-    # axes[0].set_ylim(-0.005, 0.02)
     axes[1].set_xlabel(r"$\omega$ [eV]")
     axes[1].set_ylabel(r"$\epsilon$")
     axes[1].legend()
 
-    # axes[2].set_xlabel(r"$u$")
-    # axes[2].set_ylabel(r"$\epsilon$")
-    # axes[2].legend()
-    # axes[1].set_ylim(-0.005, 0.02)
     plt.tight_layout()
     plt.show()
     # fig.savefig(f"ff_test_mermin.pdf", dpi=200)
