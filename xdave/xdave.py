@@ -63,11 +63,16 @@ class xDave:
         verbose: bool = False,
     ):
         assert np.sum(partial_densities) == 1.0, f"Fractional densities do not add up 1."
+        assert electron_temperature > 0.0, f"Ensure your temperature is positive."
+        assert mass_density < 0.0, f"Ensure your mass density is positive."
+        assert len(charge_states) == len(
+            partial_densities
+        ), f"The number of species and corresponding charge states do not match."
         self.number_of_states = len(partial_densities)
         self.mass_density = mass_density * g_per_cm3_TO_kg_per_m3
         self.electron_temperature = electron_temperature * eV_TO_K
         self.ion_temperature = ion_temperature * eV_TO_K
-        if not np.isclose(electron_temperature, ion_temperature, rtol=1.0e-6):
+        if not np.isclose(electron_temperature, ion_temperature, rtol=1.0e-4):
             warnings.warn(f"You have set non-equilibrium conditions. Make sure the models called allow this.")
         self.partial_densities = partial_densities
         self.elements = elements
@@ -193,6 +198,8 @@ class xDave:
                 continue
 
             Z = self.charge_states[i]
+
+            assert Z >= 0.0, f"Trying to set the charge state negative. This is not allowed."
             Z_mean += x * Z
             ni = x * self.mass_density / sum_term
             AN = atomic_numbers[i]
@@ -287,9 +294,13 @@ class xDave:
             array: Contributions to the bf DSF by each species in units of 1/eV
         """
 
-        lfc_kernel = LFC(state=self.overlord_state)
-        lfc = lfc_kernel.calculate_lfc(k=k, w=w, model=self.models.lfc_model)
-        print(f"Calculated LFC={lfc}") if self.verbose else None
+        if self.user_defined_lfc is None:
+            lfc_kernel = LFC(state=self.overlord_state)
+            lfc = lfc_kernel.calculate_lfc(k=k, w=w, model=self.models.lfc_model)
+            print(f"Calculated LFC={lfc}") if self.verbose else None
+        else:
+            lfc = self.user_defined_lfc
+            print(f"Using user-defined LFC={lfc}") if self.verbose else None
 
         if self.ipd_eV is not None:
             state_ipds = np.full(len(self.states), self.ipd_eV * eV_TO_J)
@@ -484,10 +495,13 @@ class xDave:
         k_SI = k / BOHR_RADIUS
         w_SI = w * eV_TO_J
 
-        lfc_kernel = LFC(state=self.overlord_state)
-        lfc = lfc_kernel.calculate_lfc(k=k_SI, w=w_SI, model=self.models.lfc_model)
-        if self.verbose:
-            print(f"Calculated LFC={lfc}")
+        if self.user_defined_lfc is None:
+            lfc_kernel = LFC(state=self.overlord_state)
+            lfc = lfc_kernel.calculate_lfc(k=k, w=w, model=self.models.lfc_model)
+            print(f"Calculated LFC={lfc}") if self.verbose else None
+        else:
+            lfc = self.user_defined_lfc
+            print(f"Using user-defined LFC={lfc}") if self.verbose else None
 
         if self.ipd_eV is not None:
             state_ipds = np.full(len(self.states), self.ipd_eV * eV_TO_J)
