@@ -170,7 +170,7 @@ class xDave:
         if self.models.ii_potential == "SRR":
             assert any(
                 x is not None for x in self.ion_core_radii
-            ), "You forgot to set the ion core radius for the SRR potential. Idiot."
+            ), "You forgot to set the ion core radius for the SRR potential."
 
     def get_mean_and_all_states(self, elements):
         """
