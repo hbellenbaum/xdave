@@ -16,6 +16,7 @@ from .utils import (
 from .unit_conversions import *
 from .constants import *
 
+from datetime import datetime
 import numpy as np
 import warnings
 
@@ -23,6 +24,7 @@ from scipy import interpolate
 
 import matplotlib.pyplot as plt
 
+import json
 import os
 
 warnings.filterwarnings("ignore", category=FutureWarning)
@@ -43,7 +45,13 @@ class xDave:
         charge_states (array): array of charge state for each species
         models (ModelOptions): instance of the class model options to specify the models used for each
         enforce_fsum (bool): flag to specify whether the bound-free output should be forced to obey the f-sum, default is False
+        hnc_mix_fraction (float): mix fraction for the HNC solver, needs to be between 0 and 1. For higher values, less of the new solution is taken into account which makes the solver more stable for strong coupling but also slower.
+        hnc_delta (float): convergence criterium on the HNC solver.
+        hnc_max_iterations (int): maximum number of iterations in the HNC solver.
         user_defined_inputs (dict): list containing values set by the user for LFC, IPD, the ion core radius and parameters to define the pseudo-potentials used in the HNC solver and the screening cloud; this is optional
+        verbose (bool): Option to print run statements throughout or run silently.
+        save_to_json (bool): option to save outputs to json file.
+        output_file_name (str): directory and file to save the json output to, has to be set if save_to_json = True.
     """
 
     def __init__(
@@ -58,13 +66,15 @@ class xDave:
         enforce_fsum: bool = False,
         hnc_mix_fraction: float = 0.9,
         hnc_delta: float = 1.0e-6,
-        hnc_max_iterations: float = 1000,
+        hnc_max_iterations: int = 1000,
         user_defined_inputs: dict = None,
         verbose: bool = False,
+        save_to_json: bool = False,
+        output_file_name: str = None,
     ):
         assert np.sum(partial_densities) == 1.0, f"Fractional densities do not add up 1."
         assert electron_temperature > 0.0, f"Ensure your temperature is positive."
-        assert mass_density < 0.0, f"Ensure your mass density is positive."
+        assert mass_density > 0.0, f"Ensure your mass density is positive."
         assert len(charge_states) == len(
             partial_densities
         ), f"The number of species and corresponding charge states do not match."
@@ -144,11 +154,22 @@ class xDave:
             self.srr_sigma_parameter = None
             self.crowley_force_constant = 0.9
 
+        self.user_defined_inputs = user_defined_inputs
+
         self.states, self.overlord_state = self.get_mean_and_all_states(elements)
 
         # Run Variables
         self.enforce_fsum = enforce_fsum
         self.verbose = verbose
+        self.save_to_json = save_to_json
+
+        if save_to_json:
+            assert output_file_name is not None, f"Please specify the output file name."
+            _, extension = os.path.splitext(output_file_name)
+
+            if not extension == ".json":
+                output_file_name += ".json"
+        self.output_file_name = output_file_name
 
         self.hnc_mix_fraction = hnc_mix_fraction
         self.hnc_delta = hnc_delta
@@ -336,7 +357,9 @@ class xDave:
             ipd = state_ipds[i]
             if self.verbose:
                 print(f"\nRunning state {i} with Z={state.charge_state} and x={x}")
-                print(f"Calculated IPD for state {i}={ipd * J_TO_eV} eV\n")
+
+                if self.ipd_eV is None:
+                    print(f"Calculated IPD for state {i}={ipd * J_TO_eV} eV\n")
 
             binding_energies = state.binding_energies * eV_TO_J
 
@@ -406,6 +429,27 @@ class xDave:
         dsf /= J_TO_eV
         ff_i /= J_TO_eV
         bf_i /= J_TO_eV
+
+        if self.save_to_json:
+            bf_data = {f"species_{i}": row.tolist() for i, row in enumerate(bf_i)}
+            result_dict = dict(
+                {
+                    "w": list(w * J_TO_eV),
+                    "lfc": lfc,
+                    "ipd": ipd,
+                    "ff": list(ff_tot),
+                    "bf": {
+                        "tot": list(bf_tot),
+                        "bf_i": bf_data,
+                    },
+                    "dsf": list(dsf),
+                    "WR": list(rayleigh_weight),
+                    "Sii": None,
+                    "qs": None,  # make sure the screening cloud and form factors are being passed down, same for the static structure factor(s)
+                    "fs": None,
+                }
+            )
+            self.save_dynamic(fname=self.output_file_name, k=k * BOHR_RADIUS, results=result_dict)
 
         return (bf_tot, ff_tot, dsf, rayleigh_weight, ff_i, bf_i)
 
@@ -687,108 +731,83 @@ class xDave:
         ff_static = np.trapezoid(ff, w)
         return bf_static, ff_static
 
-    def save_result(self, fname, dirname, data, run_mode="DYNAMIC", save_mode="dsf"):
-        """
-        Function to save output results from a specific run.
+    def save_dynamic(self, fname, k, results):
 
-        Parameters:
-            fname (str): filename, note that the file type does not need to be specified
-            dirname (str): output directory where the file should be stored
-            data (dict): dict containing all output data, note that this requires a specific format
-            run_mode (str): STATIC or DYNAMIC to indicate the data format
-            save_mode (str): this will only be passed onto the dynamic save version, to indicate whether itcf results should also be saved
-        """
-        if run_mode == "DYNAMIC":
-            self.save_result_dynamic(
-                fname,
-                dirname,
-                data["w"],
-                data["ff"],
-                data["bf"],
-                data["dsf"],
-                mode=save_mode,
-            )
-        elif run_mode == "STATIC":
-            self.save_result_static(
-                fname,
-                dirname,
-                k=data["k"],
-                Sab=data["Sab"],
-                Wr=data["Wr"],
-                qs=data["qs"],
-                fs=data["fs"],
-                lfc=data["lfc"],
-            )
-
-    def save_result_dynamic(
-        self, fname, dirname, w, ff, bf, dsf, tau=None, F_inel=None, F_bf=None, F_ff=None, mode="dsf"
-    ):
-        if not os.path.exists(dirname):
-            os.mkdir(dirname)
-        output_file = os.path.join(dirname, fname + ".csv")
-        output_file_itcf = os.path.join(dirname, fname + "_itcf.csv")
-        if mode == "all":
-            np.savetxt(
-                output_file,
-                np.transpose(np.array([w, ff, bf, dsf])),
-                delimiter=",",
-                header="w[eV] FF[1/eV] BF[1/eV] Inel[1/eV]",
-            )
-            warnings.warn(f"Saving the ITCF to file is currently broken. Please come back later.")
-            np.savetxt(
-                output_file_itcf,
-                np.transpose(np.array([tau, F_ff, F_bf, F_inel])),
-                delimiter=",",
-                header="tau[1/eV] F_FF F_BF F_Inel",
-            )
-        elif mode == "dsf":
-            np.savetxt(
-                output_file,
-                np.transpose(np.array([w, ff, bf, dsf])),
-                delimiter=",",
-                header="w[eV] FF[1/eV] BF[1/eV] Inel[1/eV]",
-            )
-        elif mode == "itcf":
-            warnings.warn(f"Saving the ITCF to file is currently broken. Please come back later.")
-            np.savetxt(
-                output_file_itcf,
-                np.transpose(np.array([tau, F_ff, F_bf, F_inel])),
-                delimiter=",",
-                header="tau[1/eV] F_FF F_BF F_Inel",
-            )
-        else:
-            raise NotImplementedError(f"Cannot save outputs in mode {mode}. I do not know what that means.")
-
-        if self.verbose:
-            print(f"Saving output to file {fname}")
-
-    def save_result_static(self, fname, dirname, k, Sab, Wr, qs, fs, lfc):
-
-        if not os.path.exists(dirname):
-            os.mkdir(dirname)
-        output_file = os.path.join(dirname, fname + ".csv")
-        nspecies = self.number_of_states
-        elements = self.elements
-        data = np.array([k, Wr, lfc])
-        header = "k[1/aB]  Wr  lfc  "
-        for n1 in range(0, nspecies):
-            for n2 in range(0, nspecies):
-                Si = Sab[n1, n2, :]
-                data = np.vstack([data, Si])
-                header += f"S_{elements[n1]}{self.states[n1].charge_state:.0f}_{elements[n2]}{self.states[n2].charge_state:.0f}  "
-                if n1 == n2:
-                    qi = qs[n1]
-                    fi = fs[n1]
-                    data = np.vstack([data, qi])
-                    header += f"q_{elements[n1]}{self.states[n1].charge_state:.0f}  "
-                    data = np.vstack([data, fi])
-                    header += f"f_{elements[n1]}{self.states[n1].charge_state:.0f}  "
-        np.savetxt(
-            output_file,
-            np.transpose(data),
-            delimiter=",",
-            header=header,
+        setup_dict = dict(
+            {
+                "xDave Version": "0.0.1a0",  # automate this
+                "Time": str(datetime.today().strftime("%Y-%m-%d %H:%M:%S")),
+                "models": self.models.toJSON(),
+                "mode": {
+                    "run_mode": "dynamic",
+                    "k": k,
+                    # "probe_energy" : probe_energy,
+                    # "angle": calculate_angle(q=k * BOHR_RADIUS, energy=probe_energy),
+                },
+                "hnc_variables": {
+                    "mix_fraction": self.hnc_mix_fraction,
+                    "delta": self.hnc_delta,
+                    "max_iterations": self.hnc_max_iterations,
+                },
+                "user_defined_inputs": self.user_defined_inputs,
+            }
         )
+
+        plasma_parameters_dict = dict(
+            {
+                "electron_temperature": self.overlord_state.electron_temperature * K_TO_eV,
+                "ion_temperature": self.overlord_state.ion_temperature * K_TO_eV,
+                "mass_density": self.overlord_state.mass_density * kg_per_m3_TO_g_per_cm3,
+                "mean_charge_state": self.overlord_state.charge_state,
+                "mean_atomic_number": self.overlord_state.atomic_number,
+                "mean_atomic_mass": self.overlord_state.atomic_mass * kg_TO_amu,
+                "material": {
+                    "elements": list(self.elements),
+                    "charge_states": list(self.charge_states),
+                    "partial_densities": list(self.partial_densities),
+                    # "binding_energies": self.binding_energies,
+                },
+                "bound_electron_number_density": self.overlord_state.bound_electron_number_density,
+                "free_electron_number_density": self.overlord_state.free_electron_number_density,  # maybe this should move to free parameters
+                "free_electron_parameters": {
+                    "rs": -1,
+                    "theta": -1,
+                    "fermi_wavenumber": -1,
+                    "fermi_energy": -1,
+                    "chemical_potential": -1,
+                    "debye_inverse_screening_length": -1,
+                },  # TODO(HB): add these once they're stored in the plasma state
+                "ion_ion_coupling": -1,  # add Gamma_ii
+                "electron_ion_coupling": -1,  # add Gamma_ei
+            }
+        )
+        # results_dict = results
+        run_info_dict = dict(
+            {
+                "run_time": -1,
+                "Sii": {  # TODO(HB): add these values from HNC solver
+                    "convergence": True,
+                    "iterations": -1,
+                },
+            }
+        )
+        output_dict = dict(
+            {
+                "setup": setup_dict,
+                "plasma_parameters": plasma_parameters_dict,
+                "results": results,
+                "run_info": run_info_dict,
+            }
+        )
+
+        with open(fname, "w") as fp:
+            json.dump(output_dict, fp)
+
+    def load_result_from_json(self, fname):
+        with open(fname) as f:
+            data = json.load(f)
+
+        return data
 
     ## ------------------- ##
     ## -- Miscellaneous -- ##

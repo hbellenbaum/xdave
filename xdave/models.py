@@ -1,4 +1,11 @@
-from dataclasses import dataclass
+from dataclasses import dataclass, is_dataclass, fields
+
+
+def serialize(obj):
+    if is_dataclass(obj):
+        return {f.name: serialize(getattr(obj, f.name)) for f in fields(obj)}
+
+    return obj
 
 
 @dataclass(slots=True)
@@ -31,6 +38,9 @@ class ModelOptions:
     ipd_model: str = "CROWLEY"
     bridge_function: str = "IYETOMI"
     screening_model: str = "FINITE_WAVELENGTH"
+
+    def toJSON(self):
+        return serialize(self)
 
     def print_default_options(self):
         print(

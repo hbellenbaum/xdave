@@ -17,7 +17,7 @@ import os
 def test_sif():
     T = 80.0  # eV
     rho = 3.5  # g/cc
-    ZC = 4.0  # also ZC=2.5, 3.5, 4.0, 4.5
+    ZC = 4.5  # also ZC=2.5, 3.5, 4.0, 4.5
     ZH = 1.0
     xH = 0.2
     angle = 120  # degrees
@@ -54,6 +54,7 @@ def test_sif():
         partial_densities=partial_densities,
         user_defined_inputs=None,
         enforce_fsum=False,
+        save_to_json=True,
     )
 
     mcss_norm = 1  # kernel.overlord_state.atomic_number
@@ -120,5 +121,64 @@ def test_sif():
     plt.show()
 
 
+def test_full_spectrum():
+    T = 80.0  # eV
+    rho = 3.5  # g/cc
+    ZC = 4.5  # also ZC=2.5, 3.5, 4.0, 4.5
+    ZH = 1.0
+    xH = 0.2
+    angle = 120  # degrees
+    beam_energy = 8.5e3  # eV
+    q = calculate_q(angle=angle, energy=beam_energy)
+    print(f"Running at q={q:.3f}")
+
+    elements = np.array(["H", "C", "C"])
+
+    Zmin, Zmax, xmin, xmax = get_fractions_from_Z_partial(ZC, x0=xH)
+    partial_densities = np.array([xH, xmin, xmax])
+    charge_states = np.array([ZH, Zmin, Zmax])
+    user_defined_inputs = dict({"ipd": -10, "lfc": 0.0})
+
+    models = ModelOptions(
+        polarisation_model="DANDREA_FIT",
+        bf_model="SCHUMACHER",
+        lfc_model="NONE",
+        ipd_model="STEWART_PYATT",
+        screening_model="DEBYE_HUCKEL",
+    )
+
+    k = q  # 1/aB
+
+    omega_array = np.arange(-4000, 4000, 1.0)  # eV
+
+    output_file_name = os.path.join(os.path.dirname(__file__), f"ch_run_T={T:.0f}")
+    # output_file_name = f"ch_run_T={T:.0f}_ZC={ZC}"
+
+    kernel = xDave(
+        models=models,
+        electron_temperature=T,
+        ion_temperature=T,
+        mass_density=rho,
+        charge_states=charge_states,
+        elements=elements,
+        partial_densities=partial_densities,
+        user_defined_inputs=user_defined_inputs,
+        enforce_fsum=False,
+        verbose=True,
+        save_to_json=True,
+        output_file_name=output_file_name,
+    )
+
+    bf_tot, ff_tot, dsf, WR, ff_i, bf_i = kernel.run(k=k, w=omega_array)
+
+    # energy, inelastic, elastic, spectrum = kernel.convolve_with_sif(
+    #     omega=omega_array, bf=bf_tot, ff=ff_tot, dsf=dsf, Wr=WR, beam_energy=beam_energy, type="GAUSSIAN", fwhm=26
+    # )
+
+    data = kernel.load_result_from_json(fname=kernel.output_file_name)
+    print(data["setup"]["user_defined_inputs"])
+
+
 if __name__ == "__main__":
-    test_sif()
+    # test_sif()
+    test_full_spectrum()
