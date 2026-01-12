@@ -435,8 +435,8 @@ class xDave:
             result_dict = dict(
                 {
                     "w": list(w * J_TO_eV),
-                    "lfc": lfc,
-                    "ipd": ipd,
+                    "lfc": float(lfc),
+                    "ipd": ipd * J_TO_eV,
                     "ff": list(ff_tot),
                     "bf": {
                         "tot": list(bf_tot),
@@ -514,6 +514,43 @@ class xDave:
             for n1 in range(0, self.number_of_states):
                 for n2 in range(0, self.number_of_states):
                     Sab_tot += np.sqrt(self.partial_densities[n1] * self.partial_densities[n2]) * Sab[n1, n2, :]
+
+        if self.save_to_json:
+            nspecies = self.number_of_states
+            sf_data = dict({})
+            qs_data = dict({})
+            fs_data = dict({})
+
+            for n1 in range(0, nspecies):
+                for n2 in range(0, nspecies):
+                    Si = Sab[n1, n2, :]
+                    new_row = dict(
+                        {
+                            f"S_{self.elements[n1]}{self.states[n1].charge_state:.0f}_{self.elements[n2]}{self.states[n2].charge_state:.0f}": list(
+                                Si
+                            )
+                        }
+                    )
+                    sf_data.update(new_row)
+
+                    if n1 == n2:
+                        new_q = dict({f"q_{self.elements[n1]}{self.states[n1].charge_state:.0f}": list(qs[n1])})
+                        qs_data.update(new_q)
+                        new_f = dict({f"f_{self.elements[n1]}{self.states[n1].charge_state:.0f}": list(fs[n1])})
+                        fs_data.update(new_f)
+
+            result_dict = dict(
+                {
+                    "k": list(k / BOHR_RADIUS),
+                    "lfc": list(lfc),
+                    "WR": list(rayleigh_weight),
+                    "Sii": sf_data,
+                    "q": qs_data,
+                    "f": fs_data,
+                }
+            )
+
+            self.save_static(fname=self.output_file_name, results=result_dict)
 
         # Return outputs in cgs
         return k * BOHR_RADIUS, Sab, Sab_tot, rayleigh_weight, qs, fs, lfc
@@ -731,6 +768,10 @@ class xDave:
         ff_static = np.trapezoid(ff, w)
         return bf_static, ff_static
 
+    ## -------------------------------- ##
+    ## -- Saving and loading outputs -- ##
+    ## -------------------------------- ##
+
     def save_dynamic(self, fname, k, results):
 
         setup_dict = dict(
@@ -765,10 +806,80 @@ class xDave:
                     "elements": list(self.elements),
                     "charge_states": list(self.charge_states),
                     "partial_densities": list(self.partial_densities),
-                    # "binding_energies": self.binding_energies,
+                    "binding_energies": {
+                        f"species_{i}": list(self.states[i].binding_energies) for i in range(0, self.number_of_states)
+                    },
                 },
-                "bound_electron_number_density": self.overlord_state.bound_electron_number_density,
-                "free_electron_number_density": self.overlord_state.free_electron_number_density,  # maybe this should move to free parameters
+                "bound_electron_number_density": self.overlord_state.bound_electron_number_density * per_m3_TO_per_cm3,
+                "free_electron_number_density": self.overlord_state.free_electron_number_density * per_m3_TO_per_cm3,
+                "free_electron_parameters": {
+                    "rs": -1,
+                    "theta": -1,
+                    "fermi_wavenumber": -1,
+                    "fermi_energy": -1,
+                    "chemical_potential": -1,
+                    "debye_inverse_screening_length": -1,
+                },  # TODO(HB): add these once they're stored in the plasma state
+                "ion_ion_coupling": -1,  # add Gamma_ii
+                "electron_ion_coupling": -1,  # add Gamma_ei
+            }
+        )
+        # results_dict = results
+        run_info_dict = dict(
+            {
+                "run_time": -1,
+                "Sii": {  # TODO(HB): add these values from HNC solver
+                    "convergence": True,
+                    "iterations": -1,
+                },
+            }
+        )
+        output_dict = dict(
+            {
+                "setup": setup_dict,
+                "plasma_parameters": plasma_parameters_dict,
+                "results": results,
+                "run_info": run_info_dict,
+            }
+        )
+
+        with open(fname, "w") as fp:
+            json.dump(output_dict, fp)
+
+    def save_static(self, fname, results):
+        setup_dict = dict(
+            {
+                "xDave Version": "0.0.1a0",  # automate this
+                "Time": str(datetime.today().strftime("%Y-%m-%d %H:%M:%S")),
+                "models": self.models.toJSON(),
+                "mode": {
+                    "run_mode": "static",
+                    # "probe_energy" : probe_energy,
+                    # "angle": calculate_angle(q=k * BOHR_RADIUS, energy=probe_energy),
+                },
+                "hnc_variables": {
+                    "mix_fraction": self.hnc_mix_fraction,
+                    "delta": self.hnc_delta,
+                    "max_iterations": self.hnc_max_iterations,
+                },
+                "user_defined_inputs": self.user_defined_inputs,
+            }
+        )
+        plasma_parameters_dict = dict(
+            {
+                "electron_temperature": self.overlord_state.electron_temperature * K_TO_eV,
+                "ion_temperature": self.overlord_state.ion_temperature * K_TO_eV,
+                "mass_density": self.overlord_state.mass_density * kg_per_m3_TO_g_per_cm3,
+                "mean_charge_state": self.overlord_state.charge_state,
+                "mean_atomic_number": self.overlord_state.atomic_number,
+                "mean_atomic_mass": self.overlord_state.atomic_mass * kg_TO_amu,
+                "material": {
+                    "elements": list(self.elements),
+                    "charge_states": list(self.charge_states),
+                    "partial_densities": list(self.partial_densities),
+                },
+                "bound_electron_number_density": self.overlord_state.bound_electron_number_density * per_m3_TO_per_cm3,
+                "free_electron_number_density": self.overlord_state.free_electron_number_density * per_m3_TO_per_cm3,
                 "free_electron_parameters": {
                     "rs": -1,
                     "theta": -1,

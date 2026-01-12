@@ -152,7 +152,6 @@ def test_full_spectrum():
     omega_array = np.arange(-4000, 4000, 1.0)  # eV
 
     output_file_name = os.path.join(os.path.dirname(__file__), f"ch_run_T={T:.0f}")
-    # output_file_name = f"ch_run_T={T:.0f}_ZC={ZC}"
 
     kernel = xDave(
         models=models,
@@ -162,21 +161,21 @@ def test_full_spectrum():
         charge_states=charge_states,
         elements=elements,
         partial_densities=partial_densities,
-        user_defined_inputs=user_defined_inputs,
+        user_defined_inputs=None,
         enforce_fsum=False,
         verbose=True,
         save_to_json=True,
         output_file_name=output_file_name,
     )
 
-    bf_tot, ff_tot, dsf, WR, ff_i, bf_i = kernel.run(k=k, w=omega_array)
+    bf_tot, ff_tot, dsf, WR, ff_i, bf_i = kernel.run(k=k, w=omega_array, mode="DYNAMIC")
 
-    # energy, inelastic, elastic, spectrum = kernel.convolve_with_sif(
-    #     omega=omega_array, bf=bf_tot, ff=ff_tot, dsf=dsf, Wr=WR, beam_energy=beam_energy, type="GAUSSIAN", fwhm=26
-    # )
+    # data = kernel.load_result_from_json(fname=kernel.output_file_name)
+    # print(data["setup"]["user_defined_inputs"])
+    # print(data["plasma_parameters"]["electron_temperature"])
 
-    data = kernel.load_result_from_json(fname=kernel.output_file_name)
-    print(data["setup"]["user_defined_inputs"])
+    k = np.linspace(0.1, 15, 1000)
+    k, Sab, _, WR, qs, fs, lfc = kernel.run(k=k, w=0.0, mode="STATIC")
 
 
 if __name__ == "__main__":
