@@ -33,7 +33,7 @@ def be_example():
         mass_density=rho,
         electron_temperature=T,
         ion_temperature=T,
-        elements=np.array(["C", "C"]),
+        elements=np.array(["Be", "Be"]),
         charge_states=np.array([Zmin, Zmax]),
         partial_densities=np.array([xmin, xmax]),
         models=models,
@@ -117,7 +117,6 @@ def be_example():
     k = np.linspace(0.5, 10, 1000)
     k, Sab, _, Wr, qs, fs, lfc = kernel.run(w=w, k=k, beam_energy=8.0e3, mode="STATIC")
     data = dict({"k": k, "Sab": Sab, "Wr": Wr, "qs": qs, "fs": fs, "lfc": lfc})
-    kernel.save_result(fname="be_test_static", dirname=os.path.dirname(__file__), data=data, run_mode="STATIC")
     end_time = time.time()
     print(f"Run took {end_time - start_time} s")
 
