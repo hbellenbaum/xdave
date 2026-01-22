@@ -216,6 +216,10 @@ class xDave:
             x = self.partial_densities[i]
             if x == 0:
                 warnings.warn(f"Trying to initialize state with zero fractional density. Skipping this one!")
+                # remove corresponding element from the list and subtract the number of states to ensure consistency
+                np.delete(self.elements, i)
+                np.delete(self.charge_states, i)
+                self.number_of_states -= 1
                 continue
 
             Z = self.charge_states[i]

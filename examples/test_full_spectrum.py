@@ -121,6 +121,59 @@ def test_sif():
     plt.show()
 
 
+def check_convolution():
+
+    T = 30  # eV
+    rho = 1.2  # g/cc
+    Z = 1.5
+    elements = np.array(["C", "C"])
+    Zmin, Zmax, xmin, xmax = get_fractions_from_Z(Z)
+    charge_states = np.array([Zmin, Zmax])
+    partial_densities = np.array([xmin, xmax])
+
+    models = ModelOptions()
+    beam_energy = 8.5e3  # eV
+    angle = 120
+    q = calculate_q(angle=angle, energy=beam_energy)  # inverse aB
+    omega_array = np.arange(-800, 1000, 10.0)  # eV
+
+    output_file_name = os.path.join(os.path.dirname(__file__), f"ch_run_T={T:.0f}")
+
+    kernel = xDave(
+        models=models,
+        electron_temperature=T,
+        ion_temperature=T,
+        mass_density=rho,
+        charge_states=charge_states,
+        elements=elements,
+        partial_densities=partial_densities,
+        user_defined_inputs=None,
+        enforce_fsum=False,
+        verbose=True,
+        save_to_json=True,
+        output_file_name=output_file_name,
+    )
+
+    bf_tot, ff_tot, dsf, WR, ff_i, bf_i = kernel.run(k=q, w=omega_array, mode="DYNAMIC")
+
+    energy1, inelastic1, elastic1, spectrum1 = kernel.convolve_with_sif(
+        omega=omega_array, bf=bf_tot, ff=ff_tot, dsf=dsf, Wr=WR, beam_energy=beam_energy, type="GAUSSIAN", fwhm=26
+    )
+
+    area_tot = np.trapezoid(spectrum1, energy1)
+    area_inel = np.trapezoid(inelastic1, energy1)
+    print(
+        f"\nTotal integrated area: {area_tot}\n Total inelastic integrated area: {area_inel}\n Diff = {abs(area_tot - area_inel)}\n WR = {WR[0]}\n"
+    )
+
+    plt.figure()
+    plt.plot(energy1, inelastic1, c="navy", label="Inel")
+    plt.plot(energy1, elastic1, c="crimson", label="El")
+    plt.plot(energy1, spectrum1, c="green", label="Tot")
+    plt.legend()
+    plt.show()
+
+
 def test_full_spectrum():
     T = 80.0  # eV
     rho = 3.5  # g/cc
@@ -180,4 +233,5 @@ def test_full_spectrum():
 
 if __name__ == "__main__":
     # test_sif()
-    test_full_spectrum()
+    # test_full_spectrum()
+    check_convolution()

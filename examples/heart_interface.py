@@ -87,7 +87,7 @@ def test():
     fname = "test_heart_output"
 
     energy, intensity = create_xdave_spectrum(plot=True)
-    photon_energies = energy * 1.0e-3 + Eb
+    photon_energies = energy * 1.0e-3  # + Eb
 
     ## this is where the spectrum will go...
     # photon_energies = np.array([Eb])
