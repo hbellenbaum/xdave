@@ -45,7 +45,7 @@ def compare_mcss_xdave_be():
     models = ModelOptions(polarisation_model="NUMERICAL", bf_model="SCHUMACHER", lfc_model="NONE", ipd_model="NONE")
     k = q  # 1/aB
 
-    omega_array = np.arange(-4000, 4000, 0.5)  # eV
+    omega_array = np.arange(-2000, 2000, 0.05)  # eV
     kernel = xDave(
         models=models,
         electron_temperature=T,

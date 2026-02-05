@@ -231,7 +231,115 @@ def test_full_spectrum():
     k, Sab, _, WR, qs, fs, lfc = kernel.run(k=k, w=0.0, mode="STATIC")
 
 
+def compare_full_spectrum_mcss():
+    T = 155.5  # eV
+    rho = 30.0  # g/cc
+    Z = 3.5  #
+    angle = 75  # degrees, also can run 120
+    beam_energy = 9.0e3  # eV
+    q = calculate_q(angle=angle, energy=beam_energy)
+    print(f"Running at q={q:.3f}")
+
+    fn = os.path.join(
+        os.path.dirname(__file__),
+        f"comparison_data/mcss_comparisons/be_runs_T={T:.2f}_rho={rho:.2f}/mcss_run_be_T={T:.2f}_rho={rho:.2f}_Z={Z}_angle={angle:.0f}_full.csv",
+    )
+    status_fn = os.path.join(
+        os.path.dirname(__file__),
+        f"comparison_data/mcss_comparisons/be_runs_T={T:.2f}_rho={rho:.2f}/mcss_run_be_T={T:.2f}_rho={rho:.2f}_Z={Z}_angle={angle:.0f}_full_status.txt",
+    )
+    En_mcss, wff_mcss, wbf_mcss, ff_mcss, bf_mcss, el_mcss = load_mcss_result(filename=fn)
+    WR_mcss = get_mcss_wr_from_status_file(status_file=status_fn)
+
+    mcss_norm = 1
+
+    # hard-coded for Z=3.5
+    elements = np.array(["Be", "Be"])
+    partial_densities = np.array([0.5, 0.5])
+    charge_states = np.array([3, 4])
+
+    models = ModelOptions(polarisation_model="NUMERICAL", bf_model="SCHUMACHER", lfc_model="NONE", ipd_model="NONE")
+    k = q  # 1/aB
+
+    omega_array = np.linspace(-2000, 2000, 20000)  # eV
+    kernel = xDave(
+        models=models,
+        electron_temperature=T,
+        ion_temperature=T,
+        mass_density=rho,
+        elements=elements,
+        charge_states=charge_states,
+        partial_densities=partial_densities,
+        user_defined_inputs=None,
+        enforce_fsum=False,
+    )
+
+    bf_tot, ff_tot, dsf, WR, ff_i, bf_i = kernel.run(k=k, w=omega_array)
+    ff_tot[np.isnan(ff_tot)] = 0.0
+
+    print(f"MCSS WR = {WR_mcss}\nxDave WR = {WR}")
+
+    # plot results
+    fig, axes = plt.subplots(1, 3, figsize=(16, 16))
+
+    ax = axes[0]
+    ax.set_title("Total DSF")
+    ax.plot(omega_array, dsf, label="Inel", ls="-.", c="magenta")
+    ax.plot(En_mcss, (wbf_mcss + wff_mcss) / mcss_norm, ls=":", c="purple", label="MCSS / AN")
+    ax.legend()
+    ax.set_xlabel(r"$\omega$ [eV]")
+    ax.set_ylabel(r"DSF [1/eV]")
+
+    ax = axes[1]
+    ax.set_title("FF DSF")
+    ax.plot(omega_array, ff_tot, label="FF", ls="--", c="orange")
+    ax.plot(En_mcss, wff_mcss / mcss_norm, c="navy", ls=":", label="MCSS: ff")
+    ax.legend()
+    ax.set_xlabel(r"$\omega$ [eV]")
+    ax.set_ylabel(r"DSF [1/eV]")
+
+    ax = axes[2]
+    ax.set_title("BF DSF")
+    ax.plot(omega_array, bf_tot, label="BF", ls="solid", c="dodgerblue")
+    ax.plot(En_mcss, wbf_mcss / mcss_norm, c="brown", ls=":", label="MCSS: bf")
+    ax.legend()
+    ax.set_xlabel(r"$\omega$ [eV]")
+    ax.set_ylabel(r"DSF [1/eV]")
+
+    plt.show()
+    plt.close()
+
+    spec_energy, inelastic, elastic, spectrum = kernel.convolve_with_sif(
+        omega=omega_array, bf=bf_tot, ff=ff_tot, dsf=dsf, Wr=WR_mcss, beam_energy=beam_energy, type="GAUSSIAN", fwhm=1
+    )
+
+    fig2, axes = plt.subplots(1, 2, figsize=(14, 14))
+    ax = axes[0]
+    ax.plot(En_mcss + beam_energy, ff_mcss + bf_mcss, label="MCSS: inel", ls="-.", c="orange")
+    ax.plot(spec_energy, inelastic, label="xDave: inel", ls=":", c="crimson")
+    ax.plot(En_mcss + beam_energy, el_mcss, label="MCSS: el", ls="-.", c="dodgerblue")
+    ax.plot(spec_energy, elastic, label="xDave: el", ls=":", c="navy")
+    ax.legend()
+    ax.set_xlabel(r"$E$ [eV]")
+    ax.set_ylabel(r"I [arb. u.]")
+
+    diff1 = inelastic - np.interp(x=spec_energy, xp=En_mcss + beam_energy, fp=ff_mcss + bf_mcss)
+    diff1 = np.abs(diff1)
+    diff2 = elastic - np.interp(x=spec_energy, xp=En_mcss + beam_energy, fp=el_mcss)
+    diff2 = np.abs(diff2)
+    ax = axes[1]
+    ax.plot(spec_energy, diff1, label="Diff: inel", c="crimson", ls="solid")
+    ax.plot(spec_energy, diff2, label="Diff: el", c="navy", ls="solid")
+    ax.legend()
+    ax.set_xlabel(r"$E$ [eV]")
+    ax.set_ylabel(r"Abs. diff.")
+
+    plt.show()
+    plt.close()
+
+
 if __name__ == "__main__":
     # test_sif()
     # test_full_spectrum()
-    check_convolution()
+    # check_convolution()
+    compare_full_spectrum_mcss()

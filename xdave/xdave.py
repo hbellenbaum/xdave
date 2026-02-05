@@ -753,7 +753,7 @@ class xDave:
         new_source = np.interp(x=spec_energy, xp=source_energy, fp=source_spectrum)
         new_source /= np.sum(new_source)
         inelastic = spectrum.copy()
-        elastic = new_source * Wr / (source_energy[1] - source_energy[0])
+        elastic = new_source * Wr / (spec_energy[1] - spec_energy[0])
         spectrum += elastic
         if flip_spec_ene:
             spec_energy = spec_energy[::-1]
