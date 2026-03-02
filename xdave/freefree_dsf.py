@@ -78,8 +78,7 @@ class FreeFreeDSF:
 
     def get_collision_frequency(self, k, w, lfc, model):
         if model == "BORN":
-            # return self._born_ei_collision_frequency(k, w, lfc)
-            return self._full_born_ei_collision_frequency(k, w, lfc)
+            return self._born_ei_collision_frequency(k, w, lfc)
         elif model == "ZIMAN":
             return self._ziman_ei_collision_frequency()
         else:
@@ -517,7 +516,7 @@ class FreeFreeDSF:
         For details see Eqn. (12) in Fortmann et al., Phys. Rev. E 81 (2010).
 
         Returns:
-            array: collision frequency in units of J
+            array: collision frequency in units of 1/s
         """
         rs = self.state.rs
         EF = self.state.fermi_energy(self.state.free_electron_number_density, ELECTRON_MASS)
@@ -526,61 +525,15 @@ class FreeFreeDSF:
         collision_frequency = EF / DIRAC_CONSTANT * (a * rs**2 * (np.log(1 + b / rs) - 1 / (1 + rs / b)))
         return collision_frequency
 
-    def _born_ei_collision_frequency_old(self, k, w, lfc):
-        k_temp = np.linspace(1.0e-3, 1.0e2, 1000) / BOHR_RADIUS
-        Siik = OCPStaticStructureFactor(state=self.state).get_ii_static_structure_factor(k=k_temp, sf_model="HNC")
-
-        Zi = self.state.charge_state
-        mi = self.state.atomic_mass
-        ni = self.state.ion_number_density
-        ne = self.state.free_electron_number_density
-        w_plasma = self.state.plasma_frequency(charge=Zi, number_density=ni, mass=mi)
-        w_freq = w / DIRAC_CONSTANT
-
-        def integral(q):
-            epsilon0 = self.dandrea_fit(k=q, omega=0)
-            epsilon = self.dandrea_fit(k=q, omega=w)
-            Sii = np.interp(q, xp=k_temp, fp=Siik)
-            return 1 / TWO_PI**3 * Sii / epsilon0 * (epsilon - epsilon0)
-
-        prefactor = FOUR_THIRDS_PI * w_plasma / w_freq * mi / ELECTRON_MASS * 1 / ne * 1.0j
-        int_term, _ = integrate.quad_vec(integral, 0, 1.0e14)
-        return prefactor * int_term
-        # interp_Sk = np.interp(k_temp, Siik, fill_value="extrapolate")
-
     def _born_ei_collision_frequency(self, k, w, lfc):
+        r"""
+        Calculate the Born collision frequency.
+        For details see Eqn. (10) in Fortmann et al., Phys. Rev. E 81 (2010)
+        or Eqn. (B1-B2) in Sch\"orner et al., Phys. Rev. E 107 (2023).
 
-        ni = self.state.ion_number_density
-        mi = self.state.atomic_mass
-        me = ELECTRON_MASS
-        ne = self.state.free_electron_number_density
-        Zi = self.state.charge_state
-        wpi = self.state.plasma_frequency(charge=Zi, number_density=ni, mass=mi)
-
-        w_freq = w / DIRAC_CONSTANT
-
-        prefactor = VACUUM_PERMITTIVITY * ni / (6 * PI**2 * ELEMENTARY_CHARGE_SQR * me * ne)
-
-        k_temp = np.linspace(1.0e-3, 1.0e2, 1000) / BOHR_RADIUS
-        Siik = OCPStaticStructureFactor(
-            state=self.state, verbose=False, mix_fraction=0.99, max_iterations=10000
-        ).get_ii_static_structure_factor(k=k_temp, sf_model="HNC")
-
-        def integrand(q):
-            Si = np.interp(q, k_temp, Siik)
-
-            Vee = ELEMENTARY_CHARGE**2 / (VACUUM_PERMITTIVITY * q**2)  # []
-            # q /= 1.0e-10
-            epsilon = 1 - Vee * self.dandrea_fit(q, w)
-            epsilon0 = 1 - Vee * self.dandrea_fit(q, 0)
-            VeiS = Vee / epsilon0
-            I = -1.0j * q**6 * VeiS**2 * Si / w_freq * (epsilon - epsilon0)
-            return I
-
-        integral, _ = integrate.quad_vec(integrand, 0, 1.0e10)
-        return integral * prefactor
-
-    def _full_born_ei_collision_frequency(self, k, w, lfc):
+        Returns:
+            array: collision frequency in units of 1/s
+        """
         w_freq = w / DIRAC_CONSTANT
         omega_p = self.state.plasma_frequency(
             self.state.charge_state, self.state.ion_number_density, self.state.atomic_mass
@@ -589,29 +542,10 @@ class FreeFreeDSF:
 
         ff_kernel = FreeFreeDSF(state=self.state)
 
-        # def int_function(k, w):
-        #     Uee = 4 * np.pi * COULOMB_CONSTANT * ELEMENTARY_CHARGE**2 / k**2
-        #     epsilon_k_omega = 1 - Uee * ff_kernel.dandrea_fit(k=k, w=0)
-        #     epsilon_k_0 = 1 - Uee * ff_kernel.dandrea_fit(k=k, w=0)
-        #     return -1.0j * (epsilon_k_omega - epsilon_k_0) / (epsilon_k_0**2)
-
-        temp_k = np.linspace(0.01, 10, 100) / BOHR_RADIUS
-        Siis = OCPStaticStructureFactor(self.state).get_ii_static_structure_factor(k=temp_k)
-
-        # def real_integrand(u):
-        #     x = np.tan(HALF_PI * u)
-        #     j = np.arctan(u) / HALF_PI
-
-        #     kF = self.state.fermi_wave_number(self.state.free_electron_number_density)
-        #     k = kF * x
-
-        #     Uee = ELEMENTARY_CHARGE**2 / (VACUUM_PERMITTIVITY * k**2)  # []
-        #     epsilon_k_omega = 1 - Uee * ff_kernel.dandrea_fit(k=k, omega=w)
-        #     epsilon_k_0 = 1 - Uee * ff_kernel.dandrea_fit(k=k, omega=0)
-        #     F = -1.0j * (epsilon_k_omega - epsilon_k_0) / (epsilon_k_0**2)
-
-        #     Sii = np.interp(x=k, xp=temp_k, fp=Siis)
-        #     return j * x**2 * Sii * F.real
+        temp_k = np.linspace(0.1, 10, 50) / BOHR_RADIUS
+        Siis = OCPStaticStructureFactor(
+            self.state, mix_fraction=0.99, max_iterations=10000
+        ).get_ii_static_structure_factor(k=temp_k, sf_model="HNC")
 
         def integrand(u):
             x = np.tan(HALF_PI * u)
@@ -628,27 +562,9 @@ class FreeFreeDSF:
             Sii = np.interp(x=k, xp=temp_k, fp=Siis)
             return j * x**2 * Sii * F
 
-        # def imag_integrand(u):
-        #     x = np.tan(HALF_PI * u)
-        #     j = np.arctan(u) / HALF_PI
-
-        #     kF = self.state.fermi_wave_number(self.state.free_electron_number_density)
-        #     k = kF * x
-
-        #     Uee = 4 * np.pi * COULOMB_CONSTANT * ELEMENTARY_CHARGE**2 / k**2
-        #     epsilon_k_omega = 1 - Uee * ff_kernel.dandrea_fit(k=k, omega=w)
-        #     epsilon_k_0 = 1 - Uee * ff_kernel.dandrea_fit(k=k, omega=0)
-        #     F = -1.0j * (epsilon_k_omega - epsilon_k_0) / (epsilon_k_0**2)
-
-        #     Sii = np.interp(x=k, xp=temp_k, fp=Siis)
-        #     return j * x**2 * Sii * F.imag
-
-        # coll_freq_real = -col0 * integrate.quad_vec(integrand, 0, 1)[0]
-        # coll_freq_imag = col0 * integrate.quad_vec(integrand, 0, 1)[0]
-
         coll_freq = col0 * integrate.quad_vec(integrand, 0, 1)[0]
 
-        return coll_freq  # coll_freq_real + 1.0j * coll_freq_imag
+        return coll_freq
 
     def _real_dielectric_mermin(self, k, w, mu1, mu2):
         wtilde = w - mu2
@@ -734,7 +650,7 @@ class FreeFreeDSF:
         if input_collision_frequency is not None:
             mu_ei = input_collision_frequency * wp * (1.0 + 0.0j)
         else:
-            mu_ei = self.get_collision_frequency(k=k, w=w, lfc=lfc, model=collision_frequency_model)  # * wp
+            mu_ei = self.get_collision_frequency(k=k, w=w, lfc=lfc, model=collision_frequency_model)
 
         Vee = 4 * np.pi * COULOMB_CONSTANT * ELEMENTARY_CHARGE**2 / k**2
         mu_ei_energy = mu_ei * DIRAC_CONSTANT
