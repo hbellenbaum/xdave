@@ -47,17 +47,18 @@ def test():
     lfc = 0.0
     mu_ei_born = ff_kernel.get_collision_frequency(k=k, w=w, lfc=lfc, model="BORN")
     mu_ei_ziman = ff_kernel.get_collision_frequency(k=k, w=w, lfc=lfc, model="ZIMAN")
-    # print(mu_ei_ziman)
-    # print(mu_ei_born)
+    mu_ei_full = ff_kernel._full_born_ei_collision_frequency(k=k, w=w, lfc=lfc)
+
+    EF = state.fermi_energy(state.free_electron_number_density, mass=ELECTRON_MASS)
+    norm_factor = DIRAC_CONSTANT / EF
+    print(norm_factor)
+    w_freq = w / DIRAC_CONSTANT
 
     fig, ax = plt.subplots(1, 1)
     ax.set_xscale("log")
-    ax.plot(w * J_TO_eV, mu_ei_born.real, label="Re[Born]", c="navy", ls="-.")  #  * DIRAC_CONSTANT / EF
-    # ax.axhline(mu_ei_ziman, label="Ziman", c="gray", ls="-.")
-    # ax.axhline(plasma_freq, label=r"$\omega_p$", c="black", ls="-.")
-    ax.plot(w * J_TO_eV, mu_ei_born.imag, label="Im[Born]", c="crimson", ls="-.")  #  * DIRAC_CONSTANT / EF
+    ax.plot(w_freq * norm_factor, mu_ei_full.real * norm_factor, label="real")
+    ax.plot(w_freq * norm_factor, mu_ei_full.imag * norm_factor, label="imag")
 
-    ax.set_xlim(1.0e-6, 100)
     ax.legend()
     plt.tight_layout()
     plt.show()
@@ -101,13 +102,14 @@ def test_fortmann_2010_Fig1():
     angle = 75
     k = calculate_q(angle=angle, energy=8.0e3) / BOHR_RADIUS
     born_mu_ei = ff_kernel.get_collision_frequency(k=k, w=w, lfc=0.0, model="BORN")
+    norm_factor = 1
 
     plt.figure()
     plt.xscale("log")
-    # plt.scatter(dat1_re[:, 0] * norm1, dat1_re[:, 1] * norm1, label=f"rs=1, Re", marker="x", c="navy")
-    # plt.scatter(dat1_im[:, 0] * norm1, dat1_im[:, 1] * norm1, label=f"rs=1, Im", marker="<", c="navy")
-    plt.plot(w * J_TO_eV, born_mu_ei.real, label=f"xDave rs=1, Re", c="navy", ls=":")
-    plt.plot(w * J_TO_eV, born_mu_ei.imag, label=f"xDave rs=1, Im", c="navy", ls="-.")
+    plt.scatter(dat1_re[:, 0] * norm1, dat1_re[:, 1] * norm1, label=f"rs=1, Re", marker="x", c="navy")
+    plt.scatter(dat1_im[:, 0] * norm1, dat1_im[:, 1] * norm1, label=f"rs=1, Im", marker="<", c="navy")
+    # plt.plot(w * J_TO_eV, born_mu_ei.real / norm_factor, label=f"xDave rs=1, Re", c="navy", ls=":")
+    # plt.plot(w * J_TO_eV, born_mu_ei.imag / norm_factor, label=f"xDave rs=1, Im", c="navy", ls="-.")
     # plt.scatter(dat2_re[:, 0] * norm5, dat2_re[:, 1] * norm5, label=f"rs=5, Re", marker="x", c="crimson")
     # plt.scatter(dat2_im[:, 0] * norm5, dat2_im[:, 1] * norm5, label=f"rs=5, Im", marker="<", c="crimson")
     plt.legend()

@@ -78,7 +78,8 @@ class FreeFreeDSF:
 
     def get_collision_frequency(self, k, w, lfc, model):
         if model == "BORN":
-            return self._born_ei_collision_frequency(k, w, lfc)
+            # return self._born_ei_collision_frequency(k, w, lfc)
+            return self._full_born_ei_collision_frequency(k, w, lfc)
         elif model == "ZIMAN":
             return self._ziman_ei_collision_frequency()
         else:
@@ -579,34 +580,75 @@ class FreeFreeDSF:
         integral, _ = integrate.quad_vec(integrand, 0, 1.0e10)
         return integral * prefactor
 
-        # w_freq = w / DIRAC_CONSTANT
+    def _full_born_ei_collision_frequency(self, k, w, lfc):
+        w_freq = w / DIRAC_CONSTANT
+        omega_p = self.state.plasma_frequency(
+            self.state.charge_state, self.state.ion_number_density, self.state.atomic_mass
+        )
+        col0 = 1.0 * omega_p**2 * self.state.atomic_mass / (2 * w_freq * ELECTRON_MASS)
 
-        # k_temp = np.linspace(1.0e-3, 1.0e2, 1000) / BOHR_RADIUS
-        # Siik = OCPStaticStructureFactor(state=self.state, verbose=False).get_ii_static_structure_factor(
-        #     k=k_temp, sf_model="HNC"
-        # )
+        ff_kernel = FreeFreeDSF(state=self.state)
 
-        # prefactor = (
-        #     -1.0j * Zi**2 * ni * ELEMENTARY_CHARGE_SQR / (6 * PI_SQR * VACUUM_PERMITTIVITY * ne * ELECTRON_MASS)
-        # )
+        # def int_function(k, w):
+        #     Uee = 4 * np.pi * COULOMB_CONSTANT * ELEMENTARY_CHARGE**2 / k**2
+        #     epsilon_k_omega = 1 - Uee * ff_kernel.dandrea_fit(k=k, w=0)
+        #     epsilon_k_0 = 1 - Uee * ff_kernel.dandrea_fit(k=k, w=0)
+        #     return -1.0j * (epsilon_k_omega - epsilon_k_0) / (epsilon_k_0**2)
 
-        # def real_integrand(q):
-        #     Si = np.interp(q, k_temp, Siik)
-        #     Vee = ELEMENTARY_CHARGE**2 / (VACUUM_PERMITTIVITY * q**2)
-        #     epsilon = 1 - Vee * self.dandrea_fit(q, w)
-        #     epsilon0 = 1 - Vee * self.dandrea_fit(q, 0)
-        #     # Vei = -Zi * COULOMB_CONSTANT_SQR / (VACUUM_PERMITTIVITY * q**2 * epsilon0)
-        #     I = q**2 / w_freq * Si * (epsilon - epsilon0) / epsilon0**2
-        #     return I
+        temp_k = np.linspace(0.01, 10, 100) / BOHR_RADIUS
+        Siis = OCPStaticStructureFactor(self.state).get_ii_static_structure_factor(k=temp_k)
 
-        # integral, _ = integrate.quad_vec(real_integrand, 0, 1.0e10)
-        # real_part = prefactor * integral
+        # def real_integrand(u):
+        #     x = np.tan(HALF_PI * u)
+        #     j = np.arctan(u) / HALF_PI
 
-        # def imag_integral(wdash):
-        #     return 1 / PI * real_part / (w_freq - wdash)
+        #     kF = self.state.fermi_wave_number(self.state.free_electron_number_density)
+        #     k = kF * x
 
-        # imag_part, _ = integrate.quad_vec(imag_integral, -1.0e16, 1.0e16)
-        # return real_part + 1.0j * imag_part
+        #     Uee = ELEMENTARY_CHARGE**2 / (VACUUM_PERMITTIVITY * k**2)  # []
+        #     epsilon_k_omega = 1 - Uee * ff_kernel.dandrea_fit(k=k, omega=w)
+        #     epsilon_k_0 = 1 - Uee * ff_kernel.dandrea_fit(k=k, omega=0)
+        #     F = -1.0j * (epsilon_k_omega - epsilon_k_0) / (epsilon_k_0**2)
+
+        #     Sii = np.interp(x=k, xp=temp_k, fp=Siis)
+        #     return j * x**2 * Sii * F.real
+
+        def integrand(u):
+            x = np.tan(HALF_PI * u)
+            j = np.arctan(u) / HALF_PI
+
+            kF = self.state.fermi_wave_number(self.state.free_electron_number_density)
+            k = kF * x
+
+            Uee = ELEMENTARY_CHARGE**2 / (VACUUM_PERMITTIVITY * k**2)  # []
+            epsilon_k_omega = 1 - Uee * ff_kernel.dandrea_fit(k=k, omega=w)
+            epsilon_k_0 = 1 - Uee * ff_kernel.dandrea_fit(k=k, omega=0)
+            F = -1.0j * (epsilon_k_omega - epsilon_k_0) / (epsilon_k_0**2)
+
+            Sii = np.interp(x=k, xp=temp_k, fp=Siis)
+            return j * x**2 * Sii * F
+
+        # def imag_integrand(u):
+        #     x = np.tan(HALF_PI * u)
+        #     j = np.arctan(u) / HALF_PI
+
+        #     kF = self.state.fermi_wave_number(self.state.free_electron_number_density)
+        #     k = kF * x
+
+        #     Uee = 4 * np.pi * COULOMB_CONSTANT * ELEMENTARY_CHARGE**2 / k**2
+        #     epsilon_k_omega = 1 - Uee * ff_kernel.dandrea_fit(k=k, omega=w)
+        #     epsilon_k_0 = 1 - Uee * ff_kernel.dandrea_fit(k=k, omega=0)
+        #     F = -1.0j * (epsilon_k_omega - epsilon_k_0) / (epsilon_k_0**2)
+
+        #     Sii = np.interp(x=k, xp=temp_k, fp=Siis)
+        #     return j * x**2 * Sii * F.imag
+
+        # coll_freq_real = -col0 * integrate.quad_vec(integrand, 0, 1)[0]
+        # coll_freq_imag = col0 * integrate.quad_vec(integrand, 0, 1)[0]
+
+        coll_freq = col0 * integrate.quad_vec(integrand, 0, 1)[0]
+
+        return coll_freq  # coll_freq_real + 1.0j * coll_freq_imag
 
     def _real_dielectric_mermin(self, k, w, mu1, mu2):
         wtilde = w - mu2
@@ -691,20 +733,9 @@ class FreeFreeDSF:
         w_freq = w / DIRAC_CONSTANT
         if input_collision_frequency is not None:
             mu_ei = input_collision_frequency * wp * (1.0 + 0.0j)
-            # mu_ei_energy = mu_ei * DIRAC_CONSTANT
         else:
-            mu_ei = self.get_collision_frequency(k=k, w=w, lfc=lfc, model=collision_frequency_model) * wp
-            # mu_ei_energy = mu_ei
-        # mu1 = mu_ei.real
-        # mu2 = mu_ei.imag
-        # real_part = self._real_dielectric_mermin(k=k, w=w_freq, mu1=mu1, mu2=mu2)
-        # imag_part = self._im_dielectric_mermin(k=k, w=w_freq, mu1=mu1, mu2=mu2)
-        # dielectric_function = real_part + 1.0j * imag_part
+            mu_ei = self.get_collision_frequency(k=k, w=w, lfc=lfc, model=collision_frequency_model)  # * wp
 
-        # dielectric_rpa0 = self.dielectric_function(k=k, w=0, model="DANDREA_FIT")
-        # mermin_dielectric = 1 + (1 + 1.0j * mu_ei / w_freq) * (dielectric_function - 1) / (
-        #     1 + 1.0j * mu_ei / w_freq * (dielectric_function - 1) / (dielectric_rpa0 - 1)
-        # )
         Vee = 4 * np.pi * COULOMB_CONSTANT * ELEMENTARY_CHARGE**2 / k**2
         mu_ei_energy = mu_ei * DIRAC_CONSTANT
         ratio = 1.0j * mu_ei / w_freq
