@@ -1,13 +1,81 @@
 from xdave.constants import BOHR_RADIUS, ELECTRON_MASS, DIRAC_CONSTANT
 from xdave.utils import calculate_angle, calculate_q
 from xdave.unit_conversions import g_per_cm3_TO_kg_per_m3, eV_TO_K, eV_TO_J, RYDBERG_TO_eV, J_TO_eV
-from xdave.plasma_state import PlasmaState, get_rho_T_from_rs_theta
+from xdave.plasma_state import PlasmaState, get_rho_T_from_rs_theta, get_fractions_from_Z_partial
 from xdave.freefree_dsf import FreeFreeDSF
+from xdave import ModelOptions, xDave
 
 import numpy as np
 import matplotlib.pyplot as plt
 
 import os
+
+plt.style.use("~/my_style.mplstyle")
+
+
+def compare_lfcs():
+    T = 100  # eV
+    rho = 2 * 1.845  # two times solid density [g/cc]
+    Z_C = 4.5
+
+    xH = 0.5
+    ZH = 1.0
+
+    Zmin, Zmax, xmin, xmax = get_fractions_from_Z_partial(Z=Z_C, x0=xH)
+
+    models = ModelOptions(
+        ei_potential="YUKAWA",
+        ii_potential="YUKAWA",
+        ee_potential="COULOMB",
+        polarisation_model="NUMERICAL",
+        sf_model="HNC",
+        lfc_model="NONE",
+        ipd_model="STEWART_PYATT",
+        bf_model="SCHUMACHER",
+        screening_model="FINITE_WAVELENGTH",
+    )
+
+    kernel = xDave(
+        mass_density=rho,
+        electron_temperature=T,
+        ion_temperature=T,
+        elements=np.array(["H", "C", "C"]),
+        charge_states=np.array([ZH, Zmin, Zmax]),
+        partial_densities=np.array([xH, xmin, xmax]),
+        models=models,
+        enforce_fsum=False,
+        user_defined_inputs=None,
+        verbose=True,
+        hnc_max_iterations=10000,
+        hnc_mix_fraction=0.99,
+        hnc_delta=1.0e-7,
+    )
+
+    plt.figure()
+
+    w = np.linspace(-1000, 1500, 10000)
+    bf_tot, ff_tot, dsf, rayleigh_weight, ff_i, bf_i = kernel.run(w=w, angle=15, beam_energy=9.0e3, mode="DYNAMIC")
+    plt.plot(w, ff_tot, label="RPA", ls="solid", c="navy")
+
+    # kernel.models.lfc_model = "DORNHEIM_ESA"
+    # bf_tot, ff_tot, dsf, rayleigh_weight, ff_i, bf_i = kernel.run(w=w, angle=20, beam_energy=9.0e3, mode="DYNAMIC")
+    # plt.plot(w, ff_tot, label="ESA", ls="-.", c="crimson")
+
+    kernel.models.lfc_model = "FARID"
+    bf_tot, ff_tot, dsf, rayleigh_weight, ff_i, bf_i = kernel.run(w=w, angle=15, beam_energy=9.0e3, mode="DYNAMIC")
+    plt.plot(w, ff_tot, label="RPA + LFC", ls="-.", c="red")
+
+    # kernel.models.polarisation_model = "MERMIN"
+    # bf_tot, ff_tot, dsf, rayleigh_weight, ff_i, bf_i = kernel.run(w=w, angle=20, beam_energy=9.0e3, mode="DYNAMIC")
+    # plt.plot(w, ff_tot, label="Interp", ls="-.", c="green")
+
+    plt.legend()
+    plt.xlabel(r"$\omega$ [eV]")
+    plt.ylabel(r"$S^{ff} (k,\omega)$ [1/eV]")
+    plt.xlim(-140, 160)
+    plt.tight_layout()
+    plt.savefig("ff_example.pdf", dpi=200)
+    # plt.show()
 
 
 def test_ff():
@@ -199,4 +267,5 @@ def test_mermin_ff():
 
 if __name__ == "__main__":
     # test_ff()
-    test_mermin_ff()
+    compare_lfcs()
+    # test_mermin_ff()
