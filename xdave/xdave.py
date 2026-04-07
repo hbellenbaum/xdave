@@ -267,6 +267,34 @@ class xDave:
     ## ------------------------ ##
 
     def run(self, w, k=None, angle=None, beam_energy=None, mode="DYNAMIC"):
+        """
+        Main run function.
+        Depending on the run model chosen (STATIC/DYNAMIC), this will return either the full DSF calculation
+        or the static case.
+
+
+        Parameters:
+            k (float/ array): array or single value of scattering wavenumbers in units of a_B^{-1}
+            w (array): array of points in the energy grid, in units of eV.
+            angle (float): scattering angle in degrees, optional.
+            beam_energy: energy of the probe beam in units of eV, optional.
+            mode (str): run mode, either DYNAMIC or STATIC.
+
+        Returns:
+            array: total bound-free DSF in units of 1/eV
+            array: total free-free DSF in units of 1/eV
+            float: Rayleigh Weight, dimensionless
+            array: Contributions to the ff DSF by each species in units of 1/eV (non-sensical, for completeness only)
+            array: Contributions to the bf DSF by each species in units of 1/eV
+
+        Returns:
+            array: array of k values in units of a_B^{-1}
+            array: array of static structure factors for each species, shape is determined by the number of elements, non-dimensional
+            float: Rayleigh Weight, non-dimensional
+            array: array of the screening cloud for each species, non-dimensional
+            array: array of the form factors for each species, non-dimensional
+
+        """
 
         if self.verbose:
             self._print_logo()
@@ -465,7 +493,6 @@ class xDave:
             k (array): array of scattering wavenumbers in units of a_B^{-1}
 
         Returns:
-        k, Sab, rayleigh_weight, qs, fs
             array: array of k values in units of a_B^{-1}
             array: array of static structure factors for each species, shape is determined by the number of elements, non-dimensional
             float: Rayleigh Weight, non-dimensional
@@ -560,6 +587,23 @@ class xDave:
         return k * BOHR_RADIUS, Sab, Sab_tot, rayleigh_weight, qs, fs, lfc
 
     def run_inelastic(self, w, k=None, angle=None, beam_energy=None):
+        """
+        Inelastic run function to ignore the rayleigh weight calculation.
+
+        Parameters:
+            k (float/ array): array or single value of scattering wavenumbers in units of a_B^{-1}
+            w (array): array of points in the energy grid, in units of eV.
+            angle (float): scattering angle in degrees, optional.
+            beam_energy: energy of the probe beam in units of eV, optional.
+            mode (str): run mode, either DYNAMIC or STATIC.
+
+        Returns:
+            array: total bound-free DSF in units of 1/eV
+            array: total free-free DSF in units of 1/eV
+            float: Rayleigh Weight, dimensionless
+            array: Contributions to the ff DSF by each species in units of 1/eV (non-sensical, for completeness only)
+            array: Contributions to the bf DSF by each species in units of 1/eV
+        """
 
         if self.verbose:
             self._print_logo()
@@ -643,6 +687,21 @@ class xDave:
         return bf_tot / J_TO_eV, ff_tot / J_TO_eV, dsf / J_TO_eV, ff_i / J_TO_eV, bf_i / J_TO_eV
 
     def run_elastic(self, k, w):
+        """
+
+        Elastic run function to calculate the Rayleigh weight only for a wave number.
+
+        Parameters:
+            k (float/ array): array or single value of scattering wavenumbers in units of a_B^{-1}
+            w (array): array of points in the energy grid, in units of eV.
+
+        Returns:
+            array: array of k values in units of a_B^{-1}
+            array: array of static structure factors for each species, shape is determined by the number of elements, non-dimensional
+            float: Rayleigh Weight, non-dimensional
+            array: array of the screening cloud for each species, non-dimensional
+            array: array of the form factors for each species, non-dimensional
+        """
         k_value = k / BOHR_RADIUS
         omega_array = w.copy() * eV_TO_J
 
@@ -763,11 +822,38 @@ class xDave:
         return spec_energy, inelastic, elastic, spectrum
 
     def get_itcf(self, w, ff, bf, tau=None):
+        """
+        Apply the double-sided Laplace transform to the DSF to obtain the imaginary-time correlation function (ITCF).
+
+        Parameters
+            omega (array): energy grid in units of eV
+            ff (array): free-free dsf in units of 1/eV
+            bf (array): bound-free dsf in units of 1/eV
+            tau (array): tau-grid to perform the Laplace transform over, optional.
+
+        Returns
+            array: tau-grid
+            array: total inelastic ITCF
+            array: free-free ITCF
+            array: bound-free ITCF
+        """
         if tau is None:
             tau = self.tau_array
         return laplace(tau=tau, E=w, wff=ff, wbf=bf)
 
     def get_static_structure_factors(self, w, ff, bf):
+        """
+        Integrate the dynamic structure factor over the whole energy grid to obtain a static structure factor.
+
+        Parameters
+            omega (array): energy grid in units of eV
+            ff (array): free-free dsf in units of 1/eV
+            bf (array): bound-free dsf in units of 1/eV
+
+        Returns
+            float: bound-free static structure factor
+            float: free-free static structure factor
+        """
         bf_static = np.trapezoid(bf, w)
         ff_static = np.trapezoid(ff, w)
         return bf_static, ff_static

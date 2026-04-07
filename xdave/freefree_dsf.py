@@ -6,12 +6,7 @@ from .fermi_integrals import fdi
 from .static_sf import OCPStaticStructureFactor
 
 from scipy import integrate
-
-# from collision_frequency import CollisionFrequency
-
-
 import numpy as np
-
 import warnings
 
 
@@ -19,7 +14,8 @@ class FreeFreeDSF:
     """
     Class containing the free-free dynamic structure factor calculations.
 
-    Attributes:
+    Parameters
+    ----------
         state (PlasmaState): object containing all plasma state variables
 
     """
@@ -77,6 +73,18 @@ class FreeFreeDSF:
         return S_EG_LFC
 
     def get_collision_frequency(self, k, w, lfc, model):
+        """
+        Function to get the collision frequency for a given model.
+
+        Parameters:
+            k (float): wave number in units of 1/m
+            w (array): energy grid in units of 1/J
+            lfc (float): local-field correction
+            model (str): model for the collision-frequency
+
+        Returns:
+            array: electron-ion collision frequency in units of Hz
+        """
         if model == "BORN":
             return self._born_ei_collision_frequency(k, w, lfc)
         elif model == "ZIMAN":

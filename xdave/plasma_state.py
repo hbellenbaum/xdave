@@ -131,6 +131,25 @@ class PlasmaState:
         csd_parameter: float = None,
         srr_sigma: float = None,
     ) -> None:
+        """
+        Object containing the plasma parameters.
+
+        Attributes:
+            electron_temperature (float): electronic temperature in units of K
+            ion_temperature (float): ion temperature in units of K
+            mass_density (float): mass density in units of kg/m^3
+            charge_state (float): number of free electrons per nucleus
+            atomic_mass (float): atomic mass in units of Dalton
+            atomic_number (float): atomic number
+            binding_energies (array): array containing the binding energy of each shell in J
+            electron_number_density (float): number density of the free electrons in units of 1/m^3
+            ion_number_density (float): number density of the ions in units of 1/m^3
+            ion_core_radius (float): radius of the ion core in units of m
+            sec_power (float): power used in the short range screening pseudo-potential
+            csd_core_charge (float): charge of the nucleus used in the charge switching debye peuso-potential
+            csd_parameters (float): relative weighting of the ionic core used in the charge switching debye peuso-potential
+            srr_sigma (float): used in the short-range pseudo-potential
+        """
         # TODO(Hannah): also add option to initialize using rs and theta
 
         self.initiliased = False

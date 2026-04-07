@@ -4,10 +4,8 @@ from numpy import exp, log1p
 
 
 def is_iterable(test_variable):
-    r"""
-    As noted on: https://stackoverflow.com/questions/1952464/in-python-how-do-i-determine-if-an-object-is-iterable
-    there is no one single way of testing whether an object is iterable that is 'best'. The general advice seems to be
-    to perform a try-except on the iter() method.
+    """
+    Checks whether an object is iterable.
     """
     try:
         iter(test_variable)
@@ -17,18 +15,15 @@ def is_iterable(test_variable):
 
 
 def log1pexp(x):
-    r"""
+    """
     Returns the function log1pexp(x) = \ln(1 + exp(x)) via the expressions recommended by Eq. (10) by Martin M\"achler.
 
-    Parameters
-    ----------
-    x: float scalar/iterable
-        The argument of the function.
+    Parameters:
+        x (float scalar/iterable): function argument
 
-    References
-    ----------
-    M. M\"achler, "Accurately Computing log(1-exp(-|a|)) Assessed by the Rmpfr package",
-    https://cran.r-project.org/web/packages/Rmpfr/vignettes/log1mexp-note.pdf
+    Returns:
+        float/ array: result
+
     """
     x_0 = -37.0
     x_1 = 18.0
