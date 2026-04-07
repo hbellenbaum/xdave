@@ -44,7 +44,6 @@ Form factors
 .. autofunction:: xdave.ii_ff.ScreeningConstants.c4s
 .. autofunction:: xdave.ii_ff.ScreeningConstants.c3d
 .. autofunction:: xdave.ii_ff.ScreeningConstants.get_all_screening_constants
-.. autofunction:: xdave.ii_ff.ScreeningConstants.get_all_screening_constants
 
 
 
