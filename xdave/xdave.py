@@ -582,7 +582,7 @@ class xDave:
 
         if self.user_defined_lfc is None:
             lfc_kernel = LFC(state=self.overlord_state)
-            lfc = lfc_kernel.calculate_lfc(k=k, w=w, model=self.models.lfc_model)
+            lfc = lfc_kernel.calculate_lfc(k=k_SI, w=0, model=self.models.lfc_model)
             print(f"Calculated LFC={lfc}") if self.verbose else None
         else:
             lfc = self.user_defined_lfc
