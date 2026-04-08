@@ -160,12 +160,12 @@ class xDave:
 
         self.user_defined_inputs = user_defined_inputs
 
-        self.states, self.overlord_state = self.get_mean_and_all_states(elements)
-
         # Run Variables
         self.enforce_fsum = enforce_fsum
         self.verbose = verbose
         self.save_to_json = save_to_json
+
+        self.states, self.overlord_state = self.get_mean_and_all_states(elements)
 
         if save_to_json:
             assert output_file_name is not None, f"Please specify the output file name."
@@ -251,9 +251,13 @@ class xDave:
             amu = atomic_masses[i] / ATOMIC_MASS_UNIT  # this is also dumb!
             amu_mean += x * amu
 
-            if self.user_defined_binding_energies is not None:
+            if np.any(self.user_defined_binding_energies):  # is not None:
+                if self.verbose:
+                    print(f"Setting user defined binding energies.")
                 binding_energies = self.user_defined_binding_energies[i]
             else:
+                if self.verbose:
+                    print(f"Getting binding energies from FAC.")
                 binding_energies = get_binding_energies_from_element(AN, Z)
 
             state = PlasmaState(

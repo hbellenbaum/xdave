@@ -186,6 +186,8 @@ def test_user_defined_binding_energies():
         verbose=True,
     )
 
+    print(kernel.states[2].binding_energies)
+
     k = 2
     omega_array = np.linspace(-1000, 1500, 1000)
 
@@ -248,5 +250,5 @@ if __name__ == "__main__":
     # test_setup()
     # test_be()
     # test_mc_setup()
-    # test_user_defined_binding_energies()
-    test_state_setup()
+    test_user_defined_binding_energies()
+    # test_state_setup()
