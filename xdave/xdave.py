@@ -94,6 +94,9 @@ class xDave:
         if user_defined_inputs is not None:
             keys = user_defined_inputs.keys()
             self.ipd_eV = user_defined_inputs["ipd"] if "ipd" in keys else None
+            self.user_defined_binding_energies = (
+                user_defined_inputs["binding_energies"] if "binding_energies" in keys else None
+            )
             self.user_defined_lfc = user_defined_inputs["lfc"] if "lfc" in keys else None
             self.ion_core_radii = (
                 np.array(user_defined_inputs["ion_core_radii"]) * BOHR_RADIUS
@@ -147,6 +150,7 @@ class xDave:
         else:
             self.ipd_eV = None
             self.user_defined_lfc = None
+            self.user_defined_binding_energies = np.full(self.number_of_states, None)
             self.ion_core_radii = np.full(self.number_of_states, None)
             self.csd_parameters = np.full(self.number_of_states, None)
             self.csd_core_charges = np.full(self.number_of_states, None)
@@ -231,7 +235,11 @@ class xDave:
             AN_mean += x * AN
             amu = atomic_masses[i] / ATOMIC_MASS_UNIT  # this is also dumb!
             amu_mean += x * amu
-            binding_energies = get_binding_energies_from_element(AN, Z)
+
+            if self.user_defined_binding_energies is not None:
+                binding_energies = self.user_defined_binding_energies[i]
+            else:
+                binding_energies = get_binding_energies_from_element(AN, Z)
 
             state = PlasmaState(
                 electron_temperature=self.electron_temperature,
