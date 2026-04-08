@@ -215,17 +215,32 @@ class xDave:
         atomic_masses, atomic_numbers = get_atomic_data_for_all_elements(elements)
 
         sum_term = np.sum(self.partial_densities * atomic_masses)
+
+        mask = self.partial_densities != 0
+        if not mask.all():
+            n = np.sum(~mask)
+            warnings.warn(f"Trying to initialize {n} state(s) with zero fractional density. Skipping these!")
+            self.number_of_states -= n
+
+        self.elements, self.partial_densities, self.charge_states, atomic_masses, atomic_numbers = (
+            self.elements[mask],
+            self.partial_densities[mask],
+            self.charge_states[mask],
+            atomic_masses[mask],
+            atomic_numbers[mask],
+        )
+
+        assert (
+            len(self.elements)
+            == len(self.partial_densities)
+            == len(self.charge_states)
+            == len(atomic_masses)
+            == len(atomic_numbers)
+            == self.number_of_states
+        ), f"Array length mismatch after filtering in the state setup."
+
         for i in range(0, self.number_of_states):
-
             x = self.partial_densities[i]
-            if x == 0:
-                warnings.warn(f"Trying to initialize state with zero fractional density. Skipping this one!")
-                # remove corresponding element from the list and subtract the number of states to ensure consistency
-                np.delete(self.elements, i)
-                np.delete(self.charge_states, i)
-                self.number_of_states -= 1
-                continue
-
             Z = self.charge_states[i]
 
             assert Z >= 0.0, f"Trying to set the charge state negative. This is not allowed."
@@ -267,7 +282,7 @@ class xDave:
             atomic_number=AN_mean,
             binding_energies=np.array([]),
         )
-        self.ocp_flag = len(states) < 2  # (len(np.unique(atomic_numbers)) < len(states)) and len(states) <= 2
+        self.ocp_flag = len(states) < 2
         return np.array(states), overlord_state
 
     ## ------------------------ ##

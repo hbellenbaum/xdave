@@ -194,15 +194,59 @@ def test_user_defined_binding_energies():
     plt.figure()
     plt.plot(omega_array, bf_tot, label="Tot", c="gray", ls="solid")
     plt.plot(omega_array, bf_i[0], label="H 1+", c="crimson", ls="dashed")
-    plt.plot(omega_array, bf_i[1], label="C 4 +", c="navy", ls="dashed")
-    plt.plot(omega_array, bf_i[2], label="N 4 +", c="green", ls="dashed")
-    plt.plot(omega_array, bf_i[3], label="O 4 +", c="magenta", ls="dashed")
+    plt.plot(omega_array, bf_i[1], label="C 4+", c="navy", ls="dashed")
+    plt.plot(omega_array, bf_i[2], label="N 4+", c="green", ls="dashed")
+    plt.plot(omega_array, bf_i[3], label="O 4+", c="magenta", ls="dashed")
     plt.legend()
     plt.show()
+
+
+def test_state_setup():
+    T = 45  # eV
+    rho = 2 * 1.42  # g/cc
+    partial_densities = np.array([0.0, 0.026362, 0.691133, 0.073270, 0.0, 0.209235])
+    charge_states = np.array([1, 1, 3, 4, 4, 5])
+    elements = np.array(["H", "H", "C", "N", "N", "O"])
+
+    models = ModelOptions(ipd_model="NONE")
+
+    user_defined_inputs = {
+        "ipd": -10,
+        "lfc": 0.1,
+        "ion_core_radii": [1, 1, 1, 1, 1, 1],
+        "csd_parameters": [1, 1, 1, 1, 1, 1],
+        "csd_core_charges": [1, 1, 6, 7, 7, 8],
+        "sec_core_power": 0.1,
+        "srr_sigma_parameter": 1,
+    }
+
+    kernel = xDave(
+        mass_density=rho,
+        electron_temperature=T,
+        ion_temperature=T,
+        elements=elements,
+        partial_densities=partial_densities,
+        charge_states=charge_states,
+        models=models,
+        user_defined_inputs=user_defined_inputs,
+        verbose=True,
+    )
+
+    # print(kernel.number_of_states)
+    # print(kernel.charge_states)
+    # print(kernel.partial_densities)
+    # print(kernel.states[-1].atomic_number)
+
+    print("\n")
+    print(len(kernel.states))
+    print(len(kernel.charge_states))
+    print(len(kernel.partial_densities))
+    print(kernel.number_of_states)
 
 
 if __name__ == "__main__":
     # test_setup()
     # test_be()
     # test_mc_setup()
-    test_user_defined_binding_energies()
+    # test_user_defined_binding_energies()
+    test_state_setup()
