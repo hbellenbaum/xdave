@@ -462,6 +462,8 @@ class xDave:
         bf_i /= J_TO_eV
 
         if self.save_to_json:
+            if self.verbose:
+                print(f"Saving output to: {self.output_file_name}")
             bf_data = {f"species_{i}": row.tolist() for i, row in enumerate(bf_i)}
             result_dict = dict(
                 {
@@ -666,8 +668,36 @@ class xDave:
         if self.enforce_fsum:
             bf *= self._bf_norm(w=w, ff=ff, bf=bf, k=k)
 
+        bf_tot /= J_TO_eV
+        ff_tot /= J_TO_eV
+        ff_i /= J_TO_eV
+        bf_i /= J_TO_eV
         dsf = ff_tot + bf_tot
-        return bf_tot / J_TO_eV, ff_tot / J_TO_eV, dsf / J_TO_eV, ff_i / J_TO_eV, bf_i / J_TO_eV
+
+        if self.save_to_json:
+            if self.verbose:
+                print(f"Saving output to: {self.output_file_name}")
+            bf_data = {f"species_{i}": row.tolist() for i, row in enumerate(bf_i)}
+            result_dict = dict(
+                {
+                    "w": list(w * J_TO_eV),
+                    "lfc": float(lfc),
+                    "ipd": ipd * J_TO_eV,
+                    "ff": list(ff_tot),
+                    "bf": {
+                        "tot": list(bf_tot),
+                        "bf_i": bf_data,
+                    },
+                    "dsf": list(dsf),
+                    "WR": None,
+                    "Sii": None,
+                    "qs": None,  # make sure the screening cloud and form factors are being passed down, same for the static structure factor(s)
+                    "fs": None,
+                }
+            )
+            self.save_dynamic(fname=self.output_file_name, k=k * BOHR_RADIUS, results=result_dict)
+        return bf_tot, ff_tot, dsf, ff_i, bf_i
+        # return bf_tot / J_TO_eV, ff_tot / J_TO_eV, dsf / J_TO_eV, ff_i / J_TO_eV, bf_i / J_TO_eV
 
     def run_elastic(self, k, w):
         k_value = k / BOHR_RADIUS
@@ -830,13 +860,13 @@ class xDave:
                 "electron_temperature": self.overlord_state.electron_temperature * K_TO_eV,
                 "ion_temperature": self.overlord_state.ion_temperature * K_TO_eV,
                 "mass_density": self.overlord_state.mass_density * kg_per_m3_TO_g_per_cm3,
-                "mean_charge_state": self.overlord_state.charge_state,
+                "mean_charge_state": np.float64(self.overlord_state.charge_state),
                 "mean_atomic_number": self.overlord_state.atomic_number,
                 "mean_atomic_mass": self.overlord_state.atomic_mass * kg_TO_amu,
                 "material": {
                     "elements": list(self.elements),
-                    "charge_states": list(self.charge_states),
-                    "partial_densities": list(self.partial_densities),
+                    "charge_states": list(np.float64(self.charge_states)),
+                    "partial_densities": list(np.float64(self.partial_densities)),
                     "binding_energies": {
                         f"species_{i}": list(self.states[i].binding_energies) for i in range(0, self.number_of_states)
                     },
