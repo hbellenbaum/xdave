@@ -591,9 +591,9 @@ class xDave:
             Wr (float): rayleigh weight describing the elastic feature
             beam_energy (float): energy of the probe beam in units of eV
             type (float, optional): specifies the type of SIF, either analytic or USER_DEFINED
-            fwhm (float): defines the full-width-half-maximum of the analytic SIF, only applied if type is analytic
-            sigma_left/right (float): defines the standard deviation of the analytic SIF, only applied if type is "ASYM_GAUSSIAN" or "ASYM_VOIGT"
-            gamma_left/right (float): defines the  of the analytic SIF, only applied if type is "ASYM_VOIGT"
+            fwhm (float): defines the full-width-half-maximum of the analytic SIF, only applied if type is "GAUSSIAN"
+            sigma_left/right (float): defines the width of the analytic SIF, only applied if type is "ASYM_GAUSSIAN" or "ASYM_VOIGT"
+            gamma_left/right (float): defines the wings of the analytic SIF, only applied if type is "ASYM_VOIGT"
             source_energ (array): energy grid corresponding to the source in units of eV
             source (array): source intensity in arbitrary units
 
