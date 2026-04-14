@@ -241,8 +241,8 @@ def laplace(tau, E, wff, wbf):
 
         kernel_wff = np.exp(-tau[i] * E) * wff  # * omega_factor
         kernel_wbf = np.exp(-tau[i] * E) * wbf  # * omega_factor
-        F_wff[i] = np.trapz(kernel_wff, E)  # * omega_new[i]
-        F_wbf[i] = np.trapz(kernel_wbf, E)  # * omega_new[i]
+        F_wff[i] = np.trapezoid(kernel_wff, E)  # * omega_new[i]
+        F_wbf[i] = np.trapezoid(kernel_wbf, E)  # * omega_new[i]
 
     F_tot_inel = F_wff + F_wbf
     return tau, F_tot_inel, F_wff, F_wbf
