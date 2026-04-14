@@ -267,5 +267,5 @@ def test_mermin_ff():
 
 if __name__ == "__main__":
     # test_ff()
-    compare_lfcs()
-    # test_mermin_ff()
+    # compare_lfcs()
+    test_mermin_ff()
