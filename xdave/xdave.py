@@ -324,7 +324,7 @@ class xDave:
         """
         k /= BOHR_RADIUS
         f_sum = k**2 / 2
-        F_tot, F_wff, F_wbf = self.get_itcf(tau=self.tau_array, w=w, ff=ff, bf=bf)
+        _, F_tot, F_wff, F_wbf = self.get_itcf(tau=self.tau_array, w=w, ff=ff, bf=bf)
         dF_ff = np.polyfit(self.tau_array[:3], F_wff[:3], deg=1)[0]
         dF_bf = np.polyfit(self.tau_array[:3], F_wbf[:3], deg=1)[0]
         A = -1 / dF_bf * (f_sum + dF_ff)
@@ -448,11 +448,14 @@ class xDave:
         if self.enforce_fsum:
             if self.verbose:
                 print(f"You are currently enforcing a normalization based on the f-sum rule.")
-            bf_i /= self.overlord_state.Zb
+            for i in range(0, len(self.states)):
+                bf_i[i] /= self.states[i].Zb
+                # bf_i[i] *= self._bf_norm(w=w, ff=ff_tot, bf=bf_i[i], k=k)
             bf_tot /= self.overlord_state.Zb
+            # bf_tot *= self._bf_norm(w=w, ff=ff_tot, bf=bf_tot, k=k)
             ff_i /= self.overlord_state.charge_state
             ff_tot /= self.overlord_state.charge_state
-            rayleigh_weight /= self.overlord_state.charge_state
+            rayleigh_weight /= self.overlord_state.atomic_number
 
         # convert everything to cgs before returning results
         bf_tot /= J_TO_eV
@@ -666,7 +669,16 @@ class xDave:
             bf_i[i] = x * bf_dsf
 
         if self.enforce_fsum:
-            bf *= self._bf_norm(w=w, ff=ff, bf=bf, k=k)
+            if self.verbose:
+                print(f"You are currently enforcing a normalization based on the f-sum rule.")
+            for i in range(0, len(self.states)):
+                bf_i[i] /= self.states[i].Zb
+                # bf_i[i] *= self._bf_norm(w=w, ff=ff_tot, bf=bf_i[i], k=k)
+            bf_tot /= self.overlord_state.Zb
+            # bf_tot *= self._bf_norm(w=w, ff=ff_tot, bf=bf_tot, k=k)
+
+            ff_i /= self.overlord_state.charge_state
+            ff_tot /= self.overlord_state.charge_state
 
         bf_tot /= J_TO_eV
         ff_tot /= J_TO_eV
