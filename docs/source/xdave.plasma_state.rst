@@ -1,7 +1,7 @@
 PlasmaState
 -----------
 
+.. autoclass:: xdave.plasma_state.PlasmaState
+    :members:
 
 
-.. toctree::
-    :maxdepth: 2
