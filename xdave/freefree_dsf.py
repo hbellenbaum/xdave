@@ -74,7 +74,7 @@ class FreeFreeDSF:
 
     def get_collision_frequency(self, k, w, lfc, model):
         """
-        Function to get the collision frequency for a given model.
+        Return the collision frequency for a given model.
 
         Parameters:
             k (float): wave number in units of 1/m
