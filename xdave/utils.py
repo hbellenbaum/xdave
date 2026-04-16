@@ -292,7 +292,7 @@ def get_atomic_data_for_all_elements(elements):
 def get_atomic_mass_for_element(e):
     """
     Load data from atomic data in folder xdave/data.
-    Data taken from the x-ray data booklet.
+    The data is taken from the x-ray data booklet.
 
     Parameters:
         e (str): element abbreviation.
