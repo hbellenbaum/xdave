@@ -690,7 +690,7 @@ class xDave:
     def run_elastic(self, k, w):
         """
 
-        Elastic run function to calculate the Rayleigh weight only for a wave number.
+        Elastic run function to calculate the Rayleigh weight for a single wave number.
 
         Parameters:
             k (float/ array): array or single value of scattering wavenumbers in units of a_B^{-1}
