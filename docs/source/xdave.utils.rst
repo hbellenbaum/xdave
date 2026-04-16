@@ -1,6 +1,6 @@
 
 Util functions
-^^^^^^^^^^^^^^
+==============
 
 .. autofunction:: xdave.utils.calculate_angle
 .. autofunction:: xdave.utils.calculate_q

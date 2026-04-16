@@ -1,7 +1,8 @@
 
 
 Kernel
-^^^^^^
+======
+
 .. autoclass:: xdave.xdave.xDave
 .. autofunction:: xdave.xdave.xDave.get_mean_and_all_states
 .. autofunction:: xdave.xdave.xDave.run
@@ -10,7 +11,7 @@ Kernel
 
 
 Post-processing functions
-+++++++++++++++++++++++++
+==========================
 
 .. autofunction:: xdave.xdave.xDave.convolve_with_sif
 .. autofunction:: xdave.xdave.xDave.get_itcf
