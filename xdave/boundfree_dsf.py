@@ -111,7 +111,6 @@ class BoundFreeDSF:
             # dimensionless scattering wave number
             q = (w_freq - wC) / (SPEED_OF_LIGHT * k)
 
-
             if (c1s > 0) and (Eb[0] <= 0):
 
                 n = 1
@@ -121,9 +120,8 @@ class BoundFreeDSF:
                 xnl = 1.0 / (1.0 + (n * q / (Znl * FINE_STRUCTURE_CONSTANT)) ** 2.0)  # [xnl] =
 
                 Jnl = self._shell_amplitude(Znl, n, l) * xnl**3 / 3
-                
-                J += c1s * Jnl * np.heaviside(E + Eb[0], 1)
 
+                J += c1s * Jnl * np.heaviside(E + Eb[0], 1)
 
             if (c2s > 0) and (Eb[1] <= 0):
 
@@ -134,9 +132,8 @@ class BoundFreeDSF:
                 xnl = 1.0 / (1.0 + (n * q / (Znl * FINE_STRUCTURE_CONSTANT)) ** 2.0)
 
                 Jnl = self._shell_amplitude(Znl, n, l) * 4.0 * (xnl**3.0 / 3.0 - xnl**4.0 + 4.0 * xnl**5.0 / 5.0)
-                
+
                 J += c2s * Jnl * np.heaviside(E + Eb[1], 1)
-                
 
             if (c2p > 0) and ((Eb[2] <= 0) or (Eb[3] <= 0)):
 
@@ -147,7 +144,7 @@ class BoundFreeDSF:
                 xnl = 1.0 / (1.0 + (n * q / (Znl * FINE_STRUCTURE_CONSTANT)) ** 2.0)
 
                 Jnl = self._shell_amplitude(Znl, n, l) * (xnl**4.0 / 4.0 - xnl**5.0 / 5.0)
-                
+
                 # Divide c2p between the states
                 c_12 = 0
                 c_32 = 0
@@ -157,10 +154,9 @@ class BoundFreeDSF:
                     elif (c_32 < 4) and (Eb[3] <= 0):
                         c_32 += 1
                     c2p -= 1
-                
+
                 J += c_12 * Jnl * np.heaviside(E + Eb[2], 1)
                 J += c_32 * Jnl * np.heaviside(E + Eb[3], 1)
-
 
             if (c3s > 0) and (Eb[4] <= 0):
 
@@ -178,7 +174,6 @@ class BoundFreeDSF:
                 )
 
                 J += c3s * Jnl * np.heaviside(E + Eb[4], 1)
-
 
             if (c3p > 0) and ((Eb[5] <= 0) or (Eb[6] <= 0)):
 
@@ -206,7 +201,6 @@ class BoundFreeDSF:
                 J += c_12 * Jnl * np.heaviside(E + Eb[5], 1)
                 J += c_32 * Jnl * np.heaviside(E + Eb[6], 1)
 
-
             if (c4s > 0) and (Eb[9] <= 0):
                 n = 4
                 l = 0
@@ -229,7 +223,6 @@ class BoundFreeDSF:
 
                 J += c4s * Jnl * np.heaviside(E + Eb[9], 1)
 
-
             if (c3d > 0) and ((Eb[7] <= 0) or (Eb[8] <= 0)):
 
                 n = 3
@@ -238,7 +231,6 @@ class BoundFreeDSF:
                 Znl = self.ff_model.calculate_effective_charge_state(ZA, Zb, n, l)
                 xnl = 1.0 / (1.0 + (n * q / (Znl * FINE_STRUCTURE_CONSTANT)) ** 2.0)
                 Jnl = self._shell_amplitude(Znl, n, l) * (xnl**5.0 / 5.0 - xnl**6.0 / 3.0 + xnl**7.0 / 7.0)
-
 
                 # Divide c3d between the states
                 c_32 = 0
@@ -249,10 +241,9 @@ class BoundFreeDSF:
                     elif (c_52 < 6) and (Eb[8] <= 0):
                         c_52 += 1
                     c3d -= 1
-                
+
                 J += c_32 * Jnl * np.heaviside(E + Eb[7], 1)
                 J += c_52 * Jnl * np.heaviside(E + Eb[8], 1)
-            
 
             # Sce = (c1s * Jnl10 + c2s * Jnl20 + c2p * Jnl21) / (SPEED_OF_LIGHT * k)
             Sce = J / (SPEED_OF_LIGHT * k)
@@ -261,7 +252,6 @@ class BoundFreeDSF:
             Sce = np.where(w < 0, np.exp(-E / (BOLTZMANN_CONSTANT * self.state.electron_temperature)) * Sce, Sce)
 
         return Sce
-
 
     def schumacher_ia_correction(self, ZA, Zb, k, w, Eb):
         """
@@ -354,7 +344,6 @@ class BoundFreeDSF:
 
                 J += c2s * (Jnl0 + Jnl1) * np.heaviside(E + Eb[1], 1)
 
-
             if (c2p > 0) and ((Eb[2] <= 0) or (Eb[3] <= 0)):
 
                 n = 2
@@ -385,10 +374,9 @@ class BoundFreeDSF:
                     elif (c_32 < 4) and (Eb[3] <= 0):
                         c_32 += 1
                     c2p -= 1
-                
+
                 J += c_12 * (Jnl0 + Jnl1) * np.heaviside(E + Eb[2], 1)
                 J += c_32 * (Jnl0 + Jnl1) * np.heaviside(E + Eb[3], 1)
-
 
         Sce = J / (SPEED_OF_LIGHT * k)
 
@@ -415,3 +403,14 @@ class BoundFreeDSF:
         exp_term = np.exp(beta * (w - Eb[0])) + 1
         Sce_trunc = Sce * (1 - 1 / exp_term)
         return Sce_trunc
+
+    def fletcher_modified_IA(self, ZA, Zb, k, w, Eb):
+        """
+        Modified impulse approximation specifically designed for carbon.
+        The valence electrons are treated using RPA.
+        K and L-shell contributions are considered separately.
+        """
+        assert ZA == 6, f"You are using a BF model calibrated to carbon."
+
+        Sce_IA = self.schuhmacher_ia(ZA=ZA, Zb=Zb, k=k, w=w, Eb=Eb)
+        return

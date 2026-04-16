@@ -238,7 +238,6 @@ def test_multispecies_bf():
 
 if __name__ == "__main__":
 
-    plt.style.use("~/my_style.mplstyle")
     test_multispecies_bf()
     # test_bf_mcss()
     # test_be_bf()
