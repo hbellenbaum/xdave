@@ -21,6 +21,7 @@ import numpy as np
 import warnings
 
 from scipy import interpolate
+from scipy.special import voigt_profile
 
 import matplotlib.pyplot as plt
 
@@ -740,7 +741,12 @@ class xDave:
     ## --------------------- ##
 
     def convolve_with_sif(
-        self, omega, bf, ff, dsf, Wr, beam_energy, type="GAUSSIAN", fwhm=10, source_energy=None, source=None
+        self, omega, bf, ff, dsf, Wr, beam_energy, 
+        type="GAUSSIAN", 
+        fwhm=10, 
+        sigma_left=None, sigma_right=None,
+        gamma_left=None, gamma_right=None,
+        source_energy=None, source=None
     ):
         """
         Convolve DSF with a source instrument function. You can either specify an analytic type (Gaussian only for now) or input your own
@@ -752,7 +758,9 @@ class xDave:
             Wr (float): rayleigh weight describing the elastic feature
             beam_energy (float): energy of the probe beam in units of eV
             type (float, optional): specifies the type of SIF, either analytic or USER_DEFINED
-            fwhm (float): defines the forward-half-width-maximum of the analytic SIF, only applied if type is analytic
+            fwhm (float): defines the full-width-half-maximum of the analytic SIF, only applied if type is "GAUSSIAN"
+            sigma_left/right (float): defines the width of the analytic SIF, only applied if type is "ASYM_GAUSSIAN" or "ASYM_VOIGT"
+            gamma_left/right (float): defines the wings of the analytic SIF, only applied if type is "ASYM_VOIGT"
             source_energ (array): energy grid corresponding to the source in units of eV
             source (array): source intensity in arbitrary units
 
@@ -769,6 +777,26 @@ class xDave:
             assert fwhm is not None
             sigma = fwhm / 2.355
             source = 1 / np.sqrt(2 * np.pi * sigma**2) * np.exp(-(omega**2) / (2 * sigma**2))
+            source_energy = spec_energy
+        elif type == "ASYM_GAUSSIAN":
+            assert sigma_left is not None
+            assert sigma_right is not None
+            sigma = np.where(omega < 0, sigma_left, sigma_right)
+            norm = np.sqrt(np.pi / 2.0) * (sigma_left + sigma_right) 
+            source = 1 / norm * np.exp(-0.5 * (omega / sigma) ** 2)
+            source_energy = spec_energy
+        elif type == "ASYM_VOIGT":
+            assert sigma_left is not None
+            assert sigma_right is not None
+            assert gamma_left is not None
+            assert gamma_right is not None
+            V0_left = voigt_profile(0, sigma_left, gamma_left)
+            V0_right = voigt_profile(0, sigma_right, gamma_right)
+            A_left = 2 * V0_right / (V0_left + V0_right)
+            A_right = 2 * V0_left / (V0_left + V0_right)
+            V_left = A_left * voigt_profile(omega[omega < 0], sigma_left, gamma_left)
+            V_right = A_right * voigt_profile(omega[omega >= 0], sigma_right, gamma_right)
+            source = np.concatenate((V_left, V_right))
             source_energy = spec_energy
         elif type == "USER_DEFINED":
             assert source_energy is not None, f"If you want to use a user-defined sif, you need to define it."
