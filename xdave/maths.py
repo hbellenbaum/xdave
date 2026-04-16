@@ -5,7 +5,7 @@ from numpy import exp, log1p
 
 def is_iterable(test_variable):
     """
-    Checks whether an object is iterable.
+    Check whether an object is iterable.
     """
     try:
         iter(test_variable)
@@ -16,7 +16,7 @@ def is_iterable(test_variable):
 
 def log1pexp(x):
     """
-    Returns the function log1pexp(x) = \ln(1 + exp(x)) via the expressions recommended by Eq. (10) by Martin M\"achler.
+    Return the function log1pexp(x) = \ln(1 + exp(x)) via the expressions recommended by Eq. (10) by Martin M\"achler.
 
     Parameters:
         x (float scalar/iterable): function argument
