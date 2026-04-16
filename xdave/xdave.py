@@ -871,7 +871,7 @@ class xDave:
 
     def get_static_structure_factors(self, w, ff, bf):
         """
-        Integrate the dynamic structure factor over the whole energy grid to obtain a static structure factor.
+        Integrate the dynamic structure factor over the full energy grid to obtain a static structure factor.
 
         Parameters
             omega (array): energy grid in units of eV
