@@ -364,7 +364,7 @@ def get_binding_energies_from_element(AN, Z):
 def get_emission_lines_for_element(element):
     """
 
-    Reads in emission lines for a given element from the x-ray data booklet.
+    Read emission lines for a given element from the x-ray data booklet.
 
     Parameters:
         element (str): element abbreviation
