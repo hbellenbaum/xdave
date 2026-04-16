@@ -54,7 +54,7 @@ def read_mcss_output(filepath, start_line=0, end_line=96022):
 def calculate_q(angle, energy):
     """
 
-    Get the wave number for a scattering angle and energy.
+    Return the wave number for a scattering angle and energy.
 
     Parameters:
         angle (float): scattering angle in degrees
