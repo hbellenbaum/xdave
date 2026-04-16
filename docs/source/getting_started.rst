@@ -44,7 +44,7 @@ Note that the script ``hydrogen_test.py`` currently will not run because the rel
 The same goes for the comparison test cases against MCSS in the ``test`` folder.
 
 
-A simple example on how to run the code in its default options is given here
+An example on how to run the code in its default options is given here
 
 .. code-block:: python3
 
