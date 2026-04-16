@@ -589,7 +589,7 @@ class xDave:
 
     def run_inelastic(self, w, k=None, angle=None, beam_energy=None):
         """
-        Inelastic run function to ignore the rayleigh weight calculation.
+        Inelastic run function, which ignores the Rayleigh weight.
 
         Parameters:
             k (float/ array): array or single value of scattering wavenumbers in units of a_B^{-1}
