@@ -16,7 +16,15 @@ The packages and versions required are
    scipy >= 1.16.2
    pandas >= 2.2.3
 
-The code can be installed by cloning this repo and using the command:
+``xDAVE`` is currently not registered anywhere. Therefore, to install it, you must build it from source. 
+
+First you must clone the repository
+
+.. code-block:: console
+
+    git clone https://github.com/hbellenbaum/xdave.git
+
+Then you can use ``pip`` to build and install ``xDAVE`` locally: 
 
 .. code-block:: console
 
