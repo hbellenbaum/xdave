@@ -265,7 +265,7 @@ def laplace(tau, E, wff, wbf):
 def get_atomic_data_for_all_elements(elements):
     """
 
-    Get atomic masses and numbers for elements.
+    Return atomic masses and numbers for elements.
 
     Parameters:
         elements (array): string elements
