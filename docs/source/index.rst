@@ -13,7 +13,7 @@ The ``xDAVE`` Documentation
 The code uses the Chihara decomposition [#f1]_ to split the elastic scattering into bound-free/free-bound and free-free scattering contributions.
 It is based on the work by Glenzer et al. [#f2]_ and Gregori et al. [#f3]_, and includes the multi-component description taken from Wuensch et al. [#f4]_.
 
-All suggestions for improvements or additional models are welcome. Submit a merge request or contact the author: h.bellenbaum@hzdr.de .
+Any suggestions for improvements, additional models, or bug reports are very welcome. Feel free to file an issue, submit a merge request, or contact the author: h.bellenbaum@hzdr.de.
 
 .. [#f1]  Chihara, J. (2000). "Interaction of photons with plasmas and liquid metals - photoabsorption and scattering." *J. Phys. Condens. Matter, 12*
 .. [#f2]  Glenzer, S., and Redmer, R. (2009). "X-ray Thomson scattering in high energy density plasmas." *Reviews of Modern Physics, 81*

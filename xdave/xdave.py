@@ -589,7 +589,7 @@ class xDave:
 
     def run_inelastic(self, w, k=None, angle=None, beam_energy=None):
         """
-        Inelastic run function to ignore the rayleigh weight calculation.
+        Inelastic run function, which ignores the Rayleigh weight.
 
         Parameters:
             k (float/ array): array or single value of scattering wavenumbers in units of a_B^{-1}
@@ -690,7 +690,7 @@ class xDave:
     def run_elastic(self, k, w):
         """
 
-        Elastic run function to calculate the Rayleigh weight only for a wave number.
+        Elastic run function to calculate the Rayleigh weight for a single wave number.
 
         Parameters:
             k (float/ array): array or single value of scattering wavenumbers in units of a_B^{-1}
@@ -871,7 +871,7 @@ class xDave:
 
     def get_static_structure_factors(self, w, ff, bf):
         """
-        Integrate the dynamic structure factor over the whole energy grid to obtain a static structure factor.
+        Integrate the dynamic structure factor over the full energy grid to obtain a static structure factor.
 
         Parameters
             omega (array): energy grid in units of eV

@@ -54,7 +54,7 @@ def read_mcss_output(filepath, start_line=0, end_line=96022):
 def calculate_q(angle, energy):
     """
 
-    Get the wave number for a scattering angle and energy.
+    Return the wave number for a scattering angle and energy.
 
     Parameters:
         angle (float): scattering angle in degrees
@@ -265,7 +265,7 @@ def laplace(tau, E, wff, wbf):
 def get_atomic_data_for_all_elements(elements):
     """
 
-    Get atomic masses and numbers for elements.
+    Return atomic masses and numbers for elements.
 
     Parameters:
         elements (array): string elements
@@ -292,7 +292,7 @@ def get_atomic_data_for_all_elements(elements):
 def get_atomic_mass_for_element(e):
     """
     Load data from atomic data in folder xdave/data.
-    Data taken from the x-ray data booklet.
+    The data is taken from the x-ray data booklet.
 
     Parameters:
         e (str): element abbreviation.
@@ -319,7 +319,7 @@ def get_atomic_mass_for_element(e):
 def get_binding_energies_from_element(AN, Z):
     """
 
-    Get the binding energies for a given element.
+    Return the binding energies for a given element.
     For AN up to 12, the values are taken from the FAC code.
     For higher-Z elements, the value is taken from the x-ray data booklet.
 
@@ -364,7 +364,7 @@ def get_binding_energies_from_element(AN, Z):
 def get_emission_lines_for_element(element):
     """
 
-    Reads in emission lines for a given element from the x-ray data booklet.
+    Read emission lines for a given element from the x-ray data booklet.
 
     Parameters:
         element (str): element abbreviation
