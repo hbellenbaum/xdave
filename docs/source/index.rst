@@ -4,7 +4,7 @@
    contain the root `toctree` directive.
 
 ===================================================================
-X-Ray Diagnostics, Analysis, Validation and Evaluation (xDAVE) Code
+The ``xDAVE`` Documentation
 ===================================================================
 
 .. **xDAVE** (X-Ray Diagnostics, Analysis, Validation and Evaluation) 
