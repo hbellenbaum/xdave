@@ -114,7 +114,7 @@ def inverse_electron_screening_length_sqr(ne, Te):
 
 def ipd_debye_hueckel(csd, Zis, ne, ni, Te, Ti):
     """
-    Debye-Hueckel IPD model.
+    Return IDP according to the Debye-Hueckel model.
 
     Parameters:
         csd (array): charge-state distribution
