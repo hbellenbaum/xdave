@@ -319,7 +319,7 @@ def get_atomic_mass_for_element(e):
 def get_binding_energies_from_element(AN, Z):
     """
 
-    Get the binding energies for a given element.
+    Return the binding energies for a given element.
     For AN up to 12, the values are taken from the FAC code.
     For higher-Z elements, the value is taken from the x-ray data booklet.
 
