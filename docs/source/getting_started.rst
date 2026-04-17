@@ -7,14 +7,14 @@ Installation
 
 The code was written using Python (Version 3.12.8) using mostly standard library packages.
 
-The packages and versions required are
+.. The packages and versions required are
 
-.. code-block:: console
+.. .. code-block:: console
 
-   numpy >= 1.26
-   matplotlib >= 3.10
-   scipy >= 1.16.2
-   pandas >= 2.2.3
+..    numpy >= 1.26
+..    matplotlib >= 3.10
+..    scipy >= 1.16.2
+..    pandas >= 2.2.3
 
 ``xDAVE`` is currently not registered anywhere. Therefore, to install it, you must build it from source. 
 
@@ -36,12 +36,7 @@ Examples
 ------------
 
 A test suite is included which can be used for building examples.
-
-The ``examples`` folder contains a few more examples for a simple Be and CH test case.
-These give an overview of how the code can be used to derive dynamic structure factors and a spectrum for a given SIF.
-This also contains an interface to the x-ray tracing code HEART.
-Note that the script ``hydrogen_test.py`` currently will not run because the relevant PIMC files have not been added to the repo.
-The same goes for the comparison test cases against MCSS in the ``test`` folder.
+These include demonstrations of the individual code components and comparisons against ``MCSS``.
 
 
 An example on how to run the code in its default options is given here
@@ -66,7 +61,7 @@ An example on how to run the code in its default options is given here
         output_file_name='./test_output.json'
     )
 
-   w = np.linspace(-1000, 1000, 10000)
+   w = np.linspace(-1000, 1000, 1000)
    bf_tot, ff_tot, dsf, rayleigh_weight, ff_i, bf_i = kernel.run(w=w, angle=75, beam_energy=9.0e3, mode="DYNAMIC")
 
    spec_energy, inelastic, elastic, spectrum = kernel.convolve_with_sif(
@@ -81,6 +76,25 @@ An example on how to run the code in its default options is given here
     )
 
 
+The ``xDAVE`` kernel contains information required for the setup and calculation of the dynamic strucutre factors.
+When initialised, it calculates the mean and individual plasma states required to contain the different bound and free states.
+Outputs are given in terms of the individual components: bound-free (bf), free-free (ff) and the rayleigh weight.
+The DSF output contains the sum of the BF and FF components.
+The variable ``bf_i`` is an array of the bound-freec components of each individual state.
+
+
+
+Unit testing
+-------------
+
+Several unit tests to track changes in the code are included in a separate test suite.
+These can be run with python using the command:
+
+.. code-block:: console
+    
+    python -m pytest tests/
+
+The version tests keep track of any changes made to the models.
 
 .. toctree::
     :maxdepth: 2
