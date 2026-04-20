@@ -27,7 +27,9 @@ class FreeFreeDSF:
     def __init__(self, state: PlasmaState) -> None:
         self.state = state
 
-    def get_dsf(self, k, w, lfc, model="NUMERICAL_RPA", input_collision_frequency=None):
+    def get_dsf(
+        self, k, w, lfc, model="NUMERICAL_RPA", collision_frequency_model="BORN", input_collision_frequency=None
+    ):
         """
         Main function to call the dynamic structure factor for a given model.
         This internally calculates the electron susceptibility and applies a local field correction.
@@ -663,11 +665,12 @@ class FreeFreeDSF:
 
             k = kF * x
             Uee = FOUR_PI * COULOMB_CONSTANT * ELEMENTARY_CHARGE**2 / k**2
-            epsilon_ee_k_omega = 1 - Uee * self.lindhard_pol_func(k=k, w=w)
-            epsilon_ee_k_0 = 1 - Uee * self.lindhard_pol_func(k=k, w=0)
+            epsilon_ee_k_omega = 1 - Uee * self.dandrea_fit(k=k, w=w)
+            epsilon_ee_k_0 = 1 - Uee * self.dandrea_fit(k=k, w=0)
             F = -1.0j * (epsilon_ee_k_omega - epsilon_ee_k_0) / epsilon_ee_k_0**2
-            Siik = 1.0
-            return x**2 * Siik * F.real * j
+            # Siik = 1.0
+            Siik = np.interp(x=k, xp=temp_k, fp=Siis)
+            return x**2 * Siik * F.real * j  # * measure
 
         def imag_integrand(u, w):
             x = np.tan(HALF_PI * u)
@@ -675,11 +678,12 @@ class FreeFreeDSF:
 
             k = kF * x
             Uee = FOUR_PI * COULOMB_CONSTANT * ELEMENTARY_CHARGE**2 / k**2
-            epsilon_ee_k_omega = 1 - Uee * self.lindhard_pol_func(k=k, w=w)
-            epsilon_ee_k_0 = 1 - Uee * self.lindhard_pol_func(k=k, w=0)
+            epsilon_ee_k_omega = 1 - Uee * self.dandrea_fit(k=k, w=w)
+            epsilon_ee_k_0 = 1 - Uee * self.dandrea_fit(k=k, w=0)
             F = -1.0j * (epsilon_ee_k_omega - epsilon_ee_k_0) / epsilon_ee_k_0**2
-            Siik = 1.0
-            return x**2 * Siik * F.imag * j
+            # Siik = 1.0
+            Siik = np.interp(x=k, xp=temp_k, fp=Siis)
+            return x**2 * Siik * F.imag * j  # * measure
 
         real_coll_freq = col0 * integrate.quad_vec(real_integrand, 0, 1, args=(w,))[0]
         imag_coll_freq = col0 * integrate.quad_vec(imag_integrand, 0, 1, args=(w,))[0]

@@ -132,6 +132,7 @@ def test_ff():
     theta = 1
     rho, Te = get_rho_T_from_rs_theta(rs=rs, theta=theta)
     ks = np.array((0.5, 1.0, 2.0, 4.0)) / BOHR_RADIUS  # 0.5, 1.0, 2.0, 4.0
+    angles = calculate_angle(q=ks * BOHR_RADIUS, energy=9.0e3)
     rho *= g_per_cm3_TO_kg_per_m3
     Te *= eV_TO_K
     # Te = 200  #
@@ -313,8 +314,59 @@ def test_mermin_ff():
     # fig.savefig(f"ff_test_mermin.pdf", dpi=200)
 
 
+def test_born_mermin():
+    THIS_DIR = os.path.dirname(__file__)
+    rs = 2
+    theta = 1
+    rho, Te = get_rho_T_from_rs_theta(rs=rs, theta=theta)
+    ks = np.array((0.5, 1.0, 2.0, 4.0)) / BOHR_RADIUS  # 0.5, 1.0, 2.0, 4.0
+    angles = calculate_angle(q=ks * BOHR_RADIUS, energy=9.0e3)
+    rho *= g_per_cm3_TO_kg_per_m3
+    Te *= eV_TO_K
+    charge_state = 1.0
+    atomic_mass = 1.0
+    atomic_number = 1.0
+    lfc = 0.0
+
+    w = np.linspace(-100, 500, 500) * eV_TO_J
+    state = PlasmaState(
+        electron_temperature=Te,
+        ion_temperature=Te,
+        mass_density=rho,
+        charge_state=charge_state,
+        binding_energies=None,
+        atomic_mass=atomic_mass,
+        atomic_number=atomic_number,
+    )
+
+    fig, axes = plt.subplots(1, 1, figsize=(14, 8))
+    colors = ["magenta", "crimson", "orange", "dodgerblue", "lightgreen", "lightgray", "yellow", "cyan"]
+
+    mcss_fn_name = os.path.join(THIS_DIR, f"comparison_data/mcss_comparisons/born_mermin/mcss_born_mermin_test_angle=")
+
+    for i in range(0, len(angles)):
+        c = colors[i]
+        angle = angles[i]
+        k = ks[i]
+        print(f"Angle = {angle}")
+        fn = mcss_fn_name + f"{angle:.0f}.csv"
+        dat = np.genfromtxt(fn, skip_header=1, delimiter=",")
+        axes.plot(dat[:, 0], dat[:, 3], label=f"MCSS: angle={angle:.0f}", c=c, ls="solid", alpha=0.7)
+
+        kernel = FreeFreeDSF(state=state)
+        dsfs_born_mermin = kernel.get_dsf(k=k, w=w, lfc=lfc, model="MERMIN", collision_frequency_model="BORN")
+        axes.plot(w * J_TO_eV, dsfs_born_mermin / J_TO_eV, label=f"BM: angle={angle:.0f}", c=c, ls=":")
+
+    axes.legend()
+    axes.set_xlim(-100, 500)
+    axes.set_xlabel(r"$\omega$ [eV]")
+    axes.set_ylabel(r"DSF [1/eV]")
+    plt.show()
+
+
 if __name__ == "__main__":
     test_ff()
-    test_lindard_ff()
+    test_born_mermin()
+    # test_lindard_ff()
     # compare_lfcs()
     # test_mermin_ff()
