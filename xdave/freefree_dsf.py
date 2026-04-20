@@ -140,7 +140,7 @@ class FreeFreeDSF:
         """
         if model == "LINDHARD":
             warnings.warn(f"Lindhard model currently not working. Try something else.")
-            susceptibility_func = self.lindhard_pol_func_dc(k=k, w=w)
+            susceptibility_func = self.lindhard_pol_func(k=k, w=w)
         elif model == "DANDREA_FIT":
             susceptibility_func = self.dandrea_fit(k=k, w=w)
         elif model == "NUMERICAL":
