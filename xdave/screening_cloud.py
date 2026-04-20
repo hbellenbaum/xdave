@@ -123,7 +123,7 @@ class ScreeningCloud:
 
     def _finite_wavelength_screening_full(self, k, lfc, Uee, Uei):
 
-        pol_func = FreeFreeDSF(state=self.overlord_state).dandrea_fit(k=k, omega=0.0).real
+        pol_func = FreeFreeDSF(state=self.overlord_state).dandrea_fit(k=k, w=0.0).real
         screening_length = -(k**2) * Uee * pol_func
         ratio = Uei / Uee
         screening_cloud = -ratio * screening_length / (k**2 + (1 - lfc) * screening_length)
