@@ -92,6 +92,19 @@ class ScreeningCloud:
         return screening_cloud
 
     def _debye_huckel_screening_full(self, k, lfc, Uee, Uei):
+        """
+        Debye-Hueckel screening model according to Eqn. (6) in Gericke et al., Phys. Rev. E 81 (2010).
+
+        Parameters:
+            k (float/array): wave number in units of 1/m
+            lfc (float/array): local field correction, dimensionless
+            screening_model (str): option to control the screening model
+            ee_potential(str): option to control the electron-electron potential model
+            ei_potential (str): option to control the electron-ion potential model
+
+        Returns:
+            float/array: screening cloud depending on the k-input type
+        """
         kappa_e_full = self.overlord_state.screening_length(
             mass=ELECTRON_MASS,
             charge=1,

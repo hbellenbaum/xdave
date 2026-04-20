@@ -6,7 +6,7 @@ from xdave.unit_conversions import (
     K_TO_eV,
 )
 from xdave.ipd import get_ipd
-from xdave import PlasmaState
+from xdave import PlasmaState, xDave, ModelOptions
 
 import numpy as np
 import matplotlib.pyplot as plt
@@ -16,6 +16,7 @@ import os
 THIS_DIR = os.path.dirname(__file__)
 
 # TODO(HB): find a better test!
+# plt.style.use("~/Desktop/resources/plotting/poster.mplstyle")
 
 
 def test_CrowleyFig1():
@@ -47,12 +48,21 @@ def test_CrowleyFig1():
             atomic_number=AN,
             binding_energies=None,
         )
-        ipds_sp.append(get_ipd(state=state, model="STEWART_PYATT") * J_TO_eV)
-        ipds_ek.append(get_ipd(state=state, model="ECKER_KROLL") * J_TO_eV)
-        ipds_crowley.append(get_ipd(state=state, model="CROWLEY") * J_TO_eV)
-        ipds_is.append(get_ipd(state=state, model="ION_SPHERE") * J_TO_eV)
+        kernel = xDave(
+            electron_temperature=Te,
+            mass_density=rho,
+            ion_temperature=Te,
+            elements=np.array(["Al"]),
+            partial_densities=np.array([1.0]),
+            charge_states=np.array([Zi]),
+            models=ModelOptions(),
+        )
+        ipds_sp.append(get_ipd(plasma=kernel, state=state, model="STEWART_PYATT") * J_TO_eV)
+        ipds_ek.append(get_ipd(plasma=kernel, state=state, model="ECKER_KROLL") * J_TO_eV)
+        ipds_crowley.append(get_ipd(plasma=kernel, state=state, model="CROWLEY") * J_TO_eV)
+        ipds_is.append(get_ipd(plasma=kernel, state=state, model="ION_SPHERE") * J_TO_eV)
 
-    data_path = "tests/comparison_data/ipd/"
+    data_path = "examples/comparison_data/ipd/"
     sp_data = np.genfromtxt(data_path + f"Crowley2014_Fig1_SP.csv", delimiter=",")
     ek_data = np.genfromtxt(data_path + f"Crowley2014_Fig1_EK.csv", delimiter=",")
     crowley_data = np.genfromtxt(data_path + f"Crowley2014_Fig1_Crowley.csv", delimiter=",")
@@ -60,13 +70,13 @@ def test_CrowleyFig1():
 
     plt.figure(figsize=(14, 10))
     plt.plot(Zis, ipds_sp, label="SP", ls="-.", c="navy")
-    plt.scatter(AN - sp_data[:, 0], sp_data[:, 1], marker="x", c="navy", label=f"Crowley Fig 1: SP")
+    plt.scatter(sp_data[:, 0], sp_data[:, 1], marker="x", c="navy", label=f"Crowley Fig 1: SP")
     plt.plot(Zis, ipds_ek, label="EK", ls="-.", c="crimson")
-    plt.scatter(AN - ek_data[:, 0], ek_data[:, 1], marker="<", c="crimson", label=f"Crowley Fig 1: EK")
+    plt.scatter(ek_data[:, 0], ek_data[:, 1], marker="<", c="crimson", label=f"Crowley Fig 1: EK")
     plt.plot(Zis, ipds_crowley, label="Crowley", ls="-.", c="green")
-    plt.scatter(AN - crowley_data[:, 0], crowley_data[:, 1], marker="*", c="green", label=f"Crowley Fig 1: Crowley")
+    plt.scatter(crowley_data[:, 0], crowley_data[:, 1], marker="*", c="green", label=f"Crowley Fig 1: Crowley")
     plt.plot(Zis, ipds_is, label="IS", ls="-.", c="orange")
-    plt.scatter(AN - exp_data[:, 0], exp_data[:, 1], marker="o", c="black", label=f"Crowley Fig 1: Exp")
+    plt.scatter(exp_data[:, 0], exp_data[:, 1], marker="o", c="black", label=f"Crowley Fig 1: Exp")
     plt.xlabel(r"$Z_i$")
     plt.ylabel(r"$\Delta_{IPD}$ [eV]")
     plt.title(f"Al IPD calculations: T={Te * K_TO_eV:.2f} eV, rho={rho * kg_per_m3_TO_g_per_cm3:.2f} g/cc")
@@ -135,5 +145,5 @@ def test_version():
 
 if __name__ == "__main__":
     # compare_all()
-    test_version()
-    # test_CrowleyFig1()
+    # test_version()
+    test_CrowleyFig1()

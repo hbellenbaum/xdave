@@ -10,7 +10,7 @@ import matplotlib.pyplot as plt
 
 import os
 
-plt.style.use("~/my_style.mplstyle")
+# plt.style.use("~/my_style.mplstyle")
 
 
 def compare_lfcs():
@@ -127,6 +127,7 @@ def test_lindard_ff():
 
 
 def test_ff():
+    plt.style.use("~/Desktop/resources/plotting/poster.mplstyle")
 
     rs = 2
     theta = 1
@@ -175,17 +176,17 @@ def test_ff():
             dat_j[:, 0] * RYDBERG_TO_eV,
             dat_j[:, 4] / RYDBERG_TO_eV,
             ls=":",
-            label=f"Jan: q={q}",
+            label=f"Comparison: k={q}",
             marker="*",
             markevery=50,
             c=cs,
         )
 
-        axes.plot(omega_new * J_TO_eV, dsfs2_new / J_TO_eV, label=f"RPA Fit: q={q}", c=cs, ls="-.")
-        axes.plot(omega_new * J_TO_eV, dsfs_new / J_TO_eV, label=f"RPA: q={q}", c=cs, ls="solid")
+        axes.plot(omega_new * J_TO_eV, dsfs2_new / J_TO_eV, label=f"RPA Fit: k={q}", c=cs, ls="-.")
+        axes.plot(omega_new * J_TO_eV, dsfs_new / J_TO_eV, label=f"RPA: k={q}", c=cs, ls="solid")
 
     axes.set_xlabel(r"$\omega$ [eV]")
-    axes.set_ylabel(r"DSF [1/eV]")
+    axes.set_ylabel(r"$S_{ee}^{ff}(k,\omega)$ [1/eV]")
     axes.legend()
     plt.tight_layout()
     plt.show()

@@ -4,23 +4,21 @@ from .utils import get_atomic_data_for_all_elements
 from .constants import *
 from .unit_conversions import *
 
-# from fermi_integrals import fermi_integral
-
-# NOTE(TG): Would recommend replacing this with Antia fits. At high densities fdi becomes
-#           extremely slow, if it even is able to reach an answer.
-# NOTE(HB): Noted! But I am being lazy.
-# NOTE(HB): 2025-11-24 done
 from .fermi_integrals import fdi
 
 import numpy as np
 
 from typing import TYPE_CHECKING
+
 if TYPE_CHECKING:
     from .plasma_state import PlasmaState
     from .xdave import xDave
 
+
 # TODO(HB): this should really be a class as well
-def get_ipd(plasma: xDave, state: PlasmaState, model: str, user_defined_ipd: float=0.0, crowley_force_constant: float=0.9):
+def get_ipd(
+    plasma: xDave, state: PlasmaState, model: str, user_defined_ipd: float = 0.0, crowley_force_constant: float = 0.9
+):
     """
     Function to calculate the IPD for a given model for a given model.
 
@@ -32,7 +30,7 @@ def get_ipd(plasma: xDave, state: PlasmaState, model: str, user_defined_ipd: flo
     Returns:
         float: calculated IPD in units of J
     """
-    
+
     ne = state.free_electron_number_density
     ni = state.ion_number_density
     Te = state.electron_temperature
@@ -41,7 +39,6 @@ def get_ipd(plasma: xDave, state: PlasmaState, model: str, user_defined_ipd: flo
     Zis = plasma.charge_states
     csd = plasma.partial_densities
     _, Zns = get_atomic_data_for_all_elements(plasma.elements)
-
 
     if model == "STEWART_PYATT":
         return ipd_stewart_pyatt(csd=csd, Zis=Zis, ne=ne, ni=ni, Te=Te, Ti=Ti)
@@ -116,6 +113,20 @@ def inverse_electron_screening_length_sqr(ne, Te):
 
 
 def ipd_debye_hueckel(csd, Zis, ne, ni, Te, Ti):
+    """
+    Return IDP according to the Debye-Hueckel model.
+
+    Parameters:
+        csd (array): charge-state distribution
+        Zis (array): charge states
+        ne (float): free electron number density in m^{-3}
+        ni (float): ion number density in m^{-3}
+        Te (float): electron temperature in K
+        Ti (float): ion temperature in K
+
+    Returns:
+        float: calculated IPD in units of J
+    """
 
     Zmean = ne / ni
     Zstar = np.sum(Zis**2 * csd) / Zmean
@@ -132,6 +143,17 @@ def ipd_debye_hueckel(csd, Zis, ne, ni, Te, Ti):
 def ipd_ion_sphere(csd, Zis, ne, ni):
     """
     Ion sphere IPD
+
+    Parameters:
+        csd (array): charge-state distribution
+        Zis (array): charge states
+        ne (float): free electron number density in m^{-3}
+        ni (float): ion number density in m^{-3}
+        Te (float): electron temperature in K
+        Ti (float): ion temperature in K
+
+    Returns:
+        float: calculated IPD in units of J
     """
     # NOTE(TG): Ion sphere model chosen should match the SP model, since it's what people will expect.
     #           Also added the missing (Z+1) dependence in the IPD and the ion sphere radius
@@ -145,12 +167,23 @@ def ipd_ion_sphere(csd, Zis, ne, ni):
 def ipd_stewart_pyatt(csd, Zis, ne, ni, Te, Ti):
     """
     Corrected Stewart-Pyatt model [Roepke (2019)]
+
+    Parameters:
+        csd (array): charge-state distribution
+        Zis (array): charge states
+        ne (float): free electron number density in m^{-3}
+        ni (float): ion number density in m^{-3}
+        Te (float): electron temperature in K
+        Ti (float): ion temperature in K
+
+    Returns:
+        float: calculated IPD in units of J
     """
 
     # Ion sphere radius depends on the charge state you're changing into
     r_IS = (3 * (Zis + 1) / (FOUR_PI * ne)) ** (1 / 3)
-    
-    Zmean = ne/ni
+
+    Zmean = ne / ni
     Zstar = np.sum(Zis**2 * csd) / Zmean
 
     kappa_sqr = inverse_electron_screening_length_sqr(ne, Te)
@@ -167,6 +200,17 @@ def ipd_stewart_pyatt(csd, Zis, ne, ni, Te, Ti):
 def ipd_ecker_kroell(csd, Zis, ne, ni, Te, Ti, Zns):
     """
     Original Ecker-Kroell model
+
+    Parameters:
+        csd (array): charge-state distribution
+        Zis (array): charge states
+        ne (float): free electron number density in m^{-3}
+        ni (float): ion number density in m^{-3}
+        Te (float): electron temperature in K
+        Ti (float): ion temperature in K
+
+    Returns:
+        float: calculated IPD in units of J
     """
 
     Zmean = ne / ni
@@ -214,24 +258,24 @@ def X_term(a, Y):
     X = np.full(Y.shape, np.nan, dtype=np.float64)
     Y_m13 = np.zeros_like(Y)
 
-    good_Y = (Y!=0)
-    Y_m13[good_Y] = Y[good_Y]**(-1/3)
-    
+    good_Y = Y != 0
+    Y_m13[good_Y] = Y[good_Y] ** (-1 / 3)
+
     f_aY = f_term(a, Y_m13)
 
     aY = a * Y_m13
     B = Y_m13**2 * (1 - a**2) / f_aY
 
     sol1 = f_aY - B - aY
-    sol2 = 0.5 * ( (1 - SQRT_THREE * 1j) * f_aY + (1 + SQRT_THREE * 1j) * B) - aY
+    sol2 = 0.5 * ((1 - SQRT_THREE * 1j) * f_aY + (1 + SQRT_THREE * 1j) * B) - aY
     sol3 = 0.5 * (-(1 + SQRT_THREE * 1j) * f_aY + (1 - SQRT_THREE * 1j) * B) - aY
 
     unsolved = np.full(X.shape, True)
     for sol in [sol1, sol2, sol3]:
-        accept = ~((np.abs(sol.imag)>1e-12)|(sol.real<0))
-        X[accept&unsolved] = sol1.real[accept&unsolved]
-        unsolved[accept&unsolved] = False
-    
+        accept = ~((np.abs(sol.imag) > 1e-12) | (sol.real < 0))
+        X[accept & unsolved] = sol1.real[accept & unsolved]
+        unsolved[accept & unsolved] = False
+
     return X
 
 
@@ -247,7 +291,18 @@ def g(L):
 
 def ipd_crowley(csd, Zis, ne, ni, Te, Ti, ForceConst):
     """
-    Crowley IPD model. For now, contains shift from the Pauli blocking term
+    Crowley IPD model. For now, contains shift from the Pauli blocking term.
+
+    Parameters:
+        csd (array): charge-state distribution
+        Zis (array): charge states
+        ne (float): free electron number density in m^{-3}
+        ni (float): ion number density in m^{-3}
+        Te (float): electron temperature in K
+        Ti (float): ion temperature in K
+
+    Returns:
+        float: calculated IPD in units of J
     """
 
     kTe = BOLTZMANN_CONSTANT * Te
@@ -264,7 +319,7 @@ def ipd_crowley(csd, Zis, ne, ni, Te, Ti, ForceConst):
     Im0p5 = fdi(j=-0.5, eta=eta_e, normalize=False)
 
     # Plasma (or perturber) effective charge
-    Zmean = ne/ni
+    Zmean = ne / ni
     Zstar = np.sum(Zis**2 * csd) / Zmean
 
     # Plasma screening length - ion's use Debye, electrons use Thomas-Fermi,
@@ -298,11 +353,10 @@ def ipd_crowley(csd, Zis, ne, ni, Te, Ti, ForceConst):
     # Polarized Lambda terms
     Lambda_0 *= pol_0
     Lambda_p *= pol_p
-    
 
     # h and g term
     h0_p_g0 = h(Lambda_0) - g(Lambda_0)
-    h0_p_g0[Zis==0] = 0 # uncomment for charge state distribution
+    h0_p_g0[Zis == 0] = 0  # uncomment for charge state distribution
     hp = h(Lambda_p)
 
     # Fermi surface adjustment term for Pauli blocking
@@ -312,6 +366,6 @@ def ipd_crowley(csd, Zis, ne, ni, Te, Ti, ForceConst):
         kTe_w = 0.0
 
     # Spectroscopic IPD
-    ipd_shift = kTi/(2*Zstar) * ( hp + np.nansum(csd*Zis * h0_p_g0)/(2 * Zmean) ) - kTe_w
+    ipd_shift = kTi / (2 * Zstar) * (hp + np.nansum(csd * Zis * h0_p_g0) / (2 * Zmean)) - kTe_w
 
     return -ipd_shift
