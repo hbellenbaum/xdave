@@ -97,9 +97,9 @@ class OCPRayleighWeight:
         rayleigh_weight = (fs + qs) * Siik
 
         if return_full:
-            return k, Siik, rayleigh_weight, qs, fs
+            return k, Siik, np.array([rayleigh_weight]), qs, fs
         else:
-            return rayleigh_weight
+            return np.array([rayleigh_weight])
 
 
 class MCPRayleighWeight:

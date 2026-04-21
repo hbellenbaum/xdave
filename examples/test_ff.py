@@ -1,22 +1,140 @@
 from xdave.constants import BOHR_RADIUS, ELECTRON_MASS, DIRAC_CONSTANT
 from xdave.utils import calculate_angle, calculate_q
 from xdave.unit_conversions import g_per_cm3_TO_kg_per_m3, eV_TO_K, eV_TO_J, RYDBERG_TO_eV, J_TO_eV
-from xdave.plasma_state import PlasmaState, get_rho_T_from_rs_theta
-from xdave.models import ModelOptions
+from xdave.plasma_state import PlasmaState, get_rho_T_from_rs_theta, get_fractions_from_Z_partial
 from xdave.freefree_dsf import FreeFreeDSF
+from xdave import ModelOptions, xDave
 
 import numpy as np
 import matplotlib.pyplot as plt
 
 import os
 
+# plt.style.use("~/my_style.mplstyle")
+
+
+def compare_lfcs():
+    T = 100  # eV
+    rho = 2 * 1.845  # two times solid density [g/cc]
+    Z_C = 4.5
+
+    xH = 0.5
+    ZH = 1.0
+
+    Zmin, Zmax, xmin, xmax = get_fractions_from_Z_partial(Z=Z_C, x0=xH)
+
+    models = ModelOptions(
+        ei_potential="YUKAWA",
+        ii_potential="YUKAWA",
+        ee_potential="COULOMB",
+        polarisation_model="NUMERICAL",
+        sf_model="HNC",
+        lfc_model="NONE",
+        ipd_model="STEWART_PYATT",
+        bf_model="SCHUMACHER",
+        screening_model="FINITE_WAVELENGTH",
+    )
+
+    kernel = xDave(
+        mass_density=rho,
+        electron_temperature=T,
+        ion_temperature=T,
+        elements=np.array(["H", "C", "C"]),
+        charge_states=np.array([ZH, Zmin, Zmax]),
+        partial_densities=np.array([xH, xmin, xmax]),
+        models=models,
+        enforce_fsum=False,
+        user_defined_inputs=None,
+        verbose=True,
+        hnc_max_iterations=10000,
+        hnc_mix_fraction=0.99,
+        hnc_delta=1.0e-7,
+    )
+
+    plt.figure()
+
+    w = np.linspace(-1000, 1500, 10000)
+    bf_tot, ff_tot, dsf, rayleigh_weight, ff_i, bf_i = kernel.run(w=w, angle=15, beam_energy=9.0e3, mode="DYNAMIC")
+    plt.plot(w, ff_tot, label="RPA", ls="solid", c="navy")
+
+    # kernel.models.lfc_model = "DORNHEIM_ESA"
+    # bf_tot, ff_tot, dsf, rayleigh_weight, ff_i, bf_i = kernel.run(w=w, angle=20, beam_energy=9.0e3, mode="DYNAMIC")
+    # plt.plot(w, ff_tot, label="ESA", ls="-.", c="crimson")
+
+    kernel.models.lfc_model = "FARID"
+    bf_tot, ff_tot, dsf, rayleigh_weight, ff_i, bf_i = kernel.run(w=w, angle=15, beam_energy=9.0e3, mode="DYNAMIC")
+    plt.plot(w, ff_tot, label="RPA + LFC", ls="-.", c="red")
+
+    # kernel.models.polarisation_model = "MERMIN"
+    # bf_tot, ff_tot, dsf, rayleigh_weight, ff_i, bf_i = kernel.run(w=w, angle=20, beam_energy=9.0e3, mode="DYNAMIC")
+    # plt.plot(w, ff_tot, label="Interp", ls="-.", c="green")
+
+    plt.legend()
+    plt.xlabel(r"$\omega$ [eV]")
+    plt.ylabel(r"$S^{ff} (k,\omega)$ [1/eV]")
+    plt.xlim(-140, 160)
+    plt.tight_layout()
+    plt.savefig("ff_example.pdf", dpi=200)
+    # plt.show()
+
+
+def test_lindard_ff():
+    rs = 2
+    theta = 1
+    rho, Te = get_rho_T_from_rs_theta(rs=rs, theta=theta)
+    ks = np.array((0.5, 1.0, 2.0, 4.0)) / BOHR_RADIUS  # 0.5, 1.0, 2.0, 4.0
+    # ks = np.array((0.5,)) / BOHR_RADIUS  # 0.5, 1.0, 2.0, 4.0
+    rho *= g_per_cm3_TO_kg_per_m3
+    Te *= eV_TO_K
+    # Te = 200  #
+    charge_state = 1.0
+    atomic_mass = 1.0
+    atomic_number = 1.0
+    lfc = 0.0
+
+    omega_array = np.linspace(-100, 100, 5000) * eV_TO_J
+    state = PlasmaState(
+        electron_temperature=Te,
+        ion_temperature=Te,
+        mass_density=rho,
+        charge_state=charge_state,
+        binding_energies=None,
+        atomic_mass=atomic_mass,
+        atomic_number=atomic_number,
+    )
+
+    fig, axes = plt.subplots(1, 1, figsize=(14, 8))
+    colors = ["magenta", "crimson", "orange", "dodgerblue", "lightgreen", "lightgray", "yellow", "cyan"]
+
+    for k, cs in zip(ks, colors):
+        dsfs = np.zeros_like(omega_array)
+        dsfs2 = np.zeros_like(omega_array)
+        q = k * BOHR_RADIUS
+        w = omega_array
+        kernel = FreeFreeDSF(state=state)
+        dsfs = kernel.get_dsf(k=k, w=w, lfc=lfc, model="NUMERICAL")
+        dsfs_lindhard = kernel.get_dsf(k=k, w=w, lfc=lfc, model="LINDHARD")
+
+        idx = np.argwhere(np.isnan(dsfs))
+        dsfs_new = np.delete(dsfs, idx)
+        dsfs_lindhard_new = np.delete(dsfs_lindhard, idx)
+        omega_new = np.delete(omega_array, idx)
+        axes.plot(omega_new * J_TO_eV, dsfs_lindhard_new / J_TO_eV, label=f"Lindhard: q={q}", c=cs, ls="-.")
+        axes.plot(omega_new * J_TO_eV, dsfs_new / J_TO_eV, label=f"RPA: q={q}", c=cs, ls="solid")
+
+    plt.legend()
+    plt.show()
+
 
 def test_ff():
+    # plt.style.use("~/Desktop/resources/plotting/poster.mplstyle")
+    THIS_DIR = os.path.dirname(__file__)
 
     rs = 2
     theta = 1
     rho, Te = get_rho_T_from_rs_theta(rs=rs, theta=theta)
     ks = np.array((0.5, 1.0, 2.0, 4.0)) / BOHR_RADIUS  # 0.5, 1.0, 2.0, 4.0
+    angles = calculate_angle(q=ks * BOHR_RADIUS, energy=9.0e3)
     rho *= g_per_cm3_TO_kg_per_m3
     Te *= eV_TO_K
     # Te = 200  #
@@ -53,23 +171,23 @@ def test_ff():
         dsfs2_new = np.delete(dsfs2, idx)
         omega_new = np.delete(omega_array, idx)
 
-        fname = f"tests/comparison_data/ff_dsf/4hannah_rs_{int(rs)}_theta_{int(theta)}_{q}.txt"
+        fname = f"{THIS_DIR}/comparison_data/ff_dsf/4hannah_rs_{int(rs)}_theta_{int(theta)}_{q}.txt"
         dat_j = np.genfromtxt(fname=fname, skip_header=22)
         axes.plot(
             dat_j[:, 0] * RYDBERG_TO_eV,
             dat_j[:, 4] / RYDBERG_TO_eV,
             ls=":",
-            label=f"Jan: q={q}",
+            label=f"Comparison: k={q}",
             marker="*",
             markevery=50,
             c=cs,
         )
 
-        axes.plot(omega_new * J_TO_eV, dsfs2_new / J_TO_eV, label=f"RPA Fit: q={q}", c=cs, ls="-.")
-        axes.plot(omega_new * J_TO_eV, dsfs_new / J_TO_eV, label=f"RPA: q={q}", c=cs, ls="solid")
+        axes.plot(omega_new * J_TO_eV, dsfs2_new / J_TO_eV, label=f"RPA Fit: k={q}", c=cs, ls="-.")
+        axes.plot(omega_new * J_TO_eV, dsfs_new / J_TO_eV, label=f"RPA: k={q}", c=cs, ls="solid")
 
     axes.set_xlabel(r"$\omega$ [eV]")
-    axes.set_ylabel(r"DSF [1/eV]")
+    axes.set_ylabel(r"$S_{ee}^{ff}(k,\omega)$ [1/eV]")
     axes.legend()
     plt.tight_layout()
     plt.show()
@@ -91,19 +209,24 @@ def test_ff():
 
 
 def test_mermin_ff():
-    rs = 2
-    theta = 1
-    rho, Te = get_rho_T_from_rs_theta(rs=rs, theta=theta)
-    ks = np.array((2.0,)) / BOHR_RADIUS  # 0.5, 1.0, 2.0, 4.0
-    rho *= g_per_cm3_TO_kg_per_m3
-    Te *= eV_TO_K
+    # rs = 2
+    # theta = 1
+    # rho, Te = get_rho_T_from_rs_theta(rs=rs, theta=theta)
+    angles = np.array([40, 120])
+    qs = calculate_q(angle=angles, energy=3e3)
+    ks = qs / BOHR_RADIUS  # np.array((2.0,)) / BOHR_RADIUS  # 0.5, 1.0, 2.0, 4.0
+    # rho *= g_per_cm3_TO_kg_per_m3
+    # Te *= eV_TO_K
     # Te = 200  #
-    charge_state = 1.0
-    atomic_mass = 1.0
-    atomic_number = 1.0
+    # charge_state = 1.0
+    atomic_mass = 13.0
+    atomic_number = 13.0
     lfc = 0.0
+    rho = 1.85 * g_per_cm3_TO_kg_per_m3
+    Te = 12 * eV_TO_K
+    charge_state = 2.45
 
-    omega_array = np.linspace(-1000, 1250, 500) * eV_TO_J
+    omega_array = np.linspace(-50, 50, 500) * eV_TO_J
     state = PlasmaState(
         electron_temperature=Te,
         ion_temperature=Te,
@@ -114,59 +237,138 @@ def test_mermin_ff():
         atomic_number=atomic_number,
     )
 
-    fig, axes = plt.subplots(1, 2, figsize=(14, 8))
+    fig, axes = plt.subplots(1, 3, figsize=(14, 8))
     colors = ["magenta", "crimson", "orange", "dodgerblue", "lightgreen", "lightgray", "yellow", "cyan"]
 
     for k, cs in zip(ks, colors):
         omega_p = state.plasma_frequency(-1, state.free_electron_number_density, ELECTRON_MASS) * DIRAC_CONSTANT
-        mu_ei = 0.5 * omega_p * (1.0 + 1.0j)
+        # mu_ei = 1.5 * omega_p * (1.0 + 1.0j)
+        input_collision_frequency = 0.5
         q = k * BOHR_RADIUS
         w = omega_array
-        kF = state.fermi_wave_number(state.free_electron_number_density)  # 1/m
-        EF = state.fermi_energy(state.free_electron_number_density, ELECTRON_MASS)  # J
-        vF = DIRAC_CONSTANT * kF / ELECTRON_MASS  # m/s
-        u = w / (k * vF * DIRAC_CONSTANT)  # dimensionless
-        u_mermin = (w + 1.0j * mu_ei) / (k * vF * DIRAC_CONSTANT)
-        z = k / (2 * kF)  # dimensionless
+        # kF = state.fermi_wave_number(state.free_electron_number_density)  # 1/m
+        # EF = state.fermi_energy(state.free_electron_number_density, ELECTRON_MASS)  # J
+        # vF = DIRAC_CONSTANT * kF / ELECTRON_MASS  # m/s
+        # u = w / (k * vF * DIRAC_CONSTANT)  # dimensionless
+        # u_mermin = (w + 1.0j * mu_ei) / (k * vF * DIRAC_CONSTANT)
+        # z = k / (2 * kF)  # dimensionless
         kernel = FreeFreeDSF(state=state)
+
+        nu_ei = 0.5  # [w_p
         dsfs_rpa = kernel.get_dsf(k=k, w=w, lfc=lfc, model="NUMERICAL")
-        dsfs_mermin = kernel.get_dsf(k=k, w=w, lfc=lfc, model="MERMIN")
+        dsfs_born_mermin = kernel.get_dsf(k=k, w=w, lfc=lfc, model="MERMIN")
+        dsfs_static_mermin = kernel.get_dsf(
+            k=k, w=w, lfc=lfc, model="MERMIN", input_collision_frequency=input_collision_frequency
+        )
         # print(dsfs_mermin)
         dielectric_rpa = kernel.dielectric_function(k=k, w=w, model="NUMERICAL")
-        dielectric_mermin = kernel.dielectric_function(k=k, w=w, model="MERMIN")
-        # twinx0 = axes[0].twinx()
-        # twinx1 = axes[1].twinx()
-        # twinx2 = axes[2].twinx()
+        dielectric_born_mermin = kernel.dielectric_function(k=k, w=w, model="MERMIN")
+        dielectric_static_mermin = kernel.dielectric_function(
+            k=k, w=w, model="MERMIN", input_collision_frequency=input_collision_frequency
+        )
 
-        axes[0].plot(omega_array * J_TO_eV, dsfs_mermin / J_TO_eV, label=f"Mermin: q={q}", c=cs, ls=":")
+        mu_ei_born = kernel.get_collision_frequency(k=k, w=w, model="BORN", lfc=0.0)
+
+        axes[0].plot(omega_array * J_TO_eV, dsfs_born_mermin / J_TO_eV, label=f"BM: q={q}", c=cs, ls=":")
         axes[0].plot(omega_array * J_TO_eV, dsfs_rpa / J_TO_eV, label=f"RPA: q={q}", c=cs, ls="--")
-        axes[1].plot(omega_array * J_TO_eV, dielectric_mermin.real, label=f"Re[Mermin]: q={q}", c=cs, ls=":")
-        axes[1].plot(omega_array * J_TO_eV, dielectric_rpa.real, label=f"Re[RPA]: q={q}", c=cs, ls="--")
-        axes[1].plot(omega_array * J_TO_eV, dielectric_mermin.imag, label=f"Im[Mermin]: q={q}", c="navy", ls=":")
-        axes[1].plot(omega_array * J_TO_eV, dielectric_rpa.imag, label=f"Im[RPA]: q={q}", c="navy", ls="--")
+        axes[0].plot(
+            omega_array * J_TO_eV, dsfs_static_mermin / J_TO_eV, label=f"Static M: q={q}", c=cs, ls="-.", alpha=0.7
+        )
 
-        # twinx2.plot(u, dielectric_mermin.real, label=f"Re[Mermin]: q={q}", c=cs, ls=":")
-        # axes[2].plot(u, dielectric_rpa.real, label=f"Re[RPA]: q={q}", c=cs, ls="--")
-        # twinx2.plot(u_mermin, dielectric_mermin.imag, label=f"Im[Mermin]: q={q}", c="navy", ls=":")
-        # axes[2].plot(u_mermin, dielectric_rpa.imag, label=f"Im[RPA]: q={q}", c="navy", ls="--")
+        if cs == "magenta":
+            axes[1].plot(omega_array * J_TO_eV, dielectric_rpa.real, label=f"Re[RPA]: q={q}", c=cs, ls="solid")
+            axes[1].plot(omega_array * J_TO_eV, dielectric_rpa.imag, label=f"Im[RPA]: q={q}", c=cs, ls="-.")
+            axes[1].plot(
+                omega_array * J_TO_eV, dielectric_born_mermin.real, label=f"Re[BM]: q={q}", c="navy", ls="solid"
+            )
+            axes[1].plot(omega_array * J_TO_eV, dielectric_born_mermin.imag, label=f"Im[BM]: q={q}", c="navy", ls="-.")
+            axes[1].plot(
+                omega_array * J_TO_eV,
+                dielectric_static_mermin.real,
+                label=f"Re[M]: q={q}",
+                c="lightgreen",
+                ls="solid",
+                alpha=0.7,
+            )
+            axes[1].plot(
+                omega_array * J_TO_eV,
+                dielectric_static_mermin.imag,
+                label=f"Im[M]: q={q}",
+                c="lightgreen",
+                ls="-.",
+                alpha=0.7,
+            )
+        axes[2].plot(omega_array * J_TO_eV, mu_ei_born.real, label=f"Re[mu]: q={q}", c=cs, ls="-.")
+        axes[2].plot(omega_array * J_TO_eV, mu_ei_born.imag, label=f"Im[mu]: q={q}", c=cs, ls="-.")
 
     axes[0].set_xlabel(r"$\omega$ [eV]")
     axes[0].set_ylabel(r"DSF [1/eV]")
     axes[0].legend()
-    # axes[0].set_ylim(-0.005, 0.02)
     axes[1].set_xlabel(r"$\omega$ [eV]")
     axes[1].set_ylabel(r"$\epsilon$")
     axes[1].legend()
+    axes[2].set_xlabel(r"$\omega$ [eV]")
+    axes[2].set_ylabel(r"$\mu$")
+    axes[2].legend()
 
-    # axes[2].set_xlabel(r"$u$")
-    # axes[2].set_ylabel(r"$\epsilon$")
-    # axes[2].legend()
-    # axes[1].set_ylim(-0.005, 0.02)
     plt.tight_layout()
     plt.show()
     # fig.savefig(f"ff_test_mermin.pdf", dpi=200)
 
 
+def test_born_mermin():
+    THIS_DIR = os.path.dirname(__file__)
+    rs = 2
+    theta = 1
+    rho, Te = get_rho_T_from_rs_theta(rs=rs, theta=theta)
+    ks = np.array((0.5, 1.0, 2.0, 4.0)) / BOHR_RADIUS  # 0.5, 1.0, 2.0, 4.0
+    angles = calculate_angle(q=ks * BOHR_RADIUS, energy=9.0e3)
+    rho *= g_per_cm3_TO_kg_per_m3
+    Te *= eV_TO_K
+    charge_state = 1.0
+    atomic_mass = 1.0
+    atomic_number = 1.0
+    lfc = 0.0
+
+    w = np.linspace(-100, 500, 500) * eV_TO_J
+    state = PlasmaState(
+        electron_temperature=Te,
+        ion_temperature=Te,
+        mass_density=rho,
+        charge_state=charge_state,
+        binding_energies=None,
+        atomic_mass=atomic_mass,
+        atomic_number=atomic_number,
+    )
+
+    fig, axes = plt.subplots(1, 1, figsize=(14, 8))
+    colors = ["magenta", "crimson", "orange", "dodgerblue", "lightgreen", "lightgray", "yellow", "cyan"]
+
+    mcss_fn_name = os.path.join(THIS_DIR, f"comparison_data/mcss_comparisons/born_mermin/mcss_born_mermin_test_angle=")
+
+    for i in range(0, len(angles)):
+        c = colors[i]
+        angle = angles[i]
+        k = ks[i]
+        print(f"Angle = {angle}")
+        fn = mcss_fn_name + f"{angle:.0f}.csv"
+        dat = np.genfromtxt(fn, skip_header=1, delimiter=",")
+        axes.plot(dat[:, 0], dat[:, 3], label=f"MCSS: angle={angle:.0f}", c=c, ls="solid", alpha=0.7)
+
+        kernel = FreeFreeDSF(state=state)
+        dsfs_born_mermin = kernel.get_dsf(k=k, w=w, lfc=lfc, model="MERMIN", collision_frequency_model="BORN")
+        axes.plot(w * J_TO_eV, dsfs_born_mermin / J_TO_eV, label=f"BM: angle={angle:.0f}", c=c, ls=":")
+
+    axes.legend()
+    axes.set_xlim(-100, 500)
+    axes.set_xlabel(r"$\omega$ [eV]")
+    axes.set_ylabel(r"DSF [1/eV]")
+    plt.show()
+
+
 if __name__ == "__main__":
     test_ff()
+    test_born_mermin()
+    # test_lindard_ff()
+    # compare_lfcs()
     # test_mermin_ff()

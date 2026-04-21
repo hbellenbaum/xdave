@@ -52,6 +52,17 @@ def read_mcss_output(filepath, start_line=0, end_line=96022):
 
 
 def calculate_q(angle, energy):
+    """
+
+    Return the wave number for a scattering angle and energy.
+
+    Parameters:
+        angle (float): scattering angle in degrees
+        energy (float): probe energy in eV
+
+    Returns:
+        float: scattering wavevector in units of a_B^{-1}
+    """
     # angle *= np.pi / 180.0
     angle_rad = angle * PI / 180
     E0 = energy * eV_TO_J
@@ -72,10 +83,13 @@ def calculate_q_SI(angle, energy):
 def calculate_angle(q, energy):
     """
     Calculates an angle for the relevant q value.
-    Input:
-    - q: in Hartree units
+
+    Parameters:
+        q (float): in Hartree units
+        energy (float): probe energy in units of eV.
+
     Returns:
-    - angle: degrees
+        float: angle in degrees
     """
 
     q_value = q / BOHR_RADIUS
@@ -241,14 +255,26 @@ def laplace(tau, E, wff, wbf):
 
         kernel_wff = np.exp(-tau[i] * E) * wff  # * omega_factor
         kernel_wbf = np.exp(-tau[i] * E) * wbf  # * omega_factor
-        F_wff[i] = np.trapz(kernel_wff, E)  # * omega_new[i]
-        F_wbf[i] = np.trapz(kernel_wbf, E)  # * omega_new[i]
+        F_wff[i] = np.trapezoid(kernel_wff, E)  # * omega_new[i]
+        F_wbf[i] = np.trapezoid(kernel_wbf, E)  # * omega_new[i]
 
     F_tot_inel = F_wff + F_wbf
     return tau, F_tot_inel, F_wff, F_wbf
 
 
 def get_atomic_data_for_all_elements(elements):
+    """
+
+    Return atomic masses and numbers for elements.
+
+    Parameters:
+        elements (array): string elements
+
+    Returns:
+        array: atomic masses in units of Dalton
+        array: atomic numbers
+
+    """
 
     nstates = len(elements)
 
@@ -266,6 +292,14 @@ def get_atomic_data_for_all_elements(elements):
 def get_atomic_mass_for_element(e):
     """
     Load data from atomic data in folder xdave/data.
+    The data is taken from the x-ray data booklet.
+
+    Parameters:
+        e (str): element abbreviation.
+
+    Returns:
+        float: atomic mass in units of Dalton
+        int: atomic number
     """
     data_path = files("xdave") / "data" / "atomic_data.csv"
 
@@ -283,6 +317,19 @@ def get_atomic_mass_for_element(e):
 
 
 def get_binding_energies_from_element(AN, Z):
+    """
+
+    Return the binding energies for a given element.
+    For AN up to 12, the values are taken from the FAC code.
+    For higher-Z elements, the value is taken from the x-ray data booklet.
+
+    Parameters:
+        AN (int): atomic number
+        Z (float): charge state
+
+    Returns:
+        array: binding energies in units of eV.
+    """
 
     N_bind_enes = 12
 
@@ -315,6 +362,17 @@ def get_binding_energies_from_element(AN, Z):
 
 
 def get_emission_lines_for_element(element):
+    """
+
+    Read emission lines for a given element from the x-ray data booklet.
+
+    Parameters:
+        element (str): element abbreviation
+
+    Returns:
+        dict: emission lines
+
+    """
     df = pd.read_csv("data/emission_lines_table_1_2.csv")
     # Filter the row for the element
     row = df[df["Element"] == element]

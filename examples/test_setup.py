@@ -25,7 +25,7 @@ def test_setup():
 
     models = ModelOptions(polarisation_model="NUMERICAL", bf_model="SCHUMACHER", lfc_model="NONE", ipd_model="NONE")
 
-    omega_array = np.linspace(-1000, 1500, 1000) * eV_TO_J
+    omega_array = np.linspace(-1000, 1500, 1000)  # * eV_TO_J
 
     k_SI = 8 / ang_TO_m
     q = k_SI * BOHR_RADIUS
@@ -145,7 +145,110 @@ def test_mc_setup():
         print(f"State {i}: {vars(kernel.states[i])}")
 
 
+def test_user_defined_binding_energies():
+    # Random black Kapton example
+    T = 45  # eV
+    rho = 2 * 1.42  # g/cc
+    partial_densities = np.array([0.026362, 0.691133, 0.073270, 0.209235])
+    charge_states = np.array([1, 4, 4, 4])
+    elements = np.array(["H", "C", "N", "O"])
+    binding_energies = np.array(
+        [
+            [-13.6, 0],
+            [-284.2, -284.2],
+            [-409.9, -37.3],
+            [-543.1, -41.6],
+        ]
+    )
+
+    models = ModelOptions(ipd_model="NONE")
+
+    user_defined_inputs = {
+        "ipd": -10,
+        "lfc": 0.1,
+        "ion_core_radii": [1, 1, 1, 1],
+        "csd_parameters": [1, 1, 1, 1],
+        "csd_core_charges": [1, 6, 7, 8],
+        "sec_core_power": 0.1,
+        "srr_sigma_parameter": 1,
+        "binding_energies": binding_energies,
+    }
+
+    kernel = xDave(
+        mass_density=rho,
+        electron_temperature=T,
+        ion_temperature=T,
+        elements=elements,
+        partial_densities=partial_densities,
+        charge_states=charge_states,
+        models=models,
+        user_defined_inputs=user_defined_inputs,
+        verbose=True,
+    )
+
+    print(kernel.states[2].binding_energies)
+
+    k = 2
+    omega_array = np.linspace(-1000, 1500, 1000)
+
+    bf_tot, ff_tot, dsf, WR, ff_i, bf_i = kernel.run(k=k, w=omega_array)
+
+    plt.figure()
+    plt.plot(omega_array, bf_tot, label="Tot", c="gray", ls="solid")
+    plt.plot(omega_array, bf_i[0], label="H 1+", c="crimson", ls="dashed")
+    plt.plot(omega_array, bf_i[1], label="C 4+", c="navy", ls="dashed")
+    plt.plot(omega_array, bf_i[2], label="N 4+", c="green", ls="dashed")
+    plt.plot(omega_array, bf_i[3], label="O 4+", c="magenta", ls="dashed")
+    plt.legend()
+    plt.show()
+
+
+def test_state_setup():
+    T = 45  # eV
+    rho = 2 * 1.42  # g/cc
+    partial_densities = np.array([0.0, 0.026362, 0.691133, 0.073270, 0.0, 0.209235])
+    charge_states = np.array([1, 1, 3, 4, 4, 5])
+    elements = np.array(["H", "H", "C", "N", "N", "O"])
+
+    models = ModelOptions(ipd_model="NONE")
+
+    user_defined_inputs = {
+        "ipd": -10,
+        "lfc": 0.1,
+        "ion_core_radii": [1, 1, 1, 1, 1, 1],
+        "csd_parameters": [1, 1, 1, 1, 1, 1],
+        "csd_core_charges": [1, 1, 6, 7, 7, 8],
+        "sec_core_power": 0.1,
+        "srr_sigma_parameter": 1,
+    }
+
+    kernel = xDave(
+        mass_density=rho,
+        electron_temperature=T,
+        ion_temperature=T,
+        elements=elements,
+        partial_densities=partial_densities,
+        charge_states=charge_states,
+        models=models,
+        user_defined_inputs=user_defined_inputs,
+        verbose=True,
+    )
+
+    # print(kernel.number_of_states)
+    # print(kernel.charge_states)
+    # print(kernel.partial_densities)
+    # print(kernel.states[-1].atomic_number)
+
+    print("\n")
+    print(len(kernel.states))
+    print(len(kernel.charge_states))
+    print(len(kernel.partial_densities))
+    print(kernel.number_of_states)
+
+
 if __name__ == "__main__":
     # test_setup()
     # test_be()
-    test_mc_setup()
+    # test_mc_setup()
+    test_user_defined_binding_energies()
+    # test_state_setup()

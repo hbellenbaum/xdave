@@ -64,9 +64,9 @@ class LFC:
             model (str): controls the model used for the LFC calculation
         """
         if self.state.charge_state == 0:
-            return 0.0
+            return np.zeros_like(k)
         elif model == "NONE":
-            return 0.0
+            return np.zeros_like(k)
         self.initialize(state=self.state)
         if model == "DORNHEIM_ESA":
             return self._dornheim_esa(k, w)

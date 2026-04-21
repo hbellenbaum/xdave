@@ -9,10 +9,14 @@ import matplotlib.pyplot as plt
 import time
 
 
+# plt.style.use("~/Desktop/resources/plotting/poster.mplstyle")
+
+
 def ch_example():
+    # plt.style.use("~/my_style.mplstyle")
     start_time = time.time()
     T = 100  # eV
-    rho = 2 * 1.845  # two times solid density [g/cc]
+    rho = 1 * 1.845  # two times solid density [g/cc]
     Z_C = 4.5
 
     xH = 0.5
@@ -21,12 +25,12 @@ def ch_example():
     Zmin, Zmax, xmin, xmax = get_fractions_from_Z_partial(Z=Z_C, x0=xH)
 
     models = ModelOptions(
-        ei_potential="YUKAWA",
+        ei_potential="COULOMB",
         ii_potential="YUKAWA",
         ee_potential="COULOMB",
         polarisation_model="NUMERICAL",
         sf_model="HNC",
-        lfc_model="DORNHEIM_ESA",
+        lfc_model="PADE_INTERP",
         ipd_model="STEWART_PYATT",
         bf_model="SCHUMACHER",
         screening_model="FINITE_WAVELENGTH",
@@ -125,14 +129,14 @@ def ch_example():
     end_time = time.time()
     print(f"Run took {end_time - start_time} s")
 
-    fig, axes = plt.subplots(1, 2)
-    ax = axes[0]
+    fig, axes = plt.subplots(2, 2)
+    ax = axes[0, 0]
     ax.plot(k, rayleigh_weight, c="navy", label="WR")
     ax.set_xlabel(r"$k$ [$a_B^{-1}$]")
     ax.set_ylabel(r"$W_R$ [#]")
     ax.legend()
 
-    ax = axes[1]
+    ax = axes[0, 1]
     ax.plot(k, Sab[0, 0, :], label=r"HH", c="crimson")
     ax.plot(k, Sab[0, 1, :], label=r"CH", c="navy")
     ax.plot(k, Sab[1, 1, :], label=r"CC", c="magenta")
@@ -140,6 +144,21 @@ def ch_example():
     ax.set_ylabel(r"$S_{ii}(k)$ [#]")
     ax.legend()
 
+    ax = axes[1, 0]
+    ax.plot(k, fs[0], label="H", c="green")
+    ax.plot(k, fs[1], label="C", c="dodgerblue")
+    ax.set_xlabel(r"$k$ [$a_B^{-1}$]")
+    ax.set_ylabel(r"$f_{a}(k)$ [#]")
+    ax.legend()
+
+    ax = axes[1, 1]
+    ax.plot(k, qs[0], label="H", c="green")
+    ax.plot(k, qs[1], label="C", c="dodgerblue")
+    ax.set_xlabel(r"$k$ [$a_B^{-1}$]")
+    ax.set_ylabel(r"$q_{a}(k)$ [#]")
+    ax.legend()
+    plt.tight_layout()
+    # plt.savefig(f"static_example.pdf", dpi=200)
     plt.show()
 
 
@@ -225,6 +244,29 @@ def cho_example():
     plt.tight_layout()
     plt.show()
 
+    start_time = time.time()
+    k = np.linspace(0.5, 10, 1000)
+    k, Sab, _, rayleigh_weight, qs, fs, lfc = kernel.run(w=w, k=k, beam_energy=8.0e3, mode="STATIC")
+    end_time = time.time()
+    print(f"Run took {end_time - start_time} s")
+
+    fig, axes = plt.subplots(1, 2)
+    ax = axes[0]
+    ax.plot(k, rayleigh_weight, c="navy", label="WR")
+    ax.set_xlabel(r"$k$ [$a_B^{-1}$]")
+    ax.set_ylabel(r"$W_R$ [#]")
+    ax.legend()
+
+    ax = axes[1]
+    ax.plot(k, Sab[0, 0, :], label=r"HH", c="crimson")
+    ax.plot(k, Sab[0, 1, :], label=r"CH", c="navy")
+    ax.plot(k, Sab[1, 1, :], label=r"CC", c="magenta")
+    ax.set_xlabel(r"$k$ [$a_B^{-1}$]")
+    ax.set_ylabel(r"$S_{ii}(k)$ [#]")
+    ax.legend()
+
+    plt.show()
+
     # this will convolve the dsf with a Gaussian sif of 10 eV fwhm
     # if you want to use your own, you can add it as an input to the sif input option
     # note that for now this will have to be centered around 0
@@ -244,7 +286,7 @@ def cho_example():
 
     start_time = time.time()
     k = np.linspace(0.5, 10, 1000)
-    k, Sab, _, rayleigh_weight, qs, fs = kernel.run(w=w, k=k, beam_energy=8.0e3, mode="STATIC")
+    k, Sab, _, rayleigh_weight, qs, fs, lfc = kernel.run(w=w, k=k, beam_energy=8.0e3, mode="STATIC")
     end_time = time.time()
     print(f"Run took {end_time - start_time} s")
 

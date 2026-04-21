@@ -1,4 +1,11 @@
-from dataclasses import dataclass
+from dataclasses import dataclass, is_dataclass, fields
+
+
+def serialize(obj):
+    if is_dataclass(obj):
+        return {f.name: serialize(getattr(obj, f.name)) for f in fields(obj)}
+
+    return obj
 
 
 @dataclass(slots=True)
@@ -32,6 +39,9 @@ class ModelOptions:
     bridge_function: str = "IYETOMI"
     screening_model: str = "FINITE_WAVELENGTH"
 
+    def toJSON(self):
+        return serialize(self)
+
     def print_default_options(self):
         print(
             "\nDefault model options\n"
@@ -64,7 +74,8 @@ class ModelOptions:
             "electron-ion collision frequency: BORN, ZIMAN\n"
             "electron-ion potential: YUKAWA, COULOMB, HARD_CORE, SOFT_CORE\n"
             "ion-ion potential: YUKAWA, DEBYE_HUCKEL, DEUTSCH\n"
-            "electron-electron potential: COULOMB, KELBG, SRR, CSD\n"
+            "electron-electron potential: COULOMB \n"
+            # "electron-electron potential: COULOMB, KELBG, SRR, CSD\n"
             "screening cloud: FINITE_WAVELENGTH, DEBYE_HUCKEL\n"
             "ionic form factor: PAULING_SHERMAN\n"
             "HNC bridge function: IYETOMI\n"

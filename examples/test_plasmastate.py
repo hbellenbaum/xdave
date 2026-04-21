@@ -67,11 +67,12 @@ def test_chemical_potential():
     plt.plot(Thetas, mus_fit, label="fit", ls="--", lw=3)
     plt.plot(Thetas, mus_low, label="low T", ls=":", lw=3)
     plt.plot(Thetas, mus_high, label="high T", ls=":", lw=3)
-    plt.plot(Thetas, mus_classical, label="classical", ls=":", lw=3)
+    # plt.plot(Thetas, mus_classical, label="classical", ls=":", lw=3)
     plt.ylim(-30.0, 1.5)
     plt.legend()
     plt.tight_layout()
-    plt.savefig(f"chemical_potential_models_compared_rho={rho*kg_per_m3_TO_g_per_cm3:.2f}.pdf")
+    plt.show()
+    # plt.savefig(f"chemical_potential_models_compared_rho={rho*kg_per_m3_TO_g_per_cm3:.2f}.pdf")
 
 
 if __name__ == "__main__":

@@ -1,4 +1,4 @@
-from xdave.plasma_state import PlasmaState
+from xdave.plasma_state import PlasmaState, get_fractions_from_Z_partial
 from xdave.boundfree_dsf import BoundFreeDSF
 from xdave.constants import BOHR_RADIUS
 from xdave.unit_conversions import (
@@ -9,7 +9,7 @@ from xdave.unit_conversions import (
     per_cm3_TO_per_m3,
 )
 from xdave.utils import calculate_q, load_mcss_result, calculate_angle
-
+from xdave import xDave, ModelOptions
 
 import numpy as np
 import matplotlib.pyplot as plt
@@ -94,8 +94,10 @@ def test_bf_mcss():
         ax.plot(En, wbf, label=f"MCSS k={k_bohr:.2f}", c=c, ls="dashed")
     for eb in EB:
         ax.axvline(np.abs(eb) * J_TO_eV, c="gray", ls="dotted")
-    ax.legend()
+    ax.legend(ncol=3)
     ax.set_xlim(-40, 300)
+    ax.set_xlabel(r"$\omega$ [eV]")
+    ax.set_ylabel(r"$S_{ee}^{bf}(k,\omega)$ [1/eV]")
     plt.show()
 
     assert np.isclose(
@@ -165,6 +167,80 @@ def test_be_bf():
     plt.show()
 
 
+def test_multispecies_bf():
+    T = 100  # eV
+    rho = 2 * 1.845  # two times solid density [g/cc]
+    Z_C = 4.5
+
+    xH = 0.5
+    ZH = 1.0
+
+    Zmin, Zmax, xmin, xmax = get_fractions_from_Z_partial(Z=Z_C, x0=xH)
+
+    models = ModelOptions(
+        ei_potential="YUKAWA",
+        ii_potential="YUKAWA",
+        ee_potential="COULOMB",
+        polarisation_model="NUMERICAL",
+        sf_model="HNC",
+        lfc_model="DORNHEIM_ESA",
+        ipd_model="NONE",
+        bf_model="SCHUMACHER",
+        screening_model="FINITE_WAVELENGTH",
+    )
+
+    kernel = xDave(
+        mass_density=rho,
+        electron_temperature=T,
+        ion_temperature=T,
+        elements=np.array(["H", "C", "C"]),
+        charge_states=np.array([ZH, Zmin, Zmax]),
+        partial_densities=np.array([xH, xmin, xmax]),
+        models=models,
+        enforce_fsum=False,
+        user_defined_inputs=None,
+        verbose=True,
+        hnc_max_iterations=10000,
+        hnc_mix_fraction=0.99,
+        hnc_delta=1.0e-7,
+    )
+
+    w = np.linspace(-1000, 1500, 10000)
+    bf_tot, ff_tot, dsf, rayleigh_weight, ff_i, bf_i = kernel.run(w=w, angle=130, beam_energy=9.0e3, mode="DYNAMIC")
+
+    plt.figure()
+    # plt.plot(w, bf_i[0], label="H")
+    plt.plot(w, bf_i[1], label="C4", c="crimson", ls="-.")
+    plt.plot(w, bf_i[2], label="C5", c="navy", ls="-.")
+    plt.plot(w, bf_tot, label="Tot", c="green", ls="-.")
+    plt.xlabel(r"$\omega$ [eV]")
+    plt.ylabel(r"$S^{bf} (k,\omega)$ [1/eV]")
+
+    models = ModelOptions(
+        ei_potential="YUKAWA",
+        ii_potential="YUKAWA",
+        ee_potential="COULOMB",
+        polarisation_model="NUMERICAL",
+        sf_model="HNC",
+        lfc_model="DORNHEIM_ESA",
+        ipd_model="CROWLEY",
+        bf_model="SCHUMACHER",
+        screening_model="FINITE_WAVELENGTH",
+    )
+    kernel.models = models
+    bf_tot, ff_tot, dsf, rayleigh_weight, ff_i, bf_i = kernel.run(w=w, angle=130, beam_energy=9.0e3, mode="DYNAMIC")
+    # plt.show()
+    # plt.plot(w, bf_i[1], c="crimson", ls=":")
+    # plt.plot(w, bf_i[2], c="navy", ls=":")
+    # plt.plot(w, bf_tot, c="green", ls=":")
+    plt.legend()
+    plt.tight_layout()
+    plt.savefig("bf_example.pdf", dpi=200)
+
+
 if __name__ == "__main__":
+
+    # plt.style.use("~/my_style.mplstyle")
+    # test_multispecies_bf()
     test_bf_mcss()
     # test_be_bf()

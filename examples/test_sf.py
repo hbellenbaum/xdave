@@ -281,6 +281,8 @@ def test_wuensch_Fig616():
     ax.scatter(CC_dat[:, 0] * per_A_TO_per_aB, CC_dat[:, 1], label="Wuensch: CC", c="red", marker="x")
     ax.plot(ks * BOHR_RADIUS, Sab[1, 1, :], label="CC", c="red", ls="-.")
     ax.legend()
+    ax.set_xlabel(r"$k$ [$a_B^{-1}$]")
+    ax.set_ylabel(r"$S_{ii}(k)$")
     plt.show()
 
 
@@ -426,7 +428,7 @@ def test_wuensch_Fig617():
 
 
 if __name__ == "__main__":
-    test_ocp()
-    test_mcp()
+    # test_ocp()
+    # test_mcp()
     test_wuensch_Fig616()
-    test_wuensch_Fig617()
+    # test_wuensch_Fig617()

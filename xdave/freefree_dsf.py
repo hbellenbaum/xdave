@@ -6,12 +6,7 @@ from .fermi_integrals import fdi
 from .static_sf import OCPStaticStructureFactor
 
 from scipy import integrate
-
-# from collision_frequency import CollisionFrequency
-
-
 import numpy as np
-
 import warnings
 
 
@@ -19,7 +14,8 @@ class FreeFreeDSF:
     """
     Class containing the free-free dynamic structure factor calculations.
 
-    Attributes:
+    Parameters
+    ----------
         state (PlasmaState): object containing all plasma state variables
 
     """
@@ -27,7 +23,9 @@ class FreeFreeDSF:
     def __init__(self, state: PlasmaState) -> None:
         self.state = state
 
-    def get_dsf(self, k, w, lfc, model="NUMERICAL_RPA"):
+    def get_dsf(
+        self, k, w, lfc, model="NUMERICAL_RPA", collision_frequency_model="BORN", input_collision_frequency=None
+    ):
         """
         Main function to call the dynamic structure factor for a given model.
         This internally calculates the electron susceptibility and applies a local field correction.
@@ -46,11 +44,15 @@ class FreeFreeDSF:
         if self.state.free_electron_number_density == 0.0:
             return 0.0
 
+        w0_idx = np.where(w == 0.0)
+        if len(w0_idx) is not None:
+            w = np.delete(w, w0_idx)
+
         # Call the susceptibility function for a given model
-        chi0 = self.susceptibility_function(k=k, w=w, model=model)
+        chi0 = self.susceptibility_function(k=k, w=w, model=model, input_collision_frequency=input_collision_frequency)
 
         # coulomb potential for the electron-electron interactions
-        Vee = 4 * np.pi * COULOMB_CONSTANT * ELEMENTARY_CHARGE**2 / k**2
+        Vee = FOUR_PI * COULOMB_CONSTANT * ELEMENTARY_CHARGE**2 / k**2
 
         # calculate corrected suscepibility
         chilfc = chi0 / (1 - Vee * (1 - lfc) * chi0)
@@ -65,17 +67,35 @@ class FreeFreeDSF:
             * im_suspectibility
         )
 
+        # This feels really lazy, but seems to get the job done.
+        if len(w0_idx) is not None:
+            S_w0 = 0.5 * (S_EG_LFC[w0_idx[0]] + S_EG_LFC[w0_idx[0] - 1])
+            S_EG_LFC = np.insert(S_EG_LFC, w0_idx[0], S_w0)
+
         return S_EG_LFC
 
     def get_collision_frequency(self, k, w, lfc, model):
+        """
+        Return the collision frequency for a given model.
+
+        Parameters:
+            k (float): wave number in units of 1/m
+            w (array): energy grid in units of 1/J
+            lfc (float): local-field correction
+            model (str): model for the collision-frequency
+
+        Returns:
+            array: electron-ion collision frequency in units of Hz
+        """
         if model == "BORN":
-            return self._born_ei_collision_frequency(k, w, lfc)
+            # return self._born_ei_collision_frequency(k, w, lfc)
+            return self._born_ei_collision_frequency_full(k, w, lfc)
         elif model == "ZIMAN":
             return self._ziman_ei_collision_frequency()
         else:
             raise NotImplementedError(f"Model {model} not recognized.")
 
-    def dielectric_function(self, k, w, model):
+    def dielectric_function(self, k, w, model, collision_frequency_model="BORN", input_collision_frequency=None):
         """
         Calculate the free electron dielectric function for a given model.
 
@@ -90,10 +110,10 @@ class FreeFreeDSF:
         """
         potential_func = 4 * np.pi * COULOMB_CONSTANT * ELEMENTARY_CHARGE**2 / k**2
         if model == "LINDHARD":
-            pol_func = self.lindhard_pol_func_dc(k=k, w=w)
+            pol_func = self.lindhard_pol_func(k=k, w=w)
             dielectric_func = 1 - potential_func * pol_func
         elif model == "DANDREA_FIT":
-            pol_func = self.dandrea_fit(k=k, omega=w)
+            pol_func = self.dandrea_fit(k=k, w=w)
             dielectric_func = 1 - potential_func * pol_func
         elif model == "NUMERICAL":
             dielectric_func = self.rpa_numerical_dielectric_func(k=k, w=w)
@@ -101,14 +121,19 @@ class FreeFreeDSF:
             warnings.warn(
                 f"Model {model} for the free-free component not yet working properly and should not be used."
             )
-            dielectric_func = self.mermin_dielectric_function(k=k, w=w)
+            dielectric_func = self.mermin_dielectric_function(
+                k=k,
+                w=w,
+                collision_frequency_model=collision_frequency_model,
+                input_collision_frequency=input_collision_frequency,
+            )
         else:
             dielectric_func = self.rpa_numerical_dielectric_func(k=k, w=w)
             warnings.warn(f"Model {model} for the free-free component not recognized. Overwriting using NUMERICAL.")
 
         return dielectric_func
 
-    def susceptibility_function(self, k, w, model):
+    def susceptibility_function(self, k, w, model, collision_frequency_model="BORN", input_collision_frequency=None):
         """
         Calculate the free electron susceptibility (polarisation) function for a given model.
 
@@ -123,16 +148,23 @@ class FreeFreeDSF:
         """
         if model == "LINDHARD":
             warnings.warn(f"Lindhard model currently not working. Try something else.")
-            susceptibility_func = self.lindhard_pol_func_dc(k=k, w=w)
+            susceptibility_func = self.lindhard_pol_func(k=k, w=w)
         elif model == "DANDREA_FIT":
-            susceptibility_func = self.dandrea_fit(k=k, omega=w)
+            susceptibility_func = self.dandrea_fit(k=k, w=w)
         elif model == "NUMERICAL":
             potential_func = 4 * np.pi * COULOMB_CONSTANT * ELEMENTARY_CHARGE**2 / k**2
             dielectric_func = self.rpa_numerical_dielectric_func(k=k, w=w)  # * potential_func
             susceptibility_func = (1 - dielectric_func) / potential_func
+        # elif model == "0T_LIMIT":
+        #     susceptibility_func = self.zeroT_susceptibility_limit(k=k, w=w)
         elif model == "MERMIN":
             potential_func = 4 * np.pi * COULOMB_CONSTANT * ELEMENTARY_CHARGE**2 / k**2
-            dielectric_func = self.mermin_dielectric_function(k=k, w=w)  # * potential_func
+            dielectric_func = self.mermin_dielectric_function(
+                k=k,
+                w=w,
+                collision_frequency_model=collision_frequency_model,
+                input_collision_frequency=input_collision_frequency,
+            )
             susceptibility_func = (1 - dielectric_func) / potential_func
         else:
             potential_func = 4 * np.pi * COULOMB_CONSTANT * ELEMENTARY_CHARGE**2 / k**2
@@ -142,64 +174,90 @@ class FreeFreeDSF:
 
         return susceptibility_func
 
+    # def lindhard_pol_func(self, k, w):
+    #     """
+    #     Lindhard model for the susceptibility function, analytic limit for the fully degenerate plasma.
+    #     Note to self: the definition of the plasma frequency has changed, I will need to check this.
+
+    #     Parameters:
+    #         k (float): wave number in units of 1/m
+    #         w (array): energy grid in units of 1/J
+
+    #     Returns:
+    #         array: susceptibility function, non-dimensional
+
+    #     """
+    #     EF = self.state.fermi_energy(self.state.free_electron_number_density, ELECTRON_MASS)
+    #     kF = self.state.fermi_wave_number(self.state.free_electron_number_density)
+    #     omega_p = self.state.plasma_frequency(
+    #         self.state.charge_state, self.state.free_electron_number_density, ELECTRON_MASS
+    #     )
+    #     gamma = EF / (DIRAC_CONSTANT * omega_p)
+
+    #     vF = DIRAC_CONSTANT * kF / ELECTRON_MASS  # m/s
+    #     U = w / (k * vF * DIRAC_CONSTANT)  # dimensionless
+    #     Z = k / (2 * kF)  # dimensionless
+    #     prefactor = -(3 * k**2 / (512 * PI * gamma**2 * Z**3 * ELEMENTARY_CHARGE_SQR * COULOMB_CONSTANT))
+    #     input1 = (U - Z - 1) / (U - Z + 1)
+    #     input2 = (U + Z - 1) / (U + Z + 1)
+    #     if input1 <= 0:
+    #         log1 = np.log(np.abs(input1)) + PI * 1.0j
+    #     else:
+    #         log1 = np.log(input1)
+    #         # log1 =
+    #     if input2 <= 0:
+    #         log2 = np.log(np.abs(input2)) + PI * 1.0j
+    #     else:
+    #         log2 = np.log(input2)
+    #     func_left = 4 * Z + (1 - (U - Z) ** 2) * log1
+    #     func_right = 1 - (U + Z) ** 2 * log2
+    #     pol_func = prefactor * (func_left - func_right)
+    #     return pol_func
+
     def lindhard_pol_func(self, k, w):
-        """
-        Lindhard model for the susceptibility function, analytic limit for the fully degenerate plasma.
-        Note to self: the definition of the plasma frequency has changed, I will need to check this.
-
-        Parameters:
-            k (float): wave number in units of 1/m
-            w (array): energy grid in units of 1/J
-
-        Returns:
-            array: susceptibility function, non-dimensional
-
-        """
-        EF = self.state.fermi_energy(self.state.free_electron_number_density, ELECTRON_MASS)
-        kF = self.state.fermi_wave_number(self.state.free_electron_number_density)
-        omega_p = self.state.plasma_frequency(
-            self.state.charge_state, self.state.free_electron_number_density, ELECTRON_MASS
-        )
-        gamma = EF / (DIRAC_CONSTANT * omega_p)
-
+        kF = self.state.fermi_wave_number(self.state.free_electron_number_density)  # 1/m
+        EF = self.state.fermi_energy(self.state.free_electron_number_density, ELECTRON_MASS)  # J
         vF = DIRAC_CONSTANT * kF / ELECTRON_MASS  # m/s
-        U = w / (k * vF * DIRAC_CONSTANT)  # dimensionless
-        Z = k / (2 * kF)  # dimensionless
-        prefactor = -(3 * k**2 / (512 * PI * gamma**2 * Z**3 * ELEMENTARY_CHARGE_SQR * COULOMB_CONSTANT))
-        input1 = (U - Z - 1) / (U - Z + 1)
-        input2 = (U + Z - 1) / (U + Z + 1)
-        if input1 <= 0:
-            log1 = np.log(np.abs(input1)) + PI * 1.0j
-        else:
-            log1 = np.log(input1)
-            # log1 =
-        if input2 <= 0:
-            log2 = np.log(np.abs(input2)) + PI * 1.0j
-        else:
-            log2 = np.log(input2)
-        func_left = 4 * Z + (1 - (U - Z) ** 2) * log1
-        func_right = 1 - (U + Z) ** 2 * log2
-        pol_func = prefactor * (func_left - func_right)
-        return pol_func
+        u = w / (k * vF * DIRAC_CONSTANT)  # dimensionless
+        z = k / (2 * kF)  # dimensionless
 
-    def lindhard_pol_func_dc(self, k, w):
-        EF = self.state.fermi_energy(self.state.free_electron_number_density, ELECTRON_MASS)
-        kF = self.state.fermi_wave_number(self.state.free_electron_number_density)
-        vF = DIRAC_CONSTANT * kF / ELECTRON_MASS  # m/s
+        chi02 = 1 / (PI * kF * BOHR_RADIUS)  # dimensionless
+        Uee = ELEMENTARY_CHARGE_SQR / (VACUUM_PERMITTIVITY * k**2)
 
-        q0 = k / (2 * kF)  # []
-        w0 = w / (k * vF * DIRAC_CONSTANT)  # []
+        def g(x):
+            # add the epsilon term to avoid instabilities
+            y = abs(((x + 1.0) ** 2 + EPSILON) / ((x - 1.0) ** 2 + EPSILON))
+            real_part = -(x - 0.5 * (x**2 - 1.0) * 0.5 * np.log(y))
+            imag_part = HALF_PI * (1.0 - x**2) * np.heaviside(1.0 - x**2, 1.0)
+            return real_part + 1.0j * imag_part
 
-        def lindhard_func(x):
-            real_part = -x - 1 / 2 * (1 - x**2) * np.log(np.abs((x + 1) / (x - 1)))
-            im_part = HALF_PI * (1 - x**2) * np.heaviside(1.0 - x**2, 1.0)
-            return real_part + 1.0j * im_part
+        func = g(u + z) - g(u - z)
+        chi_ee = 1 / Uee * chi02 / (4 * z**3) * func
+        return chi_ee
 
-        G_plus = lindhard_func(w0 + q0)
-        G_minus = lindhard_func(w0 - q0)
-        pol_func = 3 * self.state.free_electron_number_density / (4 * EF * q0) * (G_plus - G_minus)  # / (4 * q0)
+    # def zeroT_susceptibility_limit(self, k, w):
+    #     """
+    #     Ground state limit of the susceptibility function
+    #     """
+    #     kF = self.state.fermi_wave_number(self.state.free_electron_number_density)  # 1/m
+    #     EF = self.state.fermi_energy(self.state.free_electron_number_density, ELECTRON_MASS)  # J
+    #     vF = DIRAC_CONSTANT * kF / ELECTRON_MASS  # m/s
+    #     u = w / (k * vF * DIRAC_CONSTANT)  # dimensionless
+    #     z = k / (2 * kF)  # dimensionless
 
-        return pol_func
+    #     chi02 = 1 / (PI * kF * BOHR_RADIUS)  # dimensionless
+    #     Uee = ELEMENTARY_CHARGE_SQR / (VACUUM_PERMITTIVITY * k**2)
+
+    #     def g(x):
+    #         # add the epsilon term to avoid instabilities
+    #         y = abs(((x + 1.0) ** 2 + EPSILON) / ((x - 1.0) ** 2 + EPSILON))
+    #         real_part = -(x - 0.5 * (x**2 - 1.0) * 0.5 * np.log(y))
+    #         imag_part = HALF_PI * (1.0 - x**2) * np.heaviside(1.0 - x**2, 1.0)
+    #         return real_part + 1.0j * imag_part
+
+    #     func = g(u + z) - g(u - z)
+    #     chi_ee = 1 / Uee * chi02 / (4 * z**3) * func
+    #     return chi_ee
 
     def rpa_numerical_dielectric_func(self, k, w):
         """
@@ -350,7 +408,7 @@ class FreeFreeDSF:
 
         return real_part
 
-    def dandrea_fit(self, k, omega):
+    def dandrea_fit(self, k, w):
         """
         Fit to the electron-electron polarisation function based on: Dandrea et al., Phys. Rev. B 34 (1986)
 
@@ -390,8 +448,8 @@ class FreeFreeDSF:
 
         # non-dimensional variables for integral
         q0 = 0.5 * k / kF
-        w0 = 0.25 * omega / (EF * q0)  #  * DIRAC_CONSTANT
-        w = w0 / sqrt_Theta_e
+        w0 = 0.25 * w / (EF * q0)  #  * DIRAC_CONSTANT
+        w_freq = w0 / sqrt_Theta_e
         beta = 1 / (BOLTZMANN_CONSTANT * self.state.electron_temperature)
         mue = self.state.chemical_potential_ichimaru(
             self.state.electron_temperature, self.state.free_electron_number_density, ELECTRON_MASS
@@ -478,8 +536,8 @@ class FreeFreeDSF:
             # Eq. (4.8a)
             return x * u / v
 
-        exp_arg_pos = eta - (w + q) ** 2
-        exp_arg_neg = eta - (w - q) ** 2
+        exp_arg_pos = eta - (w_freq + q) ** 2
+        exp_arg_neg = eta - (w_freq - q) ** 2
 
         imag_part = SQRT_PI * (log1pexp(exp_arg_pos) - log1pexp(exp_arg_neg))
         # Eq. (4.6)
@@ -497,7 +555,7 @@ class FreeFreeDSF:
         For details see Eqn. (12) in Fortmann et al., Phys. Rev. E 81 (2010).
 
         Returns:
-            array: collision frequency in units of J
+            array: collision frequency in units of 1/s
         """
         rs = self.state.rs
         EF = self.state.fermi_energy(self.state.free_electron_number_density, ELECTRON_MASS)
@@ -506,56 +564,190 @@ class FreeFreeDSF:
         collision_frequency = EF / DIRAC_CONSTANT * (a * rs**2 * (np.log(1 + b / rs) - 1 / (1 + rs / b)))
         return collision_frequency
 
-    def _born_ei_collision_frequency_old(self, k, w, lfc):
-        k_temp = np.linspace(1.0e-3, 1.0e2, 1000) / BOHR_RADIUS
-        Siik = OCPStaticStructureFactor(state=self.state).get_ii_static_structure_factor(k=k_temp, sf_model="HNC")
-
-        Zi = self.state.charge_state
-        mi = self.state.atomic_mass
-        ni = self.state.ion_number_density
-        ne = self.state.free_electron_number_density
-        w_plasma = self.state.plasma_frequency(charge=Zi, number_density=ni, mass=mi)
-        w_freq = w / DIRAC_CONSTANT
-
-        def integral(q):
-            epsilon0 = self.dandrea_fit(k=q, omega=0)
-            epsilon = self.dandrea_fit(k=q, omega=w)
-            Sii = np.interp(q, xp=k_temp, fp=Siik)
-            return 1 / TWO_PI**3 * Sii / epsilon0 * (epsilon - epsilon0)
-
-        prefactor = FOUR_THIRDS_PI * w_plasma / w_freq * mi / ELECTRON_MASS * 1 / ne * 1.0j
-        int_term, _ = integrate.quad_vec(integral, 0, 1.0e14)
-        return prefactor * int_term
-        # interp_Sk = np.interp(k_temp, Siik, fill_value="extrapolate")
-
     def _born_ei_collision_frequency(self, k, w, lfc):
-        Zi = self.state.charge_state
-        ni = self.state.ion_number_density
-        ne = self.state.free_electron_number_density
+        r"""
+        Calculate the Born collision frequency.
+        For details see Eqn. (10) in Fortmann et al., Phys. Rev. E 81 (2010)
+        or Eqn. (B1-B2) in Sch\"orner et al., Phys. Rev. E 107 (2023).
 
-        k_temp = np.linspace(1.0e-3, 1.0e2, 1000) / BOHR_RADIUS
-        Siik = OCPStaticStructureFactor(state=self.state, verbose=False).get_ii_static_structure_factor(
-            k=k_temp, sf_model="HNC"
+        Parameters:
+            w (array): Energy grid in units of J
+            k (float): scattering wave vector in units of 1/m
+            lfc (float): local field correction, dimensionless
+
+        Returns:
+            array: collision frequency in units of 1/s
+        """
+        w_freq = w / DIRAC_CONSTANT
+        omega_p = self.state.plasma_frequency(
+            self.state.charge_state, self.state.ion_number_density, self.state.atomic_mass
         )
+        # omega_p = self.state.plasma_frequency(1, self.state.free_electron_number_density, ELECTRON_MASS)
+        # omega_p = np.sqrt(
+        #     self.state.free_electron_number_density * ELEMENTARY_CHARGE**2 / (VACUUM_PERMITTIVITY * ELECTRON_MASS)
+        # )
 
-        prefactor = Zi**2 * ni * ELEMENTARY_CHARGE_SQR / (6 * PI_SQR * VACUUM_PERMITTIVITY * ne * ELECTRON_MASS)
+        # col0 = omega_p**2 / (w_freq)
+        # col0 = 1.0
+        col0 = 1.0 * omega_p**2 * self.state.atomic_mass / (2 * w_freq * ELECTRON_MASS)
+        # col0 = self.state.charge_state * omega_p**2 / (2 * w_freq)
 
-        def real_integrand(q):
-            Si = np.interp(q, k_temp, Siik)
-            Vee = 4 * np.pi * COULOMB_CONSTANT * ELEMENTARY_CHARGE**2 / q**2
-            epsilon = 1 - Vee * self.dandrea_fit(q, w)
-            epsilon0 = 1 - Vee * self.dandrea_fit(q, 0)
-            I = q**2 * Si * (epsilon - epsilon0) / (w * epsilon0)
-            return I
+        ff_kernel = FreeFreeDSF(state=self.state)
 
-        integral, _ = integrate.quad_vec(real_integrand, 0, 1.0e16)
-        real_part = prefactor * integral
+        temp_k = np.linspace(0.1, 100, 50) / BOHR_RADIUS
+        Siis = OCPStaticStructureFactor(
+            self.state, mix_fraction=0.99, max_iterations=10000
+        ).get_ii_static_structure_factor(k=temp_k, sf_model="HNC")
 
-        def imag_integral(wdash):
-            return 1 / PI * real_part / (w - wdash)
+        # def integrand(u):
+        #     x = np.tan(HALF_PI * u)
+        #     j = HALF_PI * (1 + x**2)
 
-        imag_part, _ = integrate.quad_vec(imag_integral, -1.0e6, 1.0e6)
-        return real_part + 1.0j * imag_part
+        #     kF = self.state.fermi_wave_number(self.state.free_electron_number_density)
+        #     k = kF * x
+
+        #     Uee = ELEMENTARY_CHARGE**2 / (VACUUM_PERMITTIVITY * k**2)  # []
+        #     epsilon_k_omega = 1 - Uee * ff_kernel.dandrea_fit(k=k, w=w)
+        #     epsilon_k_0 = 1 - Uee * ff_kernel.dandrea_fit(k=k, w=0)
+        #     F = -1.0j * (epsilon_k_omega - epsilon_k_0) / (epsilon_k_0**2)
+
+        #     Sii = np.interp(x=k, xp=temp_k, fp=Siis)
+        #     return j * x**2 * Sii * F  # * (1 / TWO_PI) ** 3
+        def integrand(u):
+            x = np.tan(HALF_PI * u)
+            kF = self.state.fermi_wave_number(self.state.free_electron_number_density)
+            k = kF * x
+            # print(k)
+
+            j = HALF_PI * (1 + x**2)
+
+            # measure = FOUR_PI / TWO_PI**3
+            measure = FOUR_PI / TWO_PI**3
+
+            Uee = ELEMENTARY_CHARGE**2 / (VACUUM_PERMITTIVITY * k**2)
+
+            epsilon_k_omega = 1 - Uee * ff_kernel.dandrea_fit(k=k, w=w)
+            epsilon_k_0 = 1 - Uee * ff_kernel.dandrea_fit(k=k, w=0.0)
+
+            F = -1.0j * (epsilon_k_omega - epsilon_k_0) / (epsilon_k_0**2)
+            # F = -np.imag(1 / epsilon_k_omega)
+
+            Sii = np.interp(k, temp_k, Siis)
+
+            return measure * j * x**2 * Sii * F
+
+        coll_freq = col0 * integrate.quad_vec(integrand, 0, 1)[0]
+
+        return coll_freq
+
+    def _born_ei_collision_frequency_full(self, k, w, lfc):
+        r"""
+        Calculate the Born collision frequency.
+        For details see Eqn. (10) in Fortmann et al., Phys. Rev. E 81 (2010)
+        or Eqn. (B1-B2) in Sch\"orner et al., Phys. Rev. E 107 (2023).
+
+        Parameters:
+            w (array): Energy grid in units of J
+            k (float): scattering wave vector in units of 1/m
+            lfc (float): local field correction, dimensionless
+
+        Returns:
+            array: collision frequency in units of 1/s
+        """
+        w_freq = w / DIRAC_CONSTANT
+        omega_p = self.state.plasma_frequency(
+            self.state.charge_state, self.state.ion_number_density, self.state.atomic_mass
+        )
+        col0 = 1.0 * omega_p**2 * self.state.atomic_mass / (2 * w_freq * ELECTRON_MASS)
+
+        temp_k = np.linspace(0.1, 100, 50) / BOHR_RADIUS
+        Siis = OCPStaticStructureFactor(
+            self.state, mix_fraction=0.99, max_iterations=10000
+        ).get_ii_static_structure_factor(k=temp_k, sf_model="HNC")
+
+        kF = self.state.fermi_wave_number(self.state.free_electron_number_density)
+
+        def real_integrand(u, w):
+            x = np.tan(HALF_PI * u)
+            j = HALF_PI * (1 + x**2)
+
+            k = kF * x
+            Uee = FOUR_PI * COULOMB_CONSTANT * ELEMENTARY_CHARGE**2 / k**2
+            epsilon_ee_k_omega = 1 - Uee * self.dandrea_fit(k=k, w=w)
+            epsilon_ee_k_0 = 1 - Uee * self.dandrea_fit(k=k, w=0)
+            F = -1.0j * (epsilon_ee_k_omega - epsilon_ee_k_0) / epsilon_ee_k_0**2
+            # Siik = 1.0
+            Siik = np.interp(x=k, xp=temp_k, fp=Siis)
+            return x**2 * Siik * F.real * j  # * measure
+
+        def imag_integrand(u, w):
+            x = np.tan(HALF_PI * u)
+            j = HALF_PI * (1 + x**2)
+
+            k = kF * x
+            Uee = FOUR_PI * COULOMB_CONSTANT * ELEMENTARY_CHARGE**2 / k**2
+            epsilon_ee_k_omega = 1 - Uee * self.dandrea_fit(k=k, w=w)
+            epsilon_ee_k_0 = 1 - Uee * self.dandrea_fit(k=k, w=0)
+            F = -1.0j * (epsilon_ee_k_omega - epsilon_ee_k_0) / epsilon_ee_k_0**2
+            # Siik = 1.0
+            Siik = np.interp(x=k, xp=temp_k, fp=Siis)
+            return x**2 * Siik * F.imag * j  # * measure
+
+        real_coll_freq = col0 * integrate.quad_vec(real_integrand, 0, 1, args=(w,))[0]
+        imag_coll_freq = col0 * integrate.quad_vec(imag_integrand, 0, 1, args=(w,))[0]
+
+        return real_coll_freq + 1.0j * imag_coll_freq
+
+    def _born_ei_collision_frequency_fortmann(self, k, w, lfc):
+        r"""
+        Calculate the Born collision frequency.
+        For details see Eqn. (10) in Fortmann et al., Phys. Rev. E 81 (2010)
+        or Eqn. (B1-B2) in Sch\"orner et al., Phys. Rev. E 107 (2023).
+
+        Parameters:
+            w (array): Energy grid in units of J
+            k (float): scattering wave vector in units of 1/m
+            lfc (float): local field correction, dimensionless
+
+        Returns:
+            array: collision frequency in units of 1/s
+        """
+        w_freq = w / DIRAC_CONSTANT
+        omega_p = self.state.plasma_frequency(
+            self.state.charge_state, self.state.ion_number_density, self.state.atomic_mass
+        )
+        col0 = 1.0 * omega_p**2 * self.state.atomic_mass / (2 * w_freq * ELECTRON_MASS)
+
+        kF = self.state.fermi_wave_number(self.state.free_electron_number_density)
+
+        def real_integrand(u, w):
+            x = np.tan(HALF_PI * u)
+            j = HALF_PI * (1 + x**2)
+
+            k = kF * x
+            Uee = FOUR_PI * COULOMB_CONSTANT * ELEMENTARY_CHARGE**2 / k**2
+            epsilon_ee_k_omega = 1 - Uee * self.lindhard_pol_func(k=k, w=w)
+            epsilon_ee_k_0 = 1 - Uee * self.lindhard_pol_func(k=k, w=0)
+            F = -1.0j * (epsilon_ee_k_omega - epsilon_ee_k_0) / epsilon_ee_k_0**2
+            Siik = 1.0
+            return x**2 * Siik * F.real * j
+
+        def imag_integrand(u, w):
+            x = np.tan(HALF_PI * u)
+            j = HALF_PI * (1 + x**2)
+
+            k = kF * x
+            Uee = FOUR_PI * COULOMB_CONSTANT * ELEMENTARY_CHARGE**2 / k**2
+            epsilon_ee_k_omega = 1 - Uee * self.lindhard_pol_func(k=k, w=w)
+            epsilon_ee_k_0 = 1 - Uee * self.lindhard_pol_func(k=k, w=0)
+            F = -1.0j * (epsilon_ee_k_omega - epsilon_ee_k_0) / epsilon_ee_k_0**2
+            Siik = 1.0
+            return x**2 * Siik * F.imag * j
+
+        real_coll_freq = col0 * integrate.quad_vec(real_integrand, 0, 1, args=(w,))[0]
+        imag_coll_freq = col0 * integrate.quad_vec(imag_integrand, 0, 1, args=(w,))[0]
+
+        return real_coll_freq + 1.0j * imag_coll_freq
 
     def _real_dielectric_mermin(self, k, w, mu1, mu2):
         wtilde = w - mu2
@@ -631,25 +823,25 @@ class FreeFreeDSF:
             w (array): energy grid in units of 1/J
             lfc (float): local field correction, non-dimensional
             collision_frequency_model (str): model option for the collision frequency
-            input_collision_frequency (float): user-defined static collision frequency in 1/s
+            input_collision_frequency (float): user-defined static collision frequency in units of plasma frequency.
 
         Returns:
-            array: polarisation, non-dimensional
+            array: dielectric function, non-dimensional
         """
         wp = self.state.plasma_frequency(-1, self.state.free_electron_number_density, ELECTRON_MASS)
         w_freq = w / DIRAC_CONSTANT
         if input_collision_frequency is not None:
-            mu_ei = input_collision_frequency * wp * (1.0 + 1.0j)
+            mu_ei = input_collision_frequency * wp * (1.0 + 0.0j)
         else:
             mu_ei = self.get_collision_frequency(k=k, w=w, lfc=lfc, model=collision_frequency_model)
-        mu1 = mu_ei.real
-        mu2 = mu_ei.imag
-        real_part = self._real_dielectric_mermin(k=k, w=w_freq, mu1=mu1, mu2=mu2)
-        imag_part = self._im_dielectric_mermin(k=k, w=w_freq, mu1=mu1, mu2=mu2)
-        dielectric_function = real_part + 1.0j * imag_part
 
-        dielectric_rpa0 = self.dielectric_function(k=k, w=0, model="DANDREA_FIT")
-        mermin_dielectric = 1 + (1 + 1.0j * mu_ei / w_freq) * (dielectric_function - 1) / (
-            1 + 1.0j * mu_ei / w_freq * (dielectric_function - 1) / (dielectric_rpa0 - 1)
+        Vee = FOUR_PI * COULOMB_CONSTANT * ELEMENTARY_CHARGE**2 / k**2
+        mu_ei_energy = mu_ei * DIRAC_CONSTANT
+        ratio = 1.0j * mu_ei / w_freq
+        factor = 1 + ratio
+        rpa_dielectric = 1 - self.dandrea_fit(k=k, w=w + 1.0j * mu_ei_energy) * Vee
+        rpa_dielectric0 = 1 - self.dandrea_fit(k=k, w=0) * Vee
+        mermin_dielectric = 1 + (factor * (rpa_dielectric - 1)) / (
+            1 + ratio * (rpa_dielectric - 1) / (rpa_dielectric0 - 1)
         )
         return mermin_dielectric
