@@ -11,15 +11,15 @@ import os
 
 
 def be_example():
-    T = 20  # eV
-    rho = 3.5  # two times solid density [g/cc]
+    T = 40  # eV
+    rho = 1.5  # two times solid density [g/cc]
     Z_Be = 3.5
 
     Zmin, Zmax, xmin, xmax = get_fractions_from_Z(Z=Z_Be)
 
     models = ModelOptions(
-        ei_potential="COULOMB",
-        ii_potential="COULOMB",
+        ei_potential="YUKAWA",
+        ii_potential="YUKAWA",
         ee_potential="COULOMB",
         polarisation_model="NUMERICAL",
         sf_model="HNC",
