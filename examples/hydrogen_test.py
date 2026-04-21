@@ -160,8 +160,8 @@ def compare_hydrogen_against_pimc_and_mcss():
     charge_states = np.array([0.0, 1.0])
     user_defined_inputs = {"ipd": ipd_best_fit}
 
-    sif = stats.norm.pdf(omega_array, 0, 2 * eV_TO_J)
-    sif /= np.max(sif)
+    # sif = stats.norm.pdf(omega_array, 0, 2 * eV_TO_J)
+    # sif /= np.max(sif)
     WR = WR_pimc * J_TO_eV
 
     xdave = xDave(
