@@ -127,7 +127,8 @@ def test_lindard_ff():
 
 
 def test_ff():
-    plt.style.use("~/Desktop/resources/plotting/poster.mplstyle")
+    # plt.style.use("~/Desktop/resources/plotting/poster.mplstyle")
+    THIS_DIR = os.path.dirname(__file__)
 
     rs = 2
     theta = 1
@@ -170,7 +171,7 @@ def test_ff():
         dsfs2_new = np.delete(dsfs2, idx)
         omega_new = np.delete(omega_array, idx)
 
-        fname = f"examples/comparison_data/ff_dsf/4hannah_rs_{int(rs)}_theta_{int(theta)}_{q}.txt"
+        fname = f"{THIS_DIR}/comparison_data/ff_dsf/4hannah_rs_{int(rs)}_theta_{int(theta)}_{q}.txt"
         dat_j = np.genfromtxt(fname=fname, skip_header=22)
         axes.plot(
             dat_j[:, 0] * RYDBERG_TO_eV,

@@ -13,7 +13,7 @@ import time
 
 
 def ch_example():
-    plt.style.use("~/my_style.mplstyle")
+    # plt.style.use("~/my_style.mplstyle")
     start_time = time.time()
     T = 100  # eV
     rho = 1 * 1.845  # two times solid density [g/cc]
