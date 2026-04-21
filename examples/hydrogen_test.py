@@ -19,17 +19,17 @@ import scipy.stats as stats
 
 def compare_hydrogen_against_pimc():
 
+    THIS_DIR = os.path.dirname(__file__)
+
     rs = 3
     theta = 1
     atomic_mass = 1.00784
     Z_mean = 0.51
     ipd_best_fit = -3.43  # eV
     rho, T = get_rho_T_from_rs_theta(rs=rs, theta=theta, atomic_mass=atomic_mass)
-    # rho *= g_per_cm3_TO_kg_per_m3
-    # T *= eV_TO_K
 
     N = 14
-    pimc_data_dir = f"/home/bellen85/code/dev/itcf_fitting/data/N{N}_rs{rs}_theta{theta:.0f}"
+    pimc_data_dir = os.path.join(THIS_DIR, f"comparison_data/pimc_data/N{N}_rs{rs}_theta{theta:.0f}")
     q_value, tau_array, itcf_array, itcf_errors, S_ei, S_ii, WR = load_itcf_from_file(
         N=N, q_index=10, data_path=pimc_data_dir
     )
@@ -125,6 +125,8 @@ def compare_hydrogen_against_pimc():
 
 def compare_hydrogen_against_pimc_and_mcss():
 
+    THIS_DIR = os.path.dirname(__file__)
+
     q_index = 0
 
     rs = 3
@@ -134,7 +136,7 @@ def compare_hydrogen_against_pimc_and_mcss():
     ipd_best_fit = -3.43  # eV
     rho, T = get_rho_T_from_rs_theta(rs=rs, theta=theta, atomic_mass=atomic_mass)
     N = 14
-    pimc_data_dir = f"/home/bellen85/code/dev/itcf_fitting/data/N{N}_rs{rs}_theta{theta:.0f}"
+    pimc_data_dir = os.path.join(THIS_DIR, f"comparison_data/pimc_data/N{N}_rs{rs}_theta{theta:.0f}")
     q_value, tau_array, itcf_array, itcf_errors, S_ei, S_ii, WR_pimc = load_itcf_from_file(
         N=N, q_index=q_index, data_path=pimc_data_dir
     )

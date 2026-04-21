@@ -16,7 +16,7 @@ def is_iterable(test_variable):
 
 def log1pexp(x):
     """
-    Return the function log1pexp(x) = \ln(1 + exp(x)) via the expressions recommended by Eq. (10) by Martin M\"achler.
+    Return the function log1pexp(x) = ln(1 + exp(x)) via the expressions recommended by Eq. (10) by Martin Maechler.
 
     Parameters:
         x (float scalar/iterable): function argument
