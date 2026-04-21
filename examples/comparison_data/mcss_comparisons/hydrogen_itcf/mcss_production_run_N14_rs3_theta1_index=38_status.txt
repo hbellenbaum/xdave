@@ -1,0 +1,130 @@
+
+================================================================================================================
+MCSS was run on 12-09-2025 at 12:38 using the deck file: decks/mcss_production_run_N14_rs3_theta1_index=38.deck
+================================================================================================================
+
+ ========================================
+  .##.....##..######...######...######.. 
+  .###...###.##....##.##....##.##....##. 
+  .####.####.##.......##.......##....... 
+  .##.###.##.##........######...######.. 
+  .##.....##.##.............##.......##. 
+  .##.....##.##....##.##....##.##....##. 
+  .##.....##..######...######...######.. 
+ ========================================
+  Multi-Component Scattering Simulation  
+ ========================================
+
+ Written and maintained by D. A. Chapman (AWE)
+ Tel: +44 (0)1189 856097                      
+ Email: david.chapman@awe.co.uk               
+
+================================================================================================================
+The parameters entered in the deck file are listed below. Copy this region (without headers/borders) to be able
+to re-run this calcualtion if the deck file has been deleted/lost/over-written.:
+================================================================================================================
+
+$SETUP
+  mode_of_operation = "XRTS_SPECTRAL"
+  number_of_ions =          2
+$END
+$FILE
+  output_file_name = "/home/bellen85/code/dev/itcf_fitting/results/processing/mcss_production_run_N14_rs3_theta1_index=38.csv"
+  status_file_name = "/home/bellen85/code/dev/itcf_fitting/results/processing/mcss_production_run_N14_rs3_theta1_index=38_status.txt"
+$END
+$PLASMA
+  use_mean_charge_states = .FALSE.
+  atomic_number =  1.0000000E+000,  1.0000000E+000
+  ionization_state =  0.0000000E+000,  1.0000000E+000
+  density_fraction =  4.8485000E-001,  5.1515000E-001
+  atomic_mass = -1.0000000E+000, -1.0000000E+000
+  mass_density =  9.9860000E-002
+  elec_temperature =  5.5680000E+000
+  ion_temperature =  5.5680000E+000
+  temperature =  5.5680000E+000
+  elec_flow_along_k =  0.0000000E+000
+  ion_flow_along_k =  0.0000000E+000
+  bulk_flow_along_k =  0.0000000E+000
+$END
+$PROBE
+  probe_energy =  2.0000000E+004
+  probe_wavelength = -1.0000000E+000
+  source_func_shape = "GAUSSIAN"
+  source_func_fwhm_ev =  1.0000000E+000
+  source_func_fwhm_nm = -1.0000000E+000
+  use_source_func_data = .FALSE.
+  source_func_file_name = "default"
+$END
+$DETECTOR
+  scattering_angle =  3.9403060E+001
+  number_of_points =      60000
+  min_scat_energy =  1.7000000E+004
+  max_scat_energy =  2.3000000E+004
+  min_scat_wavelength = -1.0000000E-009 nm
+  max_scat_wavelength = -1.0000000E-009 nm
+  number_of_angles =          1
+  min_scat_angle = -1.0000000E+000
+  max_scat_angle = -1.0000000E+000
+  angle_dist_fwhm = -1.0000000E+000
+  angle_dist_power =  2.0000000E+000
+  use_angle_dist_data = .FALSE.
+  angle_dist_file_name = "default"
+$END
+$MODELS
+  ee_pol_func_model = "NUMERICAL_RPA"
+  user_defined_vei = (-1.0000000E+000,  0.0000000E+000)
+  ee_lfc_model = "USER_DEFINED"
+  user_defined_Gee = ( 2.1202000E-001,  0.0000000E+000)
+  bf_dsf_model = "IMPULSE_APPROXIMATION"
+  calculate_rk_factor = .FALSE.
+  user_defined_rk =  1.0000000E+000
+  ipd_model = "NONE"
+  user_defined_ipd = -3.4343400E+000
+  use_ideal_wr = .FALSE.
+  ideal_peak_ratio = -1.0000000E+000
+  calibration_energy = -1.0000000E+000
+  user_defined_wr = -1.0000000E+000
+  ii_potential_model = "DEBYE_HUCKEL"
+  srr_sigma_parameter = -1.0000000E+004, -1.0000000E+004
+  srr_core_power = -1.0000000E+000, -1.0000000E+000
+  ion_core_radius =  4.0000000E+001, -1.0000000E+000
+  csd_gamma_parameter = -1.0000000E+000, -1.0000000E+000
+  csd_core_charge = -1.0000000E+000, -1.0000000E+000
+  screen_cloud_model = "FINITE_WAVELENGTH"
+  ei_potential_model = "EFFECTIVE_COULOMB"
+  sec_core_power =  6.0000000E+000, -1.0000000E+000
+$END
+
+================================================================================================================
+The following plasma properties were calculated:
+================================================================================================================
+
+  The target composition is:         48.         4% H(         0+) +         51.         5% H(         1+)
+  The free electron density is:  3.0733761E+022 /cc
+  The screening length is:  1.0657628E-001 nm
+  The plasma frequency is:  9.8900703E+015 Hz
+  The mean ionization state is:  5.1515000E-001
+  The electron chemical potential is: -8.1068164E-001
+  The electron degeneracy parameter is:  7.7493626E-001
+  The electron coupling parameter is:  8.1421815E-001
+  The ion coupling parameters are:  0.0000000E+000,  8.7051677E-001
+  The scattering parameter is:  1.3730326E-001
+  The approximate wave number is:  3.6162605E+000 1/aB
+  The compton energy is:  1.7792625E+002 eV
+  The plasmon energy is:  7.9986368E+001 eV
+  The IPD energy shift is: -3.4343400E+000 eV
+
+================================================================================================================
+The following messages were generated by the code during the run:
+================================================================================================================
+
+MCSS is running in spectrally resolved XRTS mode with          2 ion species
+
+  Calculating inelastic scattering profile...Done.
+  Convolving inelastic scattering profile with source/instrument function...Done.
+  Calculating the weight of the Rayleigh peak...Done.
+  Convolving elastic scattering profile with source/instrument function...Done.
+
+The calculated weight of the Rayleigh feature is:  1.4604565E-003
+
+Writing MCSS output to file: /home/bellen85/code/dev/itcf_fitting/results/processing/mcss_production_run_N14_rs3_theta1_index=38.csv
