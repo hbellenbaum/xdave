@@ -62,7 +62,7 @@ def test_CrowleyFig1():
         ipds_crowley.append(get_ipd(plasma=kernel, state=state, model="CROWLEY") * J_TO_eV)
         ipds_is.append(get_ipd(plasma=kernel, state=state, model="ION_SPHERE") * J_TO_eV)
 
-    data_path = "examples/comparison_data/ipd/"
+    data_path = f"{os.path.dirname(__file__)}/comparison_data/ipd/"
     sp_data = np.genfromtxt(data_path + f"Crowley2014_Fig1_SP.csv", delimiter=",")
     ek_data = np.genfromtxt(data_path + f"Crowley2014_Fig1_EK.csv", delimiter=",")
     crowley_data = np.genfromtxt(data_path + f"Crowley2014_Fig1_Crowley.csv", delimiter=",")
