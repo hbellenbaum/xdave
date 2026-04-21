@@ -127,7 +127,7 @@ def compare_hydrogen_against_pimc_and_mcss():
 
     THIS_DIR = os.path.dirname(__file__)
 
-    q_index = 0
+    q_index = 0  # index 0 to 10 will work
 
     rs = 3
     theta = 1
@@ -141,7 +141,7 @@ def compare_hydrogen_against_pimc_and_mcss():
         N=N, q_index=q_index, data_path=pimc_data_dir
     )
 
-    mcss_data_dir = f"/home/bellen85/code/dev/itcf_fitting/results/processing/"
+    mcss_data_dir = os.path.join(THIS_DIR, f"comparison_data/mcss_comparisons/hydrogen_itcf")
     mcss_fn = os.path.join(mcss_data_dir, f"mcss_production_run_N{N}_rs{rs}_theta{theta:.0f}_index={q_index}.csv")
     mcss_En, mcss_wff, mcss_wbf, mcss_ff, mcss_bf, mcss_el = load_mcss_result(mcss_fn)
 
