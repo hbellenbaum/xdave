@@ -18,8 +18,8 @@ def be_example():
     Zmin, Zmax, xmin, xmax = get_fractions_from_Z(Z=Z_Be)
 
     models = ModelOptions(
-        ei_potential="DEBYE_HUCKEL",
-        ii_potential="DEBYE_HUCKEL",
+        ei_potential="COULOMB",
+        ii_potential="COULOMB",
         ee_potential="COULOMB",
         polarisation_model="NUMERICAL",
         sf_model="HNC",
