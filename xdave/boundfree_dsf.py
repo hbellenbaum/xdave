@@ -6,6 +6,8 @@ from scipy.special import gamma
 import numpy as np
 import warnings
 
+import math
+
 
 class BoundFreeDSF:
     """
@@ -404,7 +406,14 @@ class BoundFreeDSF:
         Sce_trunc = Sce * (1 - 1 / exp_term)
         return Sce_trunc
 
-    def fletcher_modified_IA(self, ZA, Zb, k, w, Eb):
+    def fletcher_effective_charge_state(self, Zf, xm):  # Effective nuclear ionization
+        m = np.polyfit(np.arange(len(xm)) - 1, xm, 1)
+        S = m[1] + (m[0] * np.arange(0, len(xm), 0.1))
+        Znl = S[int(np.round((Zf * 10)) - 1)]
+
+        return Znl
+
+    def fletcher_modified_IA(self, ZA, Zb, Zf, k, w, Eb):
         """
         Modified impulse approximation specifically designed for carbon.
         The valence electrons are treated using RPA.
@@ -412,5 +421,80 @@ class BoundFreeDSF:
         """
         assert ZA == 6, f"You are using a BF model calibrated to carbon."
 
-        Sce_IA = self.schuhmacher_ia(ZA=ZA, Zb=Zb, k=k, w=w, Eb=Eb)
+        # Empirical shift to match Compton for normalization (Numerical differences from the energy range En?)
+        E = -7 / (6.582e-16)
+
+        # TODO(HB): check units in the k-vector
+
+        Z_10 = self.fletcher_effective_charge_state(Zf, [5.7, 5.7, 5.7, 5.7, 5.7, 6])
+        phi_10 = n = 1
+        l = 0
+        Ynl = (
+            1
+            + (
+                (n / (Z_10 * FINE_STRUCTURE_CONSTANT * SPEED_OF_LIGHT * k))
+                * (w - E - ((DIRAC_CONSTANT * k**2) / (2 * ELECTRIC_CONSTANT)))
+            )
+            ** 2
+        )
+        A_10 = (
+            ((2 ** ((4 * l) + 3)) / np.pi)
+            * ((math.factorial(n - l - 1)) / (math.factorial(n + l)))
+            * ((n**2 * (math.factorial(l)) ** 2) / (Z_10 * FINE_STRUCTURE_CONSTANT))
+        )
+        phi_10 = 1 / (3 * (Ynl**3))
+        # phi_10 = 1 / (3 * (Ynl**2)) # Initial settings per Schumacher, Bloch above leads to a sharper peak and faster decay
+        phi_10 = A_10 * phi_10
+
+        Z_20 = self.fletcher_effective_charge_state(Zf, [3.25, 3.6, 3.95, 4.3, 4.3, 5.15])
+        n = 2
+        l = 0
+        Ynl = (
+            1
+            + (
+                (n / (Z_20 * FINE_STRUCTURE_CONSTANT * SPEED_OF_LIGHT * k))
+                * (w - E - ((DIRAC_CONSTANT * k**2) / (2 * ELECTRON_MASS)))
+            )
+            ** 2
+        )
+        A_20 = (
+            ((2 ** ((4 * l) + 3)) / np.pi)
+            * ((math.factorial(n - l - 1)) / (math.factorial(n + l)))
+            * ((n**2 * (math.factorial(l)) ** 2) / (Z_20 * FINE_STRUCTURE_CONSTANT))
+        )
+        phi_20 = 4 * ((1 / (3 * (Ynl**3))) - (1 / (Ynl**4)) + (4 / (5 * (Ynl**5))))
+        phi_20 = A_20 * phi_20
+
+        Z_21 = self.fletcher_effective_charge_state(Zf, [3.25, 3.6, 3.6, 3.95, 4.3, 5.15])
+        n = 2
+        l = 0
+        Ynl = (
+            1
+            + (
+                (n / (Z_21 * FINE_STRUCTURE_CONSTANT * SPEED_OF_LIGHT * k))
+                * (w - E - ((DIRAC_CONSTANT * k**2) / (2 * ELECTRON_MASS)))
+            )
+            ** 2
+        )
+        A_20 = (
+            ((2 ** ((4 * l) + 3)) / np.pi)
+            * ((math.factorial(n - l - 1)) / (math.factorial(n + l)))
+            * ((n**2 * (math.factorial(l)) ** 2) / (Z_21 * FINE_STRUCTURE_CONSTANT))
+        )
+        phi_20 = 4 * ((1 / (3 * (Ynl**3))) - (1 / (Ynl**4)) + (4 / (5 * (Ynl**5))))
+        phi_20 = A_20 * phi_20
+
+        # TODO(HB): check the negative sign here
+        continuum_edge = 1 / (1 + np.exp(-1 * w))
+        k_edgeC = 1 / (1 + np.exp(-1 * (w - 284.2 * eV_TO_J)))  # Carbon K-edge = 284.2
+
+        phi_10 *= k_edgeC
+        phi_20 *= continuum_edge
+        phi_21 *= continuum_edge
+
+        phi_L, carbon_Kshell = None, None
+
+        phi_L = -1 * normalization(phi_21 + phi_20, 4 - Zl, energy_grid(energy), angle, energy)
+        phi_K = -1 * normalization(phi_10, 2 - Zk, energy_grid(energy), angle, energy)
+
         return
