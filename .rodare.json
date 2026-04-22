@@ -1,0 +1,15 @@
+{
+    "creators": [
+        {
+            "name": "Bellenbaum, Hannah",
+            "affiliation": "Helmholtz-Zentrum Dresden-Rossendorf",
+            "orcid": "0009-0006-6530-1017"
+        }
+    ],
+    "title": "X-Ray Diagnostics, Analysis, Verification and Exploration Code",
+    "access_right": "open",
+    "upload_type": "software",
+    "license": "GPL-3.0",
+    "pub_id": "4642",
+    "description": "Open-source x-ray Thomson scattering code."
+}
