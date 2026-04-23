@@ -11,9 +11,9 @@ THIS_DIR = os.path.dirname(__file__)
 
 
 def test_Fig1b():
-    fn_C = "./examples/comparison_data/screening/Chapman_NatCommun_2015_Fig1b_q_FWS_C.csv"
+    fn_C = f"{THIS_DIR}/comparison_data/screening/Chapman_NatCommun_2015_Fig1b_q_FWS_C.csv"
     dat_C = np.genfromtxt(fn_C, delimiter=",")
-    fn_H = "./examples/comparison_data/screening/Chapman_NatCommun_2015_Fig1b_q_FWS_H.csv"
+    fn_H = f"{THIS_DIR}/comparison_data/screening/Chapman_NatCommun_2015_Fig1b_q_FWS_H.csv"
     dat_H = np.genfromtxt(fn_H, delimiter=",")
 
     ZH = 1

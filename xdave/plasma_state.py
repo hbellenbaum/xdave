@@ -9,8 +9,6 @@ from .fermi_integrals import fdi as xdave_fdi
 from scipy.integrate import quad
 from scipy.optimize import root_scalar
 
-from dataclasses import dataclass
-
 
 def get_Z(Z):
     Z_min = np.floor(Z)
@@ -131,6 +129,25 @@ class PlasmaState:
         csd_parameter: float = None,
         srr_sigma: float = None,
     ) -> None:
+        """
+        Object containing the plasma parameters.
+
+        Attributes:
+            electron_temperature (float): electronic temperature in units of K
+            ion_temperature (float): ion temperature in units of K
+            mass_density (float): mass density in units of kg/m^3
+            charge_state (float): number of free electrons per nucleus
+            atomic_mass (float): atomic mass in units of Dalton
+            atomic_number (float): atomic number
+            binding_energies (array): array containing the binding energy of each shell in J
+            electron_number_density (float): number density of the free electrons in units of 1/m^3
+            ion_number_density (float): number density of the ions in units of 1/m^3
+            ion_core_radius (float): radius of the ion core in units of m
+            sec_power (float): power used in the short range screening pseudo-potential
+            csd_core_charge (float): charge of the nucleus used in the charge switching debye peuso-potential
+            csd_parameters (float): relative weighting of the ionic core used in the charge switching debye peuso-potential
+            srr_sigma (float): used in the short-range pseudo-potential
+        """
         # TODO(Hannah): also add option to initialize using rs and theta
 
         self.initiliased = False
@@ -198,36 +215,106 @@ class PlasmaState:
         self.initiliased = True
 
     def fermi_temperature(self, mass, number_density):
+        """
+        Parameters:
+            mass (float): particle mass in units of kg
+            number_density (float): particle number density in units of 1/m^3
+        Returns:
+            float: fermi temperature in units of K
+        """
         TF = DIRAC_CONSTANT**2 / (mass * BOLTZMANN_CONSTANT) * 0.5 * (3 * PI_SQR) ** (2 / 3) * number_density**1.5
         TF = self.fermi_energy(number_density, mass) / BOLTZMANN_CONSTANT
         return TF
 
     def plasma_frequency(self, charge, number_density, mass):
+        """
+        Parameters:
+            charge (float): particle charge in units of elementary charge e
+            number_density (float): particle number density in units of 1/m^3
+            mass (float): particle mass in units of kg
+        Returns:
+            float: plasma frequency in units of 1/s
+        """
         # return np.sqrt(4 * np.pi * mass_density * ELEMENTARY_CHARGE_SQR / (atomic_mass * VACUUM_PERMITTIVITY))
         return np.sqrt(number_density / (mass * ELECTRIC_CONSTANT)) * abs(charge * ELEMENTARY_CHARGE)
 
     def mean_sphere_radius(self, number_density):
+        """
+        Parameters:
+            number_density (float): particle number density in units of 1/m^3
+        Returns:
+            float: mean sphere radius in units of m.
+        """
         return 1.0 / np.cbrt(FOUR_THIRDS_PI * number_density)
 
     def degeneracy_parameter(self, number_density, temperature, mass):
+        """
+        Parameters:
+            number_density (float): particle number density in units of 1/m^3
+            temperature (float): temperature in units of K
+            mass (float): particle mass in units of kg
+        Returns:
+            float: non-dimensional degeneracy parameter
+        """
         return number_density * self.thermal_de_broglie_wavelength(temperature, mass) ** 3
 
     def fermi_energy(self, number_density, mass):
+        """
+        Parameters:
+            number_density (float): particle number density in units of 1/m^3
+            mass (float): particle mass in units of kg
+        Returns:
+            float: fermi energy in units of J.
+        """
         return 0.5 * DIRAC_CONSTANT**2 * (3.0 * PI**2 * number_density) ** (2 / 3) / mass
 
     def fermi_frequency(self, number_density, mass):
+        """
+        Parameters:
+            number_density (float): particle number density in units of 1/m^3
+            mass (float): particle mass in units of kg
+        Returns:
+            float: fermi frequency in units of 1/s.
+        """
         return self.fermi_energy(number_density, mass) / DIRAC_CONSTANT
 
     def fermi_wave_number(self, number_density):
+        """
+        Parameters:
+            number_density (float): particle number density in units of 1/m^3
+        Returns:
+            float: fermi wave number in units of 1/m.
+        """
         return np.cbrt(3.0 * PI_SQR * number_density)
 
-    def fermi_momentum(self):
-        return DIRAC_CONSTANT * self.fermi_wave_number()
+    def fermi_momentum(self, number_density):
+        """
+        Parameters:
+            number_density (float): particle number density in units of 1/m^3
+        Returns:
+            float: fermi momentum in units of kg m / s.
+        """
+        return DIRAC_CONSTANT * self.fermi_wave_number(number_density=number_density)
 
     def compton_frequency(self, mass):
+        """
+        Parameters:
+            mass (float): particle mass in units of kg
+        Returns:
+            float: Compton frequency in units of 1/s.
+        """
         return mass * SPEED_OF_LIGHT_SQR / DIRAC_CONSTANT
 
     def screening_length(self, mass, charge, temperature, number_density):
+        """
+        Parameters:
+            mass (float): particle mass in units of kg
+            charge (float): particle charge in units of elementary charge e
+            temperature (float): temperature in units of K
+            number_density (float): particle number density in units of 1/m^3
+        Returns:
+            float: screening length in units of m.
+        """
         eta = self.chemical_potential_ichimaru(temperature=temperature, number_density=number_density, mass=mass)
         beta = 1 / (BOLTZMANN_CONSTANT * temperature)
         f = xdave_fdi(j=-0.5, eta=eta * beta, normalize=True)
@@ -245,6 +332,14 @@ class PlasmaState:
         return kappa
 
     def debye_screening_length(self, charge, number_density, temperature):
+        """
+        Parameters:
+            charge (float): particle charge in units of elementary charge e
+            number_density (float): particle number density in units of 1/m^3
+            temperature (float): temperature in units of K
+        Returns:
+            float: screening length in units of m.
+        """
         return np.sqrt(
             number_density * charge * ELEMENTARY_CHARGE**2 / (VACUUM_PERMITTIVITY * BOLTZMANN_CONSTANT * temperature)
         )
@@ -253,6 +348,14 @@ class PlasmaState:
         # )
 
     def thomas_fermi_screening_length(self, charge, number_density, mass):
+        """
+        Parameters:
+            charge (float): particle charge in units of elementary charge e
+            number_density (float): particle number density in units of 1/m^3
+            mass (float): particle mass in units of kg
+        Returns:
+            float: screening length in units of m.
+        """
         return np.sqrt(ELECTRIC_CONSTANT * self.fermi_energy(number_density) / (1.5 * number_density)) / abs(
             charge * ELEMENTARY_CHARGE
         )
@@ -261,9 +364,24 @@ class PlasmaState:
         return np.sqrt(BOLTZMANN_CONSTANT * temperature / mass)
 
     def thermal_de_broglie_wavelength(self, temperature, mass):
+        """
+        Parameters:
+            temperature (float): temperature in units of K
+            mass (float): particle mass in units of kg
+        Returns:
+            float: wavelength in units of m.
+        """
         return SQRT_TWO_PI * DIRAC_CONSTANT / np.sqrt(mass * BOLTZMANN_CONSTANT * temperature)
 
     def chemical_potential(self, temperature, number_density, mass):
+        """
+        Parameters:
+            temperature (float): temperature in units of K
+            number_density (float): particle number density in units of 1/m^3
+            mass (float): particle mass in units of kg
+        Returns:
+            float: chemical potential in units of erg.
+        """
 
         def f(mu_tilde, T_tilde):
             integrand = lambda x: x**0.5 / (np.exp((x - mu_tilde) / T_tilde) + 1)
@@ -293,6 +411,14 @@ class PlasmaState:
         return mu_erg, mu_erg_High, mu_erg_Low
 
     def chemical_potential_classical(self, temperature, number_density, mass):
+        """
+        Parameters:
+            temperature (float): temperature in units of K
+            number_density (float): particle number density in units of 1/m^3
+            mass (float): particle mass in units of kg
+        Returns:
+            float: chemical potential in units of J.
+        """
         Tq = DIRAC_CONSTANT**2 / (mass * BOLTZMANN_CONSTANT) * 2 * PI * (number_density / 2) ** 2 / 3
         mu_class = -3 / 2 * BOLTZMANN_CONSTANT * temperature * np.log(temperature / Tq)
         return mu_class
@@ -318,6 +444,14 @@ class PlasmaState:
         return eta
 
     def chemical_potential_ichimaru(self, temperature, number_density, mass):
+        """
+        Parameters:
+            temperature (float): temperature in units of K
+            number_density (float): particle number density in units of 1/m^3
+            mass (float): particle mass in units of kg
+        Returns:
+            float: chemical potential in units of J.
+        """
         # from scipy.special import gamma
 
         """

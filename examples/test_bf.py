@@ -94,8 +94,10 @@ def test_bf_mcss():
         ax.plot(En, wbf, label=f"MCSS k={k_bohr:.2f}", c=c, ls="dashed")
     for eb in EB:
         ax.axvline(np.abs(eb) * J_TO_eV, c="gray", ls="dotted")
-    ax.legend()
+    ax.legend(ncol=3)
     ax.set_xlim(-40, 300)
+    ax.set_xlabel(r"$\omega$ [eV]")
+    ax.set_ylabel(r"$S_{ee}^{bf}(k,\omega)$ [1/eV]")
     plt.show()
 
     assert np.isclose(
@@ -238,6 +240,7 @@ def test_multispecies_bf():
 
 if __name__ == "__main__":
 
-    test_multispecies_bf()
-    # test_bf_mcss()
+    # plt.style.use("~/my_style.mplstyle")
+    # test_multispecies_bf()
+    test_bf_mcss()
     # test_be_bf()

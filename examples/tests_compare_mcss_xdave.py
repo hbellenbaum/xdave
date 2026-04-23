@@ -17,6 +17,7 @@ from datetime import datetime
 
 
 THIS_DIR = os.path.dirname(__file__)
+# plt.style.use("~/Desktop/resources/plotting/poster.mplstyle")
 
 
 def compare_mcss_xdave_be():
@@ -24,7 +25,7 @@ def compare_mcss_xdave_be():
     rho = 30.0  # g/cc
     Z = 3.5  #
     angle = 75  # degrees, also can run 120
-    beam_energy = 20.0e3  # eV
+    beam_energy = 9.0e3  # eV
     q = calculate_q(angle=angle, energy=beam_energy)
     print(f"Running at q={q:.3f}")
 
@@ -69,18 +70,24 @@ def compare_mcss_xdave_be():
     ax.plot(omega_array, dsf, label="Inel", ls="-.", c="magenta")
     ax.plot(En_mcss, (wbf_mcss + wff_mcss) / mcss_norm, ls=":", c="purple", label="MCSS / AN")
     ax.legend()
+    ax.set_xlabel(r"$\omega$ [eV]")
+    ax.set_ylabel(r"$S_{ee}(k,\omega)$ [1/eV]")
 
     ax = axes[0, 1]
     ax.set_title("FF DSF")
     ax.plot(omega_array, ff_tot, label="FF", ls="--", c="orange")
     ax.plot(En_mcss, wff_mcss / mcss_norm, c="navy", ls=":", label="MCSS: ff")
     ax.legend()
+    ax.set_xlabel(r"$\omega$ [eV]")
+    ax.set_ylabel(r"$S_{ee}(k,\omega)$ [1/eV]")
 
     ax = axes[0, 2]
     ax.set_title("BF DSF")
     ax.plot(omega_array, bf_tot, label="BF", ls="solid", c="dodgerblue")
     ax.plot(En_mcss, wbf_mcss / mcss_norm, c="brown", ls=":", label="MCSS: bf")
     ax.legend()
+    ax.set_xlabel(r"$\omega$ [eV]")
+    ax.set_ylabel(r"$S_{ee}(k,\omega)$ [1/eV]")
 
     tau_array, F_tot_inel, F_wff, F_wbf = kernel.get_itcf(w=omega_array, ff=ff_tot, bf=bf_tot)
 
@@ -91,18 +98,24 @@ def compare_mcss_xdave_be():
     ax.plot(tau_array, F_tot_inel, label="xDave inel", ls="dashed", c="magenta")
     ax.plot(tau_array, F_tot_inel_mcss / mcss_norm, label="MCSS inel", ls="dotted", c="purple")
     ax.legend()
+    ax.set_xlabel(r"$\tau$ [1/eV]")
+    ax.set_ylabel(r"$F_{ee}(\tau,\omega)$")
 
     ax = axes[1, 1]
     ax.set_title("FF ITCF")
     ax.plot(tau_array, F_wff, label="xDave ff", ls="dashed", c="dodgerblue")
     ax.plot(tau_array, F_wff_mcss / mcss_norm, label="MCSS ff", ls="dotted", c="navy")
     ax.legend()
+    ax.set_xlabel(r"$\tau$ [1/eV]")
+    ax.set_ylabel(r"$F_{ee}(\tau,\omega)$")
 
     ax = axes[1, 2]
     ax.set_title("BF ITCF")
     ax.plot(tau_array, F_wbf, label="xDave bf", ls="dashed", c="orange")
     ax.plot(tau_array, F_wbf_mcss / mcss_norm, label="MCSS bf", ls="dotted", c="brown")
     ax.legend()
+    ax.set_xlabel(r"$\tau$ [1/eV]")
+    ax.set_ylabel(r"$F_{ee}(\tau,\omega)$")
     plt.tight_layout()
     plt.show()
     fig.savefig(f"be_test_T={T*K_TO_eV:.1f}_rho={rho*kg_per_m3_TO_g_per_cm3:.1f}_Z={Z}_q={q:.2f}_wrong.pdf")
@@ -496,7 +509,7 @@ def compare_mcss_xdave_ch_static_partialZC():
     ZC1 = int(ZC1)
     ZC2 = int(ZC2)
     # plot result
-    fig, axes = plt.subplots(2, 2, figsize=(16, 16))
+    fig, axes = plt.subplots(2, 2, figsize=(16, 16), sharex=True)
     ax = axes[0, 0]
     ax.plot(k, Sab[0, 0, :], label="H-H", c="crimson", ls="-.")
     ax.plot(k, Sab[0, 1, :], label=f"C{ZC1}-H", c="magenta", ls="-.")
@@ -504,43 +517,43 @@ def compare_mcss_xdave_ch_static_partialZC():
     ax.plot(k, Sab[1, 1, :], label=f"C{ZC1}-C{ZC1}", c="orange", ls="-.")
     ax.plot(k, Sab[1, 2, :], label=f"C{ZC1}-C{ZC2}", c="black", ls="-.")
     ax.plot(k, Sab[2, 2, :], label=f"C{ZC2}-C{ZC2}", c="forestgreen", ls="-.")
-    ax.plot(k_mcss, S11_mcss, label=f"MCSS: H-H", c="crimson", ls=":")
-    ax.plot(k_mcss, S12_mcss, label=f"MCSS: C{ZC1}-H", c="magenta", ls=":")
-    ax.plot(k_mcss, S13_mcss, label=f"MCSS: C{ZC2}-H", c="navy", ls=":")
-    ax.plot(k_mcss, S23_mcss, label=f"MCSS: C{ZC1}-C{ZC2}", c="black", ls=":")
-    ax.plot(k_mcss, S22_mcss, label=f"MCSS: C{ZC1}-C{ZC2}", c="orange", ls=":")
-    ax.plot(k_mcss, S33_mcss, label=f"MCSS: C{ZC2}-C{ZC2}", c="forestgreen", ls=":")
+    ax.plot(k_mcss, S11_mcss, label=f"MCSS: H-H", c="crimson", ls=":", marker="x", markevery=100)
+    ax.plot(k_mcss, S12_mcss, label=f"MCSS: C{ZC1}-H", c="magenta", ls=":", marker="x", markevery=100)
+    ax.plot(k_mcss, S13_mcss, label=f"MCSS: C{ZC2}-H", c="navy", ls=":", marker="x", markevery=100)
+    ax.plot(k_mcss, S23_mcss, label=f"MCSS: C{ZC1}-C{ZC2}", c="black", ls=":", marker="x", markevery=100)
+    ax.plot(k_mcss, S22_mcss, label=f"MCSS: C{ZC1}-C{ZC2}", c="orange", ls=":", marker="x", markevery=100)
+    ax.plot(k_mcss, S33_mcss, label=f"MCSS: C{ZC2}-C{ZC2}", c="forestgreen", ls=":", marker="x", markevery=100)
     ax.legend()
-    ax.set_xlabel(r"$k$ [$a_B^{-1}$]")
-    ax.set_ylabel(r"$S_{ab}$ [ ]")
+    # ax.set_xlabel(r"$k$ [$a_B^{-1}$]")
+    ax.set_ylabel(r"$S_{ab}$")
 
     ax = axes[0, 1]
     ax.plot(k, qs[0], label="H", c="crimson", ls="-.")
     ax.plot(k, qs[1], label=f"C{ZC1}", c="forestgreen", ls="-.")
     ax.plot(k, qs[2], label=f"C{ZC2}", c="navy", ls="-.")
-    ax.plot(k_mcss, q1_mcss, label=f"MCSS: H", c="crimson", ls=":")
-    ax.plot(k_mcss, q2_mcss, label=f"MCSS: C{ZC1}", c="forestgreen", ls=":")
-    ax.plot(k_mcss, q3_mcss, label=f"MCSS: C{ZC2}", c="navy", ls=":")
-    ax.set_xlabel(r"$k$ [$a_B^{-1}$]")
-    ax.set_ylabel(r"$q_{a}$ [ ]")
+    ax.plot(k_mcss, q1_mcss, label=f"MCSS: H", c="crimson", ls=":", marker="x", markevery=100)
+    ax.plot(k_mcss, q2_mcss, label=f"MCSS: C{ZC1}", c="forestgreen", ls=":", marker="x", markevery=100)
+    ax.plot(k_mcss, q3_mcss, label=f"MCSS: C{ZC2}", c="navy", ls=":", marker="x", markevery=100)
+    # ax.set_xlabel(r"$k$ [$a_B^{-1}$]")
+    ax.set_ylabel(r"$q_{a}$")
     ax.legend()
 
     ax = axes[1, 0]
     ax.plot(k, fs[0], label="H", c="crimson", ls="-.")
     ax.plot(k, fs[1], label=f"C{ZC1}", c="forestgreen", ls="-.")
     ax.plot(k, fs[2], label=f"C{ZC2}", c="navy", ls="-.")
-    ax.plot(k_mcss, f1_mcss, label=f"MCSS: H", c="crimson", ls=":")
-    ax.plot(k_mcss, f2_mcss, label=f"MCSS: C{ZC1}", c="forestgreen", ls=":")
-    ax.plot(k_mcss, f3_mcss, label=f"MCSS: C{ZC2}", c="navy", ls=":")
+    ax.plot(k_mcss, f1_mcss, label=f"MCSS: H", c="crimson", ls=":", marker="x", markevery=100)
+    ax.plot(k_mcss, f2_mcss, label=f"MCSS: C{ZC1}", c="forestgreen", ls=":", marker="x", markevery=100)
+    ax.plot(k_mcss, f3_mcss, label=f"MCSS: C{ZC2}", c="navy", ls=":", marker="x", markevery=100)
     ax.set_xlabel(r"$k$ [$a_B^{-1}$]")
-    ax.set_ylabel(r"$f_{a}$ [ ]")
+    ax.set_ylabel(r"$f_{a}$")
     ax.legend()
 
     ax = axes[1, 1]
     ax.plot(k, WR, label=r"$W_R$", c="darkgreen", ls="-.")
-    ax.plot(k_mcss, WR_mcss, label=r"MCSS: $W_R$", c="limegreen", ls=":")
+    ax.plot(k_mcss, WR_mcss, label=r"MCSS: $W_R$", c="limegreen", ls=":", marker="x", markevery=100)
     ax.set_xlabel(r"$k$ [$a_B^{-1}$]")
-    ax.set_ylabel(r"$W_R$ [ ]")
+    ax.set_ylabel(r"$W_R$")
     ax.legend()
 
     plt.tight_layout()
@@ -550,8 +563,8 @@ def compare_mcss_xdave_ch_static_partialZC():
 
 
 if __name__ == "__main__":
-    # compare_mcss_xdave_be()
+    compare_mcss_xdave_be()
     # compare_mcss_xdave_ch()
     # compare_mcss_xdave_c()
     # compare_mcss_xdave_ch_static()
-    compare_mcss_xdave_ch_static_partialZC()
+    # compare_mcss_xdave_ch_static_partialZC()

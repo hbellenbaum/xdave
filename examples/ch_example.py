@@ -9,8 +9,11 @@ import matplotlib.pyplot as plt
 import time
 
 
+# plt.style.use("~/Desktop/resources/plotting/poster.mplstyle")
+
+
 def ch_example():
-    plt.style.use("~/my_style.mplstyle")
+    # plt.style.use("~/my_style.mplstyle")
     start_time = time.time()
     T = 100  # eV
     rho = 1 * 1.845  # two times solid density [g/cc]
@@ -27,7 +30,7 @@ def ch_example():
         ee_potential="COULOMB",
         polarisation_model="NUMERICAL",
         sf_model="HNC",
-        lfc_model="DORNHEIM_ESA",
+        lfc_model="PADE_INTERP",
         ipd_model="STEWART_PYATT",
         bf_model="SCHUMACHER",
         screening_model="FINITE_WAVELENGTH",
@@ -155,8 +158,8 @@ def ch_example():
     ax.set_ylabel(r"$q_{a}(k)$ [#]")
     ax.legend()
     plt.tight_layout()
-    plt.savefig(f"static_example.pdf", dpi=200)
-    # plt.show()
+    # plt.savefig(f"static_example.pdf", dpi=200)
+    plt.show()
 
 
 def cho_example():

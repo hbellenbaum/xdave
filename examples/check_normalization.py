@@ -6,6 +6,8 @@ from xdave import *
 import numpy as np
 import matplotlib.pyplot as plt
 
+# plt.style.use("~/Desktop/resources/plotting/poster.mplstyle")
+
 
 def check_inelastic():
     T = 21.7  # eV
@@ -71,16 +73,17 @@ def check_inelastic():
     plt.axhline(kernel.overlord_state.atomic_number, c="crimson", ls="--", label="AN")
     plt.axhline(1.0, c="gray", ls="--", label="1.0")
     plt.xlabel(r"$k$ [$a_B^{-1}$]")
-    plt.ylabel(r"SF")
-    plt.title(f"enforce_fsum={kernel.enforce_fsum}")
+    plt.ylabel(r"$S(k)$")
+    # plt.title(f"enforce_fsum={kernel.enforce_fsum}")
     plt.legend()
+    plt.tight_layout()
     plt.show()
 
 
 def check_elastic():
     T = 21.7  # eV
     rho = 2.2  # two times solid density [g/cc]
-    Z_C = 3.0
+    Z_C = 3.5
     AN = 6
     Zb = AN - Z_C
 
@@ -118,31 +121,38 @@ def check_elastic():
     angle = 75
     _, Sab, Sab_tot, rayleigh_weight, qs, fs, lfc = kernel.run(w=w, k=ks, beam_energy=beam_energy, mode="STATIC")
 
-    fig, axes = plt.subplots(1, 4, figsize=(14, 10))
+    fig, axes = plt.subplots(1, 2, figsize=(14, 10))
+    # ax = axes[0]
+    # ax.plot(ks, Sab[0, 0, :], label="xDave: 11", ls="-.", c="dodgerblue")
+    # ax.plot(ks, Sab[0, 1, :], label="xDave: 12", ls="-.", c="magenta")
+    # ax.plot(ks, Sab[1, 1, :], label="xDave: 22", ls="-.", c="limegreen")
+    # ax.plot(ks, Sab_tot, label="xDave: tot", ls="-.", c="black")
+    # ax.legend()
+    # ax = axes[0]
+    # ax.plot(ks, rayleigh_weight, label="xDave", ls="-.", c="lightgreen")
+    # ax.plot(ks, rayleigh_weight / kernel.overlord_state.charge_state, label="xDave / Zf", ls="-.", c="dodgerblue")
+    # ax.plot(ks, rayleigh_weight / kernel.overlord_state.atomic_number, label="xDave  AN", ls="-.", c="magenta")
+    # ax.legend()
+    # ax.set_xlabel(r"$k$ [$a_B^{-1}$]")
+    # ax.set_ylabel(r"$W_R(k)$")
     ax = axes[0]
-    ax.plot(ks, Sab[0, 0, :], label="xDave: 11", ls="-.", c="dodgerblue")
-    ax.plot(ks, Sab[0, 1, :], label="xDave: 12", ls="-.", c="magenta")
-    ax.plot(ks, Sab[1, 1, :], label="xDave: 22", ls="-.", c="limegreen")
-    ax.plot(ks, Sab_tot, label="xDave: tot", ls="-.", c="black")
-    ax.legend()
-    ax = axes[1]
-    ax.plot(ks, rayleigh_weight, label="xDave", ls="-.", c="lightgreen")
-    ax.plot(ks, rayleigh_weight / kernel.overlord_state.charge_state, label="xDave / Zf", ls="-.", c="dodgerblue")
-    ax.plot(ks, rayleigh_weight / kernel.overlord_state.atomic_number, label="xDave  AN", ls="-.", c="magenta")
-    ax.legend()
-    ax = axes[2]
     ax.plot(ks, qs[0], label=r"xDave $q_1$", ls="-.", c="lightgreen")
     ax.plot(ks, qs[1], label=r"xDave $q_2$", ls="-.", c="dodgerblue")
     ax.axhline(kernel.overlord_state.charge_state, c="gray", ls=":")
     ax.legend()
-    ax = axes[3]
+    ax.set_xlabel(r"$k$ [$a_B^{-1}$]")
+    ax.set_ylabel(r"$q(k)$")
+    ax = axes[1]
     ax.plot(ks, fs[0], label=r"xDave $f_1$", ls="-.", c="lightgreen")
     ax.plot(ks, fs[1], label=r"xDave $f_2$", ls="-.", c="dodgerblue")
     ax.axhline(kernel.overlord_state.charge_state, c="gray", ls=":")
     ax.legend()
+    ax.set_ylabel(r"$f(k)$")
+    ax.set_xlabel(r"$k$ [$a_B^{-1}$]")
+    plt.tight_layout()
     plt.show()
 
 
 if __name__ == "__main__":
-    check_inelastic()
+    # check_inelastic()
     check_elastic()

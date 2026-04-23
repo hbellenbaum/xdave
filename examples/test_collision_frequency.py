@@ -78,15 +78,17 @@ def test_fortmann_2010_Fig1():
     dat2_re = np.genfromtxt(fn + f"Fortmann_2010_Fig1_rs_5_re.csv", delimiter=",")
     dat2_im = np.genfromtxt(fn + f"Fortmann_2010_Fig1_rs_5_im.csv", delimiter=",")
 
-    w = np.linspace(0.01, 500, 1000) * eV_TO_J
+    w = np.linspace(0.01, 500, 200) * eV_TO_J
     w_freq = w / DIRAC_CONSTANT
+    angle = 75
+    k = calculate_q(angle=angle, energy=8.0e3) / BOHR_RADIUS
 
     rs1 = 1
     rho1, T1 = get_rho_T_from_rs_theta(rs=rs1, theta=1)
 
     state1 = PlasmaState(
-        electron_temperature=T1 * eV_TO_K,
-        ion_temperature=T1 * eV_TO_K,
+        electron_temperature=1 * eV_TO_K,
+        ion_temperature=1 * eV_TO_K,
         mass_density=rho1 * g_per_cm3_TO_kg_per_m3,
         charge_state=1.0,
         atomic_mass=1,
@@ -94,69 +96,69 @@ def test_fortmann_2010_Fig1():
         binding_energies=None,
     )
     ff_kernel = FreeFreeDSF(state=state1)
-    angle = 75
-    k = calculate_q(angle=angle, energy=8.0e3) / BOHR_RADIUS
     born_mu_ei = ff_kernel.get_collision_frequency(k=k, w=w, lfc=0.0, model="BORN")
     w_plasma = state1.plasma_frequency(
         charge=state1.charge_state, number_density=state1.ion_number_density, mass=state1.atomic_mass
     )
-    EF1 = state1.fermi_energy(state1.ion_number_density, state1.atomic_mass)
+    EF1 = state1.fermi_energy(state1.ion_number_density, ELECTRON_MASS)
     omega_F = state1.fermi_frequency(state1.free_electron_number_density, ELECTRON_MASS)
 
-    # rs5 = 5
-    # rho5, T1 = get_rho_T_from_rs_theta(rs=rs5, theta=1)
+    print(omega_F)
+    print(w_plasma)
 
-    # state5 = PlasmaState(
-    #     electron_temperature=T1 * eV_TO_K,
-    #     ion_temperature=T1 * eV_TO_K,
-    #     mass_density=rho5 * g_per_cm3_TO_kg_per_m3,
-    #     charge_state=1.0,
-    #     atomic_mass=1,
-    #     atomic_number=1,
-    #     binding_energies=None,
-    # )
-    # ff_kernel5 = FreeFreeDSF(state=state5)
+    rs5 = 5
+    rho5, T1 = get_rho_T_from_rs_theta(rs=rs5, theta=1)
+
+    state5 = PlasmaState(
+        electron_temperature=1 * eV_TO_K,
+        ion_temperature=1 * eV_TO_K,
+        mass_density=rho5 * g_per_cm3_TO_kg_per_m3,
+        charge_state=1.0,
+        atomic_mass=1,
+        atomic_number=1,
+        binding_energies=None,
+    )
+    ff_kernel5 = FreeFreeDSF(state=state5)
     # born_mu_ei5 = ff_kernel5.get_collision_frequency(k=k, w=w, lfc=0.0, model="BORN")
     # omega_F5 = state5.fermi_frequency(state5.free_electron_number_density, ELECTRON_MASS)
     # EF5 = state5.fermi_energy(state5.free_electron_number_density, ELECTRON_MASS)
-    norm1 = EF1 / DIRAC_CONSTANT
 
     plt.figure()
     plt.xscale("log")
-    # plt.scatter(dat1_re[:, 0] * EF1, dat1_re[:, 1] * norm1, label=f"rs=1, Re", marker="x", c="navy")
-    # plt.scatter(dat1_im[:, 0] * EF1, dat1_im[:, 1] * norm1, label=f"rs=1, Im", marker="<", c="navy")
+    plt.scatter(dat1_re[:, 0], dat1_re[:, 1], label=f"rs=1, Re", marker="x", c="navy")
+    plt.scatter(dat1_im[:, 0], dat1_im[:, 1], label=f"rs=1, Im", marker="<", c="navy")
     plt.plot(
-        w * J_TO_eV,
+        w * EF1 / DIRAC_CONSTANT,
         born_mu_ei.real,
         label=f"xDave rs=1, Re",
         c="navy",
         ls=":",
     )
     plt.plot(
-        w * J_TO_eV,
+        w * EF1 / DIRAC_CONSTANT,
         born_mu_ei.imag,  # * DIRAC_CONSTANT / EF1,
         label=f"xDave rs=1, Im",
         c="navy",
         ls="-.",
     )
-    # plt.scatter(dat2_re[:, 0], dat2_re[:, 1], label=f"rs=5, Re", marker="x", c="crimson")
-    # plt.scatter(dat2_im[:, 0], dat2_im[:, 1], label=f"rs=5, Im", marker="<", c="crimson")
+    # plt.scatter(dat2_re[:, 0] / omega_F5, dat2_re[:, 1] * omega_F5, label=f"rs=5, Re", marker="x", c="crimson")
+    # plt.scatter(dat2_im[:, 0] / omega_F5, dat2_im[:, 1] * omega_F5, label=f"rs=5, Im", marker="<", c="crimson")
     # plt.plot(
-    #     w_freq * DIRAC_CONSTANT / EF5,
-    #     born_mu_ei5.real * DIRAC_CONSTANT / EF5,
+    #     w,
+    #     born_mu_ei5.real,
     #     label=f"xDave rs=5, Re",
     #     c="crimson",
     #     ls=":",
     # )
     # plt.plot(
-    #     w_freq * DIRAC_CONSTANT / EF5,
-    #     born_mu_ei5.imag * DIRAC_CONSTANT / EF5,
+    #     w,
+    #     born_mu_ei5.imag,
     #     label=f"xDave rs=5, Im",
     #     c="crimson",
     #     ls="-.",
     # )
     plt.legend()
-    plt.xlabel(r"$\omega$ [eV]")
+    plt.xlabel(r"$\omega$")
     plt.ylabel(r"$\nu_{ei}$ [$s^{-1}$]")
     # plt.xlabel(r"$\omega$ [$E_F/\hbar$]")
     # plt.ylabel(r"$\nu_{ei}$ [$E_F/\hbar$]")

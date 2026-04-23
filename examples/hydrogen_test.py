@@ -19,17 +19,17 @@ import scipy.stats as stats
 
 def compare_hydrogen_against_pimc():
 
+    THIS_DIR = os.path.dirname(__file__)
+
     rs = 3
     theta = 1
     atomic_mass = 1.00784
     Z_mean = 0.51
     ipd_best_fit = -3.43  # eV
     rho, T = get_rho_T_from_rs_theta(rs=rs, theta=theta, atomic_mass=atomic_mass)
-    # rho *= g_per_cm3_TO_kg_per_m3
-    # T *= eV_TO_K
 
     N = 14
-    pimc_data_dir = f"/home/bellen85/code/dev/itcf_fitting/data/N{N}_rs{rs}_theta{theta:.0f}"
+    pimc_data_dir = os.path.join(THIS_DIR, f"comparison_data/pimc_data/N{N}_rs{rs}_theta{theta:.0f}")
     q_value, tau_array, itcf_array, itcf_errors, S_ei, S_ii, WR = load_itcf_from_file(
         N=N, q_index=10, data_path=pimc_data_dir
     )
@@ -125,7 +125,9 @@ def compare_hydrogen_against_pimc():
 
 def compare_hydrogen_against_pimc_and_mcss():
 
-    q_index = 0
+    THIS_DIR = os.path.dirname(__file__)
+
+    q_index = 0  # index 0 to 10 will work
 
     rs = 3
     theta = 1
@@ -134,12 +136,12 @@ def compare_hydrogen_against_pimc_and_mcss():
     ipd_best_fit = -3.43  # eV
     rho, T = get_rho_T_from_rs_theta(rs=rs, theta=theta, atomic_mass=atomic_mass)
     N = 14
-    pimc_data_dir = f"/home/bellen85/code/dev/itcf_fitting/data/N{N}_rs{rs}_theta{theta:.0f}"
+    pimc_data_dir = os.path.join(THIS_DIR, f"comparison_data/pimc_data/N{N}_rs{rs}_theta{theta:.0f}")
     q_value, tau_array, itcf_array, itcf_errors, S_ei, S_ii, WR_pimc = load_itcf_from_file(
         N=N, q_index=q_index, data_path=pimc_data_dir
     )
 
-    mcss_data_dir = f"/home/bellen85/code/dev/itcf_fitting/results/processing/"
+    mcss_data_dir = os.path.join(THIS_DIR, f"comparison_data/mcss_comparisons/hydrogen_itcf")
     mcss_fn = os.path.join(mcss_data_dir, f"mcss_production_run_N{N}_rs{rs}_theta{theta:.0f}_index={q_index}.csv")
     mcss_En, mcss_wff, mcss_wbf, mcss_ff, mcss_bf, mcss_el = load_mcss_result(mcss_fn)
 
@@ -158,8 +160,8 @@ def compare_hydrogen_against_pimc_and_mcss():
     charge_states = np.array([0.0, 1.0])
     user_defined_inputs = {"ipd": ipd_best_fit}
 
-    sif = stats.norm.pdf(omega_array, 0, 2 * eV_TO_J)
-    sif /= np.max(sif)
+    # sif = stats.norm.pdf(omega_array, 0, 2 * eV_TO_J)
+    # sif /= np.max(sif)
     WR = WR_pimc * J_TO_eV
 
     xdave = xDave(

@@ -14,7 +14,7 @@ class BoundFreeDSF:
     Class containing the bound-free dynamic structure factor calculations.
     As there is only one option each for the form factor and the screening constant calculations, these are hard-coded.
 
-    Attributes:
+    Parameters:
         state (PlasmaState): object containing all plasma state variables
         ff_model (PaulingShermanIonicFormFactor): ionic form factor class
         screening_constants (ScreeningConstants): screening constant class
