@@ -238,9 +238,106 @@ def test_multispecies_bf():
     plt.savefig("bf_example.pdf", dpi=200)
 
 
+def test_modified_bf():
+
+    angle = 113
+    beam_energy = 8550
+    Te = 17
+    rho = 6
+    Zk = 1
+    Zl = 3
+    Z = 4
+
+    comparison_file = os.path.join(
+        os.path.dirname(__file__),
+        "comparison_data/bf_dsf/modified_bf_feature/carbon_xrts_example_T=17_md=6_Zk=1_Zl=3.csv",
+    )
+    dat = np.genfromtxt(comparison_file, delimiter=" ")
+
+    # models = ModelOptions(
+    #     ei_potential="YUKAWA",
+    #     ii_potential="YUKAWA",
+    #     ee_potential="COULOMB",
+    #     polarisation_model="NUMERICAL",
+    #     sf_model="HNC",
+    #     lfc_model="DORNHEIM_ESA",
+    #     ipd_model="NONE",
+    #     bf_model="SCHUMACHER",
+    #     screening_model="FINITE_WAVELENGTH",
+    # )
+
+    # kernel = xDave(
+    #     mass_density=rho,
+    #     electron_temperature=Te,
+    #     ion_temperature=Te,
+    #     elements=np.array(["C", "C"]),
+    #     charge_states=np.array([3, 4]),
+    #     partial_densities=np.array([0.5, 0.5]),
+    #     models=models,
+    #     enforce_fsum=False,
+    #     user_defined_inputs=None,
+    #     verbose=True,
+    #     hnc_max_iterations=10000,
+    #     hnc_mix_fraction=0.99,
+    #     hnc_delta=1.0e-7,
+    # )
+
+    w = np.linspace(-1000, 1500, 10000)
+    # bf_tot, ff_tot, dsf, rayleigh_weight, ff_i, bf_i = kernel.run(
+    #     w=w, angle=angle, beam_energy=beam_energy, mode="DYNAMIC"
+    # )
+
+    k = calculate_q(angle=angle, energy=beam_energy)
+    k_SI = k / BOHR_RADIUS
+
+    state = PlasmaState(
+        electron_temperature=17 * eV_TO_K,
+        ion_temperature=17 * eV_TO_K,
+        mass_density=6 * g_per_cm3_TO_kg_per_m3,
+        charge_state=Z,
+        atomic_mass=12,
+        atomic_number=6,
+        binding_energies=None,
+    )
+
+    bf_kernel = BoundFreeDSF(state=state)
+    test_L_shell, test_K_shell = bf_kernel.fletcher_modified_IA(
+        ZA=6, Zb=5.9, Zf=0.1, k=k_SI, w=w * eV_TO_J, Eb=None, Zl=Zl, Zk=Zk
+    )
+
+    test_L_shell /= J_TO_eV
+    test_K_shell /= J_TO_eV
+
+    # print(test_K_shell)
+    diff_L = test_L_shell / (np.interp(x=w, xp=beam_energy - dat[:, 0], fp=dat[:, 1]))
+    diff_K = test_K_shell / (np.interp(x=w, xp=beam_energy - dat[:, 0], fp=dat[:, 2]))
+
+    A_L = 2.5162541
+
+    print(diff_L)
+
+    fig, axes = plt.subplots(1, 2, figsize=(14, 10))
+    axes[0].plot(w, test_L_shell, label="L", c="navy", ls="-.")
+    axes[0].plot(beam_energy - dat[:, 0], dat[:, 1], label="LF: L", c="dodgerblue", ls="solid")
+    axes[0].plot(w, test_K_shell, label="K", c="crimson", ls="-.")
+    axes[0].plot(beam_energy - dat[:, 0], dat[:, 2], label="LF: K", c="orange", ls="solid")
+    axes[0].legend()
+    axes[0].set_xlabel(r"$\omega$ [eV]")
+    axes[0].set_ylabel(r"DSF [1/eV]")
+    axes[1].plot(w, diff_L, c="navy", label="Diff L")
+    axes[1].plot(w, diff_K, c="crimson", label="Diff K")
+    axes[1].set_xlabel(r"$\omega$ [eV]")
+    axes[1].set_ylabel(r"xDave / LB")
+    # plt.plot(w, test_K_shell + test_L_shell, label="BF")
+    # plt.plot(w, bf_tot, label="xDave")
+    axes[1].legend()
+    plt.show()
+
+
 if __name__ == "__main__":
 
     # plt.style.use("~/my_style.mplstyle")
     # test_multispecies_bf()
-    test_bf_mcss()
+    # test_bf_mcss()
     # test_be_bf()
+    test_modified_bf()

@@ -1,4 +1,5 @@
 from .ii_ff import PaulingShermanIonicFormFactor, ScreeningConstants
+from .freefree_dsf import FreeFreeDSF
 from .plasma_state import PlasmaState
 from .unit_conversions import *
 from .constants import *
@@ -406,95 +407,131 @@ class BoundFreeDSF:
         Sce_trunc = Sce * (1 - 1 / exp_term)
         return Sce_trunc
 
-    def fletcher_effective_charge_state(self, Zf, xm):  # Effective nuclear ionization
+    def _fletcher_effective_charge_state(self, Zf, xm):  # Effective nuclear ionization
         m = np.polyfit(np.arange(len(xm)) - 1, xm, 1)
         S = m[1] + (m[0] * np.arange(0, len(xm), 0.1))
         Znl = S[int(np.round((Zf * 10)) - 1)]
 
         return Znl
 
-    def fletcher_modified_IA(self, ZA, Zb, Zf, k, w, Eb):
+    def _bf_normalization(self, dsf, Z, w, k):
+        Z = Z + 1.0e-6
+        I_in = np.trapezoid(w, dsf * w)
+        # [Cx]
+        Cx = (I_in * (2 * ELECTRON_MASS)) / (Z * DIRAC_CONSTANT * (k * k))  # / ELEMENTARY_CHARGE
+        return dsf / Cx
+
+    def fletcher_modified_IA(self, ZA, Zb, Zf, k, w, Eb, Zl, Zk):
         """
         Modified impulse approximation specifically designed for carbon.
         The valence electrons are treated using RPA.
         K and L-shell contributions are considered separately.
         """
+        # w *= J_TO_eV
         assert ZA == 6, f"You are using a BF model calibrated to carbon."
 
+        Zf = 0.1
+
         # Empirical shift to match Compton for normalization (Numerical differences from the energy range En?)
-        E = -7 / (6.582e-16)
+        # convert energy to frequency domain
+        E = -7 * eV_TO_J  # [J]
+
+        # Compton frequency
+        wC = DIRAC_CONSTANT * k**2 / (2 * ELECTRON_MASS)  # units of s^{-1} = Hz
 
         # TODO(HB): check units in the k-vector
 
-        Z_10 = self.fletcher_effective_charge_state(Zf, [5.7, 5.7, 5.7, 5.7, 5.7, 6])
-        phi_10 = n = 1
+        Z_10 = self._fletcher_effective_charge_state(Zf, [5.7, 5.7, 5.7, 5.7, 5.7, 6])  # [ ]
+        n = 1
         l = 0
-        Ynl = (
+        Y10 = (
             1
             + (
                 (n / (Z_10 * FINE_STRUCTURE_CONSTANT * SPEED_OF_LIGHT * k))
-                * (w - E - ((DIRAC_CONSTANT * k**2) / (2 * ELECTRIC_CONSTANT)))
+                * (w / DIRAC_CONSTANT - E / DIRAC_CONSTANT - ((DIRAC_CONSTANT * k**2) / (2 * ELECTRON_MASS)))
             )
             ** 2
-        )
+        )  # [ ]
         A_10 = (
             ((2 ** ((4 * l) + 3)) / np.pi)
             * ((math.factorial(n - l - 1)) / (math.factorial(n + l)))
             * ((n**2 * (math.factorial(l)) ** 2) / (Z_10 * FINE_STRUCTURE_CONSTANT))
-        )
-        phi_10 = 1 / (3 * (Ynl**3))
+        )  # [ ]
+        phi_10 = 1 / (3 * (Y10**3))
         # phi_10 = 1 / (3 * (Ynl**2)) # Initial settings per Schumacher, Bloch above leads to a sharper peak and faster decay
-        phi_10 = A_10 * phi_10
+        phi_10 = A_10 * phi_10  # [ ]
 
-        Z_20 = self.fletcher_effective_charge_state(Zf, [3.25, 3.6, 3.95, 4.3, 4.3, 5.15])
+        Z_20 = self._fletcher_effective_charge_state(Zf, [3.25, 3.6, 3.95, 4.3, 4.3, 5.15])  # [ ]
         n = 2
         l = 0
-        Ynl = (
+        Y20 = (
             1
             + (
                 (n / (Z_20 * FINE_STRUCTURE_CONSTANT * SPEED_OF_LIGHT * k))
-                * (w - E - ((DIRAC_CONSTANT * k**2) / (2 * ELECTRON_MASS)))
+                * (w / DIRAC_CONSTANT - E / DIRAC_CONSTANT - ((DIRAC_CONSTANT * k**2) / (2 * ELECTRON_MASS)))
             )
             ** 2
-        )
+        )  # [ ]
         A_20 = (
             ((2 ** ((4 * l) + 3)) / np.pi)
             * ((math.factorial(n - l - 1)) / (math.factorial(n + l)))
             * ((n**2 * (math.factorial(l)) ** 2) / (Z_20 * FINE_STRUCTURE_CONSTANT))
         )
-        phi_20 = 4 * ((1 / (3 * (Ynl**3))) - (1 / (Ynl**4)) + (4 / (5 * (Ynl**5))))
-        phi_20 = A_20 * phi_20
+        phi_20 = 4 * ((1 / (3 * (Y20**3))) - (1 / (Y20**4)) + (4 / (5 * (Y20**5))))  # [ ]
+        phi_20 = A_20 * phi_20  # [ ]
 
-        Z_21 = self.fletcher_effective_charge_state(Zf, [3.25, 3.6, 3.6, 3.95, 4.3, 5.15])
+        Z_21 = self._fletcher_effective_charge_state(Zf, [3.25, 3.6, 3.6, 3.95, 4.3, 5.15])  # [ ]
         n = 2
         l = 0
-        Ynl = (
+        Y21 = (
             1
             + (
                 (n / (Z_21 * FINE_STRUCTURE_CONSTANT * SPEED_OF_LIGHT * k))
-                * (w - E - ((DIRAC_CONSTANT * k**2) / (2 * ELECTRON_MASS)))
+                * (w / DIRAC_CONSTANT - E / DIRAC_CONSTANT - ((DIRAC_CONSTANT * k**2) / (2 * ELECTRON_MASS)))
             )
             ** 2
-        )
-        A_20 = (
+        )  # [ ]
+        A_21 = (
             ((2 ** ((4 * l) + 3)) / np.pi)
             * ((math.factorial(n - l - 1)) / (math.factorial(n + l)))
             * ((n**2 * (math.factorial(l)) ** 2) / (Z_21 * FINE_STRUCTURE_CONSTANT))
-        )
-        phi_20 = 4 * ((1 / (3 * (Ynl**3))) - (1 / (Ynl**4)) + (4 / (5 * (Ynl**5))))
-        phi_20 = A_20 * phi_20
+        )  # [ ]
+        phi_21 = 4 * ((1 / (3 * (Y21**3))) - (1 / (Y21**4)) + (4 / (5 * (Y21**5))))  # [ ]
+        phi_21 = A_21 * phi_21  # [ ]
 
         # TODO(HB): check the negative sign here
-        continuum_edge = 1 / (1 + np.exp(-1 * w))
-        k_edgeC = 1 / (1 + np.exp(-1 * (w - 284.2 * eV_TO_J)))  # Carbon K-edge = 284.2
+        # TODO(HB): check the units here, this is not dimensionless like it should be...
+        continuum_edge = 1 / (1 + np.exp(-1 * w / DIRAC_CONSTANT))
+        k_edgeC = 1 / (1 + np.exp(-1 * (w / DIRAC_CONSTANT - 284.2 * eV_TO_J / DIRAC_CONSTANT)))
+        # continuum_edge = 1 / (1 + np.exp(-1 * wC))
+        # k_edgeC = 1 / (1 + np.exp(-1 * (w / DIRAC_CONSTANT - 284.2 * eV_TO_J / DIRAC_CONSTANT)))
+        # Carbon K-edge = 284.2
 
         phi_10 *= k_edgeC
         phi_20 *= continuum_edge
         phi_21 *= continuum_edge
 
-        phi_L, carbon_Kshell = None, None
+        phi_L = -1 * self._bf_normalization(dsf=phi_21 + phi_20, Z=4 - Zl, w=w, k=k)
+        carbon_Kshell = -1 * self._bf_normalization(dsf=phi_10, Z=2 - Zk, w=w, k=k)
 
-        phi_L = -1 * normalization(phi_21 + phi_20, 4 - Zl, energy_grid(energy), angle, energy)
-        phi_K = -1 * normalization(phi_10, 2 - Zk, energy_grid(energy), angle, energy)
+        C = 1.827e3  # ????
 
-        return
+        temp_state = PlasmaState(
+            electron_temperature=4 * eV_TO_K,
+            ion_temperature=4 * eV_TO_K,
+            mass_density=1 * g_per_cm3_TO_kg_per_m3,
+            charge_state=4,
+            atomic_number=1,
+            atomic_mass=1,
+            binding_energies=None,
+        )
+        valence_carbon_solid = FreeFreeDSF(state=temp_state).get_dsf(k=k, w=w, lfc=0.0, model="DANDREA_FIT")  # [1/J]
+        # This changes nothing
+        # valence_carbon = valence_carbon_solid / J_TO_eV
+        valence_carbon = (np.sum(phi_L) / np.sum(valence_carbon_solid)) * valence_carbon_solid
+
+        # return (
+        #     C * 0.9964219451371571 * carbon_Kshell * DIRAC_CONSTANT,
+        #     C * 1.0547927578124998 * valence_carbon * DIRAC_CONSTANT,
+        # )
+        return carbon_Kshell * DIRAC_CONSTANT, valence_carbon * DIRAC_CONSTANT
