@@ -502,7 +502,8 @@ class BoundFreeDSF:
         # TODO(HB): check the negative sign here
         # TODO(HB): check the units here, this is not dimensionless like it should be...
         continuum_edge = 1 / (1 + np.exp(-1 * w / DIRAC_CONSTANT))
-        k_edgeC = 1 / (1 + np.exp(-1 * (w / DIRAC_CONSTANT - 284.2 * eV_TO_J / DIRAC_CONSTANT)))
+        k_edgeC = 1 / (1 + np.exp(-1 * (w / DIRAC_CONSTANT - Eb / DIRAC_CONSTANT)))
+        # k_edgeC = 1 / (1 + np.exp(-1 * (w / DIRAC_CONSTANT - 284.2 * eV_TO_J / DIRAC_CONSTANT)))
         # continuum_edge = 1 / (1 + np.exp(-1 * wC))
         # k_edgeC = 1 / (1 + np.exp(-1 * (w / DIRAC_CONSTANT - 284.2 * eV_TO_J / DIRAC_CONSTANT)))
         # Carbon K-edge = 284.2
@@ -534,4 +535,5 @@ class BoundFreeDSF:
         #     C * 0.9964219451371571 * carbon_Kshell * DIRAC_CONSTANT,
         #     C * 1.0547927578124998 * valence_carbon * DIRAC_CONSTANT,
         # )
-        return carbon_Kshell * DIRAC_CONSTANT, valence_carbon * DIRAC_CONSTANT
+        C1 = 2.51624627
+        return carbon_Kshell * DIRAC_CONSTANT / C1, valence_carbon * DIRAC_CONSTANT / C1

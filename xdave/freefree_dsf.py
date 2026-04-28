@@ -5,7 +5,9 @@ from .plasma_state import PlasmaState
 from .fermi_integrals import fdi
 from .static_sf import OCPStaticStructureFactor
 
-from scipy import integrate
+from scipy import signal
+from scipy import integrate, interpolate
+from scipy.interpolate import UnivariateSpline
 import numpy as np
 import warnings
 
@@ -234,6 +236,52 @@ class FreeFreeDSF:
         func = g(u + z) - g(u - z)
         chi_ee = 1 / Uee * chi02 / (4 * z**3) * func
         return chi_ee
+
+    def _ff_normalization(self, dsf, Z, w, k):
+        Z = Z + 1.0e-6
+        I_in = np.trapezoid(w, dsf * w)
+        # [Cx]
+        Cx = (I_in * (2 * ELECTRON_MASS)) / (Z * DIRAC_CONSTANT * (k * k))  # / ELEMENTARY_CHARGE
+        return dsf / Cx
+
+    def landen_dsf(self, k, w, angle):
+        # w *= J_TO_eV
+        w_freq = w / DIRAC_CONSTANT
+        # angle = 2 * np.arcsin(K)
+        ne = self.state.free_electron_number_density
+        Te = self.state.electron_temperature
+        TF = self.state.fermi_temperature(ELECTRON_MASS, ne)
+        vF = np.sqrt(2 * BOLTZMANN_CONSTANT * TF / ELECTRON_MASS)
+        k_D = self.state.debye_screening_length(charge=1, number_density=ne, temperature=Te)
+        lambd = TWO_PI / k_D
+        omega_p = self.state.plasma_frequency(charge=1, number_density=ne, mass=ELECTRON_MASS)
+        omega_C = (2 * PI * SPEED_OF_LIGHT / lambd) ** 2
+        k1 = PLANCK_CONSTANT * SPEED_OF_LIGHT / (lambd * ELECTRON_MASS * (SPEED_OF_LIGHT**2))
+        k2 = (PLANCK_CONSTANT * SPEED_OF_LIGHT / lambd + DIRAC_CONSTANT * w_freq) / (
+            ELECTRON_MASS * (SPEED_OF_LIGHT**2)
+        )
+        kC = (
+            np.sqrt((k1**2) + (k2**2) - 2 * k1 * k2 * np.cos(angle / 180 * np.pi))
+            * ELECTRON_MASS
+            * SPEED_OF_LIGHT
+            / DIRAC_CONSTANT
+        )
+        keff = np.sqrt(1 - omega_p / omega_C) * kC
+        vx = -(w_freq + DIRAC_CONSTANT * (keff**2) / (2 * ELECTRON_MASS)) / keff
+        t = Te / TF
+        b = np.linspace(0, np.pi / 2, 250)
+        tmp = (vx[:, None] / (vF * np.cos(b))) ** 2
+        L = np.sum(tmp * np.tan(b) / (np.exp((tmp - 1 + (np.pi**2 / 12) * t**2) / t) + 1), axis=1)
+
+        ans = L * 2 * vF / SPEED_OF_LIGHT * np.sin(angle / 360 * np.pi)
+        k1 = PLANCK_CONSTANT * SPEED_OF_LIGHT / lambd
+        k2 = k1 + DIRAC_CONSTANT * w_freq
+        pwr_index = 0
+
+        Skw = self.state.charge_state * pow(k2 / k1, pwr_index) * ans
+        See = signal.medfilt(Skw, kernel_size=9)
+
+        return See[::-1]
 
     # def zeroT_susceptibility_limit(self, k, w):
     #     """
