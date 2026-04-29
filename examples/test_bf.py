@@ -1,7 +1,7 @@
 from xdave.plasma_state import PlasmaState, get_fractions_from_Z_partial
 from xdave.boundfree_dsf import BoundFreeDSF
 from xdave.freefree_dsf import FreeFreeDSF
-from xdave.constants import BOHR_RADIUS
+from xdave.constants import BOHR_RADIUS, DIRAC_CONSTANT
 from xdave.unit_conversions import (
     eV_TO_K,
     g_per_cm3_TO_kg_per_m3,
@@ -245,9 +245,9 @@ def test_modified_bf():
     beam_energy = 8550
     Te = 17
     rho = 6
-    Zk = 2
-    Zl = 4
-    Z = 4
+    Zk = 0
+    Zl = 2
+    Z = 2
 
     pairings = np.array([[0, 2], [1, 2], [1, 3], [1, 4], [2, 4]])
 
@@ -295,7 +295,8 @@ def test_modified_bf():
         #     hnc_delta=1.0e-7,
         # )
 
-        w = np.linspace(-1000, 1500, 10000)
+        w = np.linspace(-1000, 1000, 1000)
+        w = np.arange(-1000, 1000, 1)
         # bf_tot, ff_tot, dsf, rayleigh_weight, ff_i, bf_i = kernel.run(
         #     w=w, angle=angle, beam_energy=beam_energy, mode="DYNAMIC"
         # )
@@ -318,7 +319,16 @@ def test_modified_bf():
 
         bf_kernel = BoundFreeDSF(state=state)
         test_K_shell, test_L_shell = bf_kernel.fletcher_modified_IA(
-            ZA=6, Zb=5.9, Zf=0.1, k=k_SI, w=w * eV_TO_J, Eb=Eb, Zl=Zl, Zk=Zk
+            ZA=6,
+            Zb=5.9,
+            Zf=0.1,
+            k=k_SI,
+            w=w * eV_TO_J,
+            Eb=Eb,
+            Zl=Zl,
+            Zk=Zk,
+            angle=angle,
+            beam_energy=beam_energy * eV_TO_J,
         )
 
         test_L_shell /= J_TO_eV
@@ -329,6 +339,10 @@ def test_modified_bf():
 
         diff_L = test_L_shell / (np.interp(x=w, xp=beam_energy - dat[:, 0], fp=dat[:, 2]))
         diff_K = test_K_shell / (np.interp(x=w, xp=beam_energy - dat[:, 0], fp=dat[:, 1]))
+
+        idx = np.argmax(test_L_shell)
+
+        print(diff_L[idx])
 
         # idx = np.argmax(test_K_shell)
         # lk_max = np.interp(x=w, xp=beam_energy - dat[:, 0], fp=dat[:, 1])[idx]
@@ -377,6 +391,7 @@ def determine_valence_scaling():
 
     # pairings = np.array([[0, 2], [1, 2], [1, 3], [1, 4], [2, 4]])
     pairings = np.array([[1, 2], [1, 3], [1, 4], [2, 4]])
+    # Zfs = np.array([1, 2, 3, 4, 5])
 
     fig, axes = plt.subplots(1, 2, figsize=(14, 10))
 
@@ -386,10 +401,9 @@ def determine_valence_scaling():
     for i in range(0, len(colors)):
         p = pairings[i]
         c = colors[i]
-        Zk = p[0]
-        Zl = p[1]
+        # Zf = Zfs[i]
 
-        Zf = Zl + Zk
+        Zf = p[0] + p[1]
         print(f"Zf={Zf}")
 
         comparison_file = os.path.join(
@@ -409,25 +423,36 @@ def determine_valence_scaling():
         )
         ff_dsf = FreeFreeDSF(state=state).get_dsf(k=k, w=w * eV_TO_J, lfc=0.0, model="NUMERICAL")
 
-        ff_dsf_landen = FreeFreeDSF(state=state).landen_dsf(k=k, w=w * eV_TO_J, angle=angle)
+        En_landen, ff_dsf_landen = FreeFreeDSF(state=state).landen_dsf(angle=angle, beam_energy=beam_energy * eV_TO_J)
+
+        # print(ff_dsf_landen)
+        # ff_dsf_landen /= eV_TO_J
+        # ff_dsf_landen *= DIRAC_CONSTANT
+        # ff_dsf_landen /= J_TO_eV
+
+        ff_dsf_landen *= 1.55e-11
 
         ff_dsf /= J_TO_eV
         ff_dsf *= Zf
 
-        axes[0].plot(beam_energy - dat[:, 0], dat[:, 3], c=c, marker="x", ls=":", markevery=10, label=f"LF: Zf={Zf}")
-        axes[0].plot(w, ff_dsf_landen, c=c, marker="*", ls=":", markevery=10, label=f"Landon: Zf={Zf}")
-        # axes[0].plot(w, ff_dsf, c=c, ls="--", label=f"RPA: Zf={Zf}")
-        # print(np.max(ff_dsf_landen))
+        print(ff_dsf)
+
+        # axes[0].plot(beam_energy - dat[:, 0], dat[:, 3], c=c, marker="x", ls=":", markevery=10, label=f"LF: Zf={Zf}")
+        axes[0].plot(En_landen, ff_dsf_landen, c=c, marker="*", ls=":", markevery=15, label=f"Landon: Zf={Zf}")
+        axes[0].plot(w, ff_dsf, c=c, ls="--", label=f"RPA: Zf={Zf}")
 
         diff = ff_dsf / (np.interp(x=w, xp=beam_energy - dat[:, 0], fp=dat[:, 3]))
-        diff2 = ff_dsf_landen / (np.interp(x=w, xp=beam_energy - dat[:, 0], fp=dat[:, 3]))
-        axes[1].plot(w, diff, c=c, ls="solid", label=f"Diff Zf={Zf}")
-        axes[1].plot(w, diff2, c=c, ls="-.", label=f"Diff Zf={Zf}")
+        diff2 = ff_dsf_landen / (np.interp(x=En_landen, xp=beam_energy - dat[:, 0], fp=dat[:, 3]))
+        diff3 = ff_dsf / np.interp(x=w, xp=En_landen, fp=ff_dsf_landen)
+        # axes[1].plot(w, diff, c=c, ls="solid", label=f"Diff Zf={Zf}")
+        # axes[1].plot(En_landen, diff2, c=c, ls="-.", label=f"Diff Zf={Zf}")
+        axes[1].plot(w, abs(diff3), c=c, label=f"Diff Zf={Zf}")
+        # print(diff2)
 
     axes[0].legend()
     # axes[0].set_xlim(-100, 100)
-    axes[1].set_xlim(-200, 600)
-    axes[1].set_ylim(-1, 1.0e3)
+    # axes[1].set_xlim(-200, 600)
+    # axes[1].set_ylim(-1, 1.0e3)
     axes[0].set_xlabel(r"$\omega$ [eV]")
     axes[0].set_ylabel(r"DSF [1/eV]")
     axes[1].set_xlabel(r"$\omega$ [eV]")
@@ -442,5 +467,5 @@ if __name__ == "__main__":
     # test_multispecies_bf()
     # test_bf_mcss()
     # test_be_bf()
-    determine_valence_scaling()
-    # test_modified_bf()
+    # determine_valence_scaling()
+    test_modified_bf()

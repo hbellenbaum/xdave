@@ -414,14 +414,16 @@ class BoundFreeDSF:
 
         return Znl
 
-    def _bf_normalization(self, dsf, Z, w, k):
+    def _bf_normalization(self, dsf, Z, w, k, beam_energy):
         Z = Z + 1.0e-6
+        # wtilde = w * DIRAC_CONSTANT * J_TO_eV
         I_in = np.trapezoid(w, dsf * w)
+        # I_in = np.trapezoid(beam_energy - wtilde, dsf * (beam_energy - wtilde))
         # [Cx]
         Cx = (I_in * (2 * ELECTRON_MASS)) / (Z * DIRAC_CONSTANT * (k * k))  # / ELEMENTARY_CHARGE
         return dsf / Cx
 
-    def fletcher_modified_IA(self, ZA, Zb, Zf, k, w, Eb, Zl, Zk):
+    def fletcher_modified_IA(self, ZA, Zb, Zf, k, w, Eb, Zl, Zk, angle, beam_energy):
         """
         Modified impulse approximation specifically designed for carbon.
         The valence electrons are treated using RPA.
@@ -512,28 +514,35 @@ class BoundFreeDSF:
         phi_20 *= continuum_edge
         phi_21 *= continuum_edge
 
-        phi_L = -1 * self._bf_normalization(dsf=phi_21 + phi_20, Z=4 - Zl, w=w, k=k)
-        carbon_Kshell = -1 * self._bf_normalization(dsf=phi_10, Z=2 - Zk, w=w, k=k)
+        phi_L = -1 * self._bf_normalization(dsf=phi_21 + phi_20, Z=4 - Zl, w=w, k=k, beam_energy=beam_energy)
+        carbon_Kshell = -1 * self._bf_normalization(dsf=phi_10, Z=2 - Zk, w=w, k=k, beam_energy=beam_energy)
 
         C = 1.827e3  # ????
 
         temp_state = PlasmaState(
-            electron_temperature=4 * eV_TO_K,
-            ion_temperature=4 * eV_TO_K,
+            electron_temperature=17 * eV_TO_K,
+            ion_temperature=17 * eV_TO_K,
             mass_density=1 * g_per_cm3_TO_kg_per_m3,
             charge_state=4,
             atomic_number=1,
             atomic_mass=1,
             binding_energies=None,
         )
-        valence_carbon_solid = FreeFreeDSF(state=temp_state).get_dsf(k=k, w=w, lfc=0.0, model="DANDREA_FIT")  # [1/J]
-        # This changes nothing
-        # valence_carbon = valence_carbon_solid / J_TO_eV
+        # temp_state.free_electron_number_density /= 2
+        valence_carbon_solid = Zf * FreeFreeDSF(state=temp_state).get_dsf(
+            k=k, w=w, lfc=0.0, model="DANDREA_FIT"
+        )  # [1/J]
+        # tmp_energy, valence_carbon_solid = FreeFreeDSF(state=temp_state).landen_dsf(
+        #     angle=angle, beam_energy=beam_energy
+        # )
+        valence_carbon_solid = self._bf_normalization(
+            dsf=valence_carbon_solid, w=w, k=k, Z=4 - Zl, beam_energy=beam_energy
+        )
+        bf_edge_mask = w < 0
+        valence_carbon_solid[bf_edge_mask] = 0
+        # valence_carbon_solid = np.interp(x=w, xp=tmp_energy[::-1] * eV_TO_J, fp=valence_carbon_solid[::-1] / eV_TO_J)
         valence_carbon = (np.sum(phi_L) / np.sum(valence_carbon_solid)) * valence_carbon_solid
 
-        # return (
-        #     C * 0.9964219451371571 * carbon_Kshell * DIRAC_CONSTANT,
-        #     C * 1.0547927578124998 * valence_carbon * DIRAC_CONSTANT,
-        # )
-        C1 = 2.51624627
-        return carbon_Kshell * DIRAC_CONSTANT / C1, valence_carbon * DIRAC_CONSTANT / C1
+        C1 = 3.84
+        C2 = 1.158415636393724
+        return carbon_Kshell * DIRAC_CONSTANT / C1, valence_carbon * DIRAC_CONSTANT / C2

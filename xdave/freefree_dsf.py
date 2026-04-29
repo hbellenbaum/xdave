@@ -237,75 +237,114 @@ class FreeFreeDSF:
         chi_ee = 1 / Uee * chi02 / (4 * z**3) * func
         return chi_ee
 
-    def _ff_normalization(self, dsf, Z, w, k):
-        Z = Z + 1.0e-6
-        I_in = np.trapezoid(w, dsf * w)
-        # [Cx]
-        Cx = (I_in * (2 * ELECTRON_MASS)) / (Z * DIRAC_CONSTANT * (k * k))  # / ELEMENTARY_CHARGE
-        return dsf / Cx
+    def landen_dsf(self, angle, beam_energy):
+        evN = np.arange(-1700, 1700)  # [eV]
+        w = evN / 6.582e-16  # [eV] / [eVs] = 1/s
+        b = np.linspace(0, np.pi / 2, 250)  # [ ]
+        Zf = self.state.charge_state
+        te = self.state.electron_temperature  # [K]
+        AN = self.state.atomic_number  # []
+        md = self.state.mass_density * kg_per_m3_TO_g_per_cm3  # [g/cc]
+        # 1.66e-24 = atomic mass unit in g
+        # TODO(Hannah): does this make sense? I think this is where the disconnect is...
+        # I'm also not sure about the factor 2
+        ne = md / ((2 * AN * 1.66e-24) / Zf) * per_cm3_TO_per_m3  # [g/cc] / [g] = [1/cc] -> convert to [1/m^3]
+        # ne = self.state.free_electron_number_density / 2
+        energy = beam_energy * J_TO_eV  # convert J to eV
 
-    def landen_dsf(self, k, w, angle):
-        # w *= J_TO_eV
-        w_freq = w / DIRAC_CONSTANT
-        # angle = 2 * np.arcsin(K)
-        ne = self.state.free_electron_number_density
-        Te = self.state.electron_temperature
-        TF = self.state.fermi_temperature(ELECTRON_MASS, ne)
-        vF = np.sqrt(2 * BOLTZMANN_CONSTANT * TF / ELECTRON_MASS)
-        k_D = self.state.debye_screening_length(charge=1, number_density=ne, temperature=Te)
-        lambd = TWO_PI / k_D
-        omega_p = self.state.plasma_frequency(charge=1, number_density=ne, mass=ELECTRON_MASS)
-        omega_C = (2 * PI * SPEED_OF_LIGHT / lambd) ** 2
-        k1 = PLANCK_CONSTANT * SPEED_OF_LIGHT / (lambd * ELECTRON_MASS * (SPEED_OF_LIGHT**2))
-        k2 = (PLANCK_CONSTANT * SPEED_OF_LIGHT / lambd + DIRAC_CONSTANT * w_freq) / (
-            ELECTRON_MASS * (SPEED_OF_LIGHT**2)
-        )
-        kC = (
-            np.sqrt((k1**2) + (k2**2) - 2 * k1 * k2 * np.cos(angle / 180 * np.pi))
-            * ELECTRON_MASS
-            * SPEED_OF_LIGHT
-            / DIRAC_CONSTANT
-        )
-        keff = np.sqrt(1 - omega_p / omega_C) * kC
-        vx = -(w_freq + DIRAC_CONSTANT * (keff**2) / (2 * ELECTRON_MASS)) / keff
-        t = Te / TF
-        b = np.linspace(0, np.pi / 2, 250)
-        tmp = (vx[:, None] / (vF * np.cos(b))) ** 2
-        L = np.sum(tmp * np.tan(b) / (np.exp((tmp - 1 + (np.pi**2 / 12) * t**2) / t) + 1), axis=1)
+        h_ev = 4.13566733e-15  # eVs
 
-        ans = L * 2 * vF / SPEED_OF_LIGHT * np.sin(angle / 360 * np.pi)
+        def kv_func(energy, angle):
+            # eV / (eVs * m/s) = 1/m
+            return 4 * np.pi * energy / (h_ev * SPEED_OF_LIGHT) * np.sin((angle * np.pi / 180) / 2)
+
+        def keff_func(w, energy, angle, Zf, md):
+            ne = md / ((2 * AN * 1.66e-24) / Zf) * per_cm3_TO_per_m3  # [1/m^3]
+            lambd = h_ev * SPEED_OF_LIGHT / energy  # eVs * (m/s) / eV = m
+            # [wpe] = C^2 (1/m^3) / (C^2 s^2/(kg * m^3) * kg)
+            # [wpe] =  m^(-3) / (s^2 kg^(-1) m^(-3) kg) = m^(-3) / (s^2 m^(-3) ) = 1/s^2
+            # so this is actually the plasma frequency squared!!
+            wpe = (ELEMENTARY_CHARGE**2) * ne / (VACUUM_PERMITTIVITY * ELECTRON_MASS)
+
+            # [wc] = (m/s * m)^2 = 1/s^2
+            wc = (2 * np.pi * SPEED_OF_LIGHT / lambd) ** 2
+            # [k1] = Js * (m/s) / (m * kg * (m/s)^2) = J m / (kg m^3 s^(-2)) = kg m^2 s^(-2) * m / (kg m^3 s^(-2)) = [ ]
+            k1 = PLANCK_CONSTANT * SPEED_OF_LIGHT / (lambd * ELECTRON_MASS * (SPEED_OF_LIGHT**2))
+            # [k2] = (Js * m/s / m + Js / s) / (kg m^2 / s^2) = J / (kg m^s s^(-2)) = [ ]
+            k2 = (PLANCK_CONSTANT * SPEED_OF_LIGHT / lambd + DIRAC_CONSTANT * w) / (
+                ELECTRON_MASS * (SPEED_OF_LIGHT**2)
+            )
+            # [kc] = sqrt( [] + [] + []) * kg * m/s / (Js) = kg * m/s / (Js) = kg * m * s^(-2) / J
+            # [kc] = kg * m * s^(-2) / (kg m^2 s^(-2)) = 1/m
+            kc = (
+                np.sqrt((k1**2) + (k2**2) - 2 * k1 * k2 * np.cos(angle / 180 * np.pi))
+                * ELECTRON_MASS
+                * SPEED_OF_LIGHT
+                / DIRAC_CONSTANT
+            )
+            # [return] = [ ] * 1/m / (1/m) = [ ]
+            return np.sqrt(1 - wpe / wc) * kc / kv_func(energy, angle)
+
+        kv_keff = kv_func(energy, angle) * keff_func(w, energy, angle, Zf, md)  # [1/m]
+        # ne = md / ((2 * AN * 1.66e-30) / Zf)
+        # ne = self.state.free_electron_number_density
+
+        lambd = h_ev * SPEED_OF_LIGHT / energy  # m
+        # te = te * 1.16e4  # convert to K
+
+        # vx = -(w + hbar * (kv**2) / (2 * me)) / kv
+        # [vx] = (1/s + Js / m^2 / kg) / m^(-1) = (1 / s + kg m^2 s^(-2) m^(-2) / kg) m = m/s
+        vx = -(w + DIRAC_CONSTANT * (kv_keff**2) / (2 * ELECTRON_MASS)) / kv_keff
+
+        # [Tf] = (Js)^2 / (kg * J/K) * (1/m^3)^(2/3) = K
+        Tf = DIRAC_CONSTANT**2 / (2 * ELECTRON_MASS * BOLTZMANN_CONSTANT) * pow(3 * np.pi**2 * ne, 2 / 3)
+        # [vf] = (J/K * K / kg)^(1/2) = (J / kg) ^ (1/2) = (kg * m^2 * s^(-2) / kg)^(1/2) = m/s
+        vf = np.sqrt(2 * BOLTZMANN_CONSTANT * Tf / ELECTRON_MASS)
+        te_Tf = te / Tf  # [ ]
+        tmp = (vx[:, None] / (vf * np.cos(b))) ** 2  # [ ]
+
+        # [L] = [] / [] = [ ]
+        L = np.sum(tmp * np.tan(b) / (np.exp((tmp - 1 + (np.pi**2 / 12) * te_Tf**2) / te_Tf) + 1), axis=1)
+
+        # [ans] = [ ] * m/s / (m/s) = [ ]
+        ans = L * 2 * vf / SPEED_OF_LIGHT * np.sin(angle / 360 * np.pi)
+
+        # [k1] = Js * m/s / m = J
         k1 = PLANCK_CONSTANT * SPEED_OF_LIGHT / lambd
-        k2 = k1 + DIRAC_CONSTANT * w_freq
+        # [k2] = [k1] = J
+        k2 = k1 + DIRAC_CONSTANT * w
         pwr_index = 0
 
-        Skw = self.state.charge_state * pow(k2 / k1, pwr_index) * ans
-        See = signal.medfilt(Skw, kernel_size=9)
+        # [Skw] = [ ] (J / J)^0 [ ] = [ ]
+        Skw = Zf * pow(k2 / k1, pwr_index) * ans
+        ff_spec = signal.medfilt(Skw, kernel_size=9)  # Post-process numerical spike
 
-        return See[::-1]
+        ff_spec2 = np.array(np.nditer(ff_spec[::5]))
+        evN2 = np.array(np.nditer(evN[::5]))
 
-    # def zeroT_susceptibility_limit(self, k, w):
-    #     """
-    #     Ground state limit of the susceptibility function
-    #     """
-    #     kF = self.state.fermi_wave_number(self.state.free_electron_number_density)  # 1/m
-    #     EF = self.state.fermi_energy(self.state.free_electron_number_density, ELECTRON_MASS)  # J
-    #     vF = DIRAC_CONSTANT * kF / ELECTRON_MASS  # m/s
-    #     u = w / (k * vF * DIRAC_CONSTANT)  # dimensionless
-    #     z = k / (2 * kF)  # dimensionless
+        f = interpolate.interp1d(evN2, ff_spec2)
+        xnew = np.arange(-1000, 1000, 1)
+        ynew = f(xnew)
 
-    #     chi02 = 1 / (PI * kF * BOHR_RADIUS)  # dimensionless
-    #     Uee = ELEMENTARY_CHARGE_SQR / (VACUUM_PERMITTIVITY * k**2)
+        def normalization(spectrum, Z, energy_axis, angle, energy):  # F-sum normalization
+            # Somehow this normaliztation is enforcing the units
+            kv = kv_func(energy, angle)  # 1/m
+            Z = Z + 1e-6
+            I_in = np.trapezoid(energy - energy_axis, spectrum * (energy - energy_axis))  # [ ]
+            # Ignore the Coulomb constant in the original expression because it's just meant as a conversion from eV to J
+            # [Cx] = [ ] * kg / (Js * m^(-2)) = kg / (kg * m^2 * s^(-2) * s * m^(-2)) = s
+            Cx = (I_in * (2 * ELECTRON_MASS)) / (Z * DIRAC_CONSTANT * (kv * kv)) * J_TO_eV
+            return spectrum / Cx
 
-    #     def g(x):
-    #         # add the epsilon term to avoid instabilities
-    #         y = abs(((x + 1.0) ** 2 + EPSILON) / ((x - 1.0) ** 2 + EPSILON))
-    #         real_part = -(x - 0.5 * (x**2 - 1.0) * 0.5 * np.log(y))
-    #         imag_part = HALF_PI * (1.0 - x**2) * np.heaviside(1.0 - x**2, 1.0)
-    #         return real_part + 1.0j * imag_part
+        En_ff = xnew + energy - 0  # [eV]
+        Sff = normalization(ynew, Zf, En_ff, angle, energy)
 
-    #     func = g(u + z) - g(u - z)
-    #     chi_ee = 1 / Uee * chi02 / (4 * z**3) * func
-    #     return chi_ee
+        if md > 4.5:
+            spl = UnivariateSpline(En_ff, Sff, s=0)
+            Sff = spl((En_ff - 432) / 0.95)
+
+        # returns energy in [eV] and Sff in [1/eV]?
+        return energy - En_ff, Sff / h_ev
 
     def rpa_numerical_dielectric_func(self, k, w):
         """
