@@ -247,7 +247,7 @@ class FreeFreeDSF:
         md = self.state.mass_density * kg_per_m3_TO_g_per_cm3  # [g/cc]
         # 1.66e-24 = atomic mass unit in g
         # TODO(Hannah): does this make sense? I think this is where the disconnect is...
-        # I'm also not sure about the factor 2
+        # check the charge state here to compare against my estimates for ne^f
         ne = md / ((2 * AN * 1.66e-24) / Zf) * per_cm3_TO_per_m3  # [g/cc] / [g] = [1/cc] -> convert to [1/m^3]
         # ne = self.state.free_electron_number_density / 2
         energy = beam_energy * J_TO_eV  # convert J to eV

@@ -241,21 +241,24 @@ def test_multispecies_bf():
 
 def test_modified_bf():
 
-    angle = 113
+    angle = 160
     beam_energy = 8550
-    Te = 17
-    rho = 6
-    Zk = 0
-    Zl = 2
-    Z = 2
+    Te = 20
+    rho = 3
+    Zk = 3
+    Zl = 1
+    Zf = 3
 
     pairings = np.array([[0, 2], [1, 2], [1, 3], [1, 4], [2, 4]])
+    pairings = np.array(
+        [[Zk, Zl]],
+    )
 
     fig, axes = plt.subplots(2, 2, figsize=(14, 10))
 
     colors = ["crimson", "navy", "magenta", "dodgerblue", "lightgreen"]
 
-    for i in range(0, len(colors)):
+    for i in range(0, len(pairings)):
         p = pairings[i]
         c = colors[i]
         Zk = p[0]
@@ -263,8 +266,9 @@ def test_modified_bf():
 
         comparison_file = os.path.join(
             os.path.dirname(__file__),
-            f"comparison_data/bf_dsf/modified_bf_feature/carbon_xrts_example_T=17_md=6_Zk={Zk}_Zl={Zl}.csv",
+            f"comparison_data/bf_dsf/modified_bf_feature/angle={angle}/carbon_xrts_example_T={Te}_md={rho}_Zk={Zk}_Zl={Zl}_angle={angle}.csv",
         )
+        f1 = "examples/comparison_data/bf_dsf/modified_bf_feature/angle=130/carbon_xrts_example_T=20_md=3_Zk=0_Zl=0_angle=130.csv"
         dat = np.genfromtxt(comparison_file, delimiter=" ")
 
         # models = ModelOptions(
@@ -308,7 +312,7 @@ def test_modified_bf():
             electron_temperature=17 * eV_TO_K,
             ion_temperature=17 * eV_TO_K,
             mass_density=6 * g_per_cm3_TO_kg_per_m3,
-            charge_state=Z,
+            charge_state=Zf,
             atomic_mass=12,
             atomic_number=6,
             binding_energies=None,
@@ -318,41 +322,40 @@ def test_modified_bf():
         Eb *= eV_TO_J
 
         bf_kernel = BoundFreeDSF(state=state)
-        test_K_shell, test_L_shell = bf_kernel.fletcher_modified_IA(
-            ZA=6,
-            Zb=5.9,
-            Zf=0.1,
-            k=k_SI,
-            w=w * eV_TO_J,
-            Eb=Eb,
-            Zl=Zl,
-            Zk=Zk,
-            angle=angle,
-            beam_energy=beam_energy * eV_TO_J,
+        test_En, test_K_shell, test_L_shell = bf_kernel.fletcher_modified_IA(
+            angle=angle, Te=Te, rho=rho, Zl=Zl, Zk=Zk, beam_energy=beam_energy
         )
 
-        test_L_shell /= J_TO_eV
-        test_K_shell /= J_TO_eV
+        # test_L_shell /= J_TO_eV
+        # test_K_shell /= J_TO_eV
 
         # dat_l_interp = np.interp(x=w, xp=beam_energy - dat[:, 0], fp=dat[:, 1])
         # dat_k_interp = np.interp(x=w, xp=beam_energy - dat[:, 0], fp=dat[:, 2])
 
-        diff_L = test_L_shell / (np.interp(x=w, xp=beam_energy - dat[:, 0], fp=dat[:, 2]))
-        diff_K = test_K_shell / (np.interp(x=w, xp=beam_energy - dat[:, 0], fp=dat[:, 1]))
+        # diff_L = test_L_shell / (np.interp(x=w, xp=beam_energy - dat[:, 0], fp=dat[:, 2]))
+        # diff_K = test_K_shell / (np.interp(x=w, xp=beam_energy - dat[:, 0], fp=dat[:, 1]))
 
-        idx = np.argmax(test_L_shell)
+        # idx = np.argmax(test_L_shell)
 
-        print(diff_L[idx])
+        # print(diff_L[idx])
+        # print(diff_K[1400])
 
         # idx = np.argmax(test_K_shell)
         # lk_max = np.interp(x=w, xp=beam_energy - dat[:, 0], fp=dat[:, 1])[idx]
 
-        axes[0, 0].plot(w, test_K_shell, label=f"K, Zk={Zk}", marker="x", c=c, ls=":", markevery=20)
-        axes[0, 0].plot(beam_energy - dat[:, 0], dat[:, 1], label=f"LF: K, Zk={Zk}", ls="solid", c=c)
-        axes[0, 1].plot(w, diff_K, c=c, label=f"Zk={Zk}")
-        axes[1, 0].plot(w, test_L_shell, label=f"L, Zl={Zl}", marker="x", ls=":", markevery=20, c=c)
-        axes[1, 0].plot(beam_energy - dat[:, 0], dat[:, 2], label=f"LF: L, Zl={Zl}", ls="solid", c=c)
-        axes[1, 1].plot(w, diff_L, c=c, label=f"Zl={Zl}")
+        axes[0, 0].plot(test_En, test_K_shell, label=f"K, Zk={Zk}", marker="x", c=c, ls=":", markevery=20)
+        axes[0, 0].plot(dat[:, 0], dat[:, 1], label=f"LF: K, Zk={Zk}", ls="solid", c=c)
+        # axes[0, 1].plot(w, diff_K, c=c, label=f"Zk={Zk}")
+        axes[1, 0].plot(test_En, test_L_shell, label=f"L, Zl={Zl}", marker="x", ls=":", markevery=20, c=c)
+        axes[1, 0].plot(dat[:, 0], dat[:, 2], label=f"LF: L, Zl={Zl}", ls="solid", c=c)
+        # axes[1, 1].plot(w, diff_L, c=c, label=f"Zl={Zl}")
+
+    # axes[0, 0].set_xlim(-100, 800)
+    # axes[1, 0].set_xlim(-100, 800)
+    # axes[0, 1].set_xlim(-100, 800)
+    # axes[1, 1].set_xlim(-100, 800)
+    # axes[0, 1].set_ylim(-100, 400)
+    # axes[1, 1].set_ylim(-1, 10)
 
     axes[0, 0].set_title("K-shell")
     axes[1, 0].set_title("L-shell")
@@ -450,9 +453,9 @@ def determine_valence_scaling():
         # print(diff2)
 
     axes[0].legend()
-    # axes[0].set_xlim(-100, 100)
-    # axes[1].set_xlim(-200, 600)
-    # axes[1].set_ylim(-1, 1.0e3)
+    axes[0].set_xlim(-200, 600)
+    axes[1].set_xlim(-200, 600)
+    axes[1].set_ylim(-1, 10)
     axes[0].set_xlabel(r"$\omega$ [eV]")
     axes[0].set_ylabel(r"DSF [1/eV]")
     axes[1].set_xlabel(r"$\omega$ [eV]")

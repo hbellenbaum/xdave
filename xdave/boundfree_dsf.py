@@ -4,6 +4,7 @@ from .plasma_state import PlasmaState
 from .unit_conversions import *
 from .constants import *
 from scipy.special import gamma
+from scipy.interpolate import UnivariateSpline
 import numpy as np
 import warnings
 
@@ -414,7 +415,7 @@ class BoundFreeDSF:
 
         return Znl
 
-    def _bf_normalization(self, dsf, Z, w, k, beam_energy):
+    def _bf_normalization(self, dsf, Z, w, k):
         Z = Z + 1.0e-6
         # wtilde = w * DIRAC_CONSTANT * J_TO_eV
         I_in = np.trapezoid(w, dsf * w)
@@ -423,7 +424,170 @@ class BoundFreeDSF:
         Cx = (I_in * (2 * ELECTRON_MASS)) / (Z * DIRAC_CONSTANT * (k * k))  # / ELEMENTARY_CHARGE
         return dsf / Cx
 
-    def fletcher_modified_IA(self, ZA, Zb, Zf, k, w, Eb, Zl, Zk, angle, beam_energy):
+    def _XRTS_bound_free_Zeff_C(self, angle, Zf, beam_energy):
+        E = -7  # Empirical shift to match Compton for normalization (Numerical differences from the energy range En?)
+        kv = 2 * beam_energy * eV_TO_J / (DIRAC_CONSTANT * SPEED_OF_LIGHT) * np.sin((angle * PI / 180) / 2)
+
+        def energy_grid(beam_energy):
+            return beam_energy + (5000 - np.arange(1, 10001))
+
+        def IA_Zeff(Zf, xm):  # Effective nuclear ionization
+            m = np.polyfit(np.arange(len(xm)) - 1, xm, 1)
+            S = m[1] + (m[0] * np.arange(0, len(xm), 0.1))
+            Znl = S[int(np.round((Zf * 10)) - 1)]
+
+            return Znl
+
+        def IA_bound_free_1S(E, Znl):  # 1s bound-free wavefunction for carbon
+            # setup the omega grid from
+            hbar_eV = 6.582e-16  # !!!!!
+            w = np.arange(-5000, 5000) / 6.582e-16
+            E = E / (6.582e-16)
+
+            n = 1
+            l = 0
+            Ynl = (
+                1
+                + (
+                    (n / (Znl * FINE_STRUCTURE_CONSTANT * SPEED_OF_LIGHT * kv))
+                    * (w - E - ((DIRAC_CONSTANT * kv**2) / (2 * ELECTRON_MASS)))
+                )
+                ** 2
+            )
+            A_10 = (
+                ((2 ** ((4 * l) + 3)) / np.pi)
+                * ((math.factorial(n - l - 1)) / (math.factorial(n + l)))
+                * ((n**2 * (math.factorial(l)) ** 2) / (Znl * FINE_STRUCTURE_CONSTANT))
+            )
+
+            # phi_10 = 1 / (3 * (Ynl**2)) # Initial settings per Schumacher
+            phi_10 = 1 / (3 * (Ynl**3))  # Settings per Bloch; sharper peak, faster decay
+            # phi_10 = 1 / (3 * (Ynl**4))  # Custom settings
+            phi_10 = A_10 * phi_10
+
+            return phi_10
+
+        def IA_bound_free_2S(E, Znl):  # 2s bound-free wavefunction for carbon
+            w = np.arange(-5000, 5000) / 6.582e-16
+            E = E / (6.582e-16)
+            n = 2
+            l = 0
+
+            Ynl = (
+                1
+                + (
+                    (n / (Znl * FINE_STRUCTURE_CONSTANT * SPEED_OF_LIGHT * kv))
+                    * (w - E - ((DIRAC_CONSTANT * kv**2) / (2 * ELECTRON_MASS)))
+                )
+                ** 2
+            )
+            A_20 = (
+                ((2 ** ((4 * l) + 3)) / np.pi)
+                * ((math.factorial(n - l - 1)) / (math.factorial(n + l)))
+                * ((n**2 * (math.factorial(l)) ** 2) / (Znl * FINE_STRUCTURE_CONSTANT))
+            )
+
+            phi_20 = 4 * ((1 / (3 * (Ynl**3))) - (1 / (Ynl**4)) + (4 / (5 * (Ynl**5))))
+            phi_20 = A_20 * phi_20
+
+            return phi_20
+
+        def IA_bound_free_2P(E, Znl):  # 2p bound-free wavefunction for carbon
+            w = np.arange(-5000, 5000) / 6.582e-16
+            E = E / 6.582e-16
+            n = 2
+            l = 1
+
+            Ynl = (
+                1
+                + (
+                    (n / (Znl * FINE_STRUCTURE_CONSTANT * SPEED_OF_LIGHT * kv))
+                    * (w - E - ((DIRAC_CONSTANT * kv**2) / (2 * ELECTRON_MASS)))
+                )
+                ** 2
+            )
+            A_21 = (
+                ((2 ** ((4 * l) + 3)) / np.pi)
+                * ((math.factorial(n - l - 1)) / (math.factorial(n + l)))
+                * ((n**2 * (math.factorial(l)) ** 2) / (Znl * FINE_STRUCTURE_CONSTANT))
+            )
+
+            phi_21 = (1 / (4 * (Ynl**4))) - (1 / (5 * (Ynl**5)))
+            phi_21 = A_21 * phi_21
+
+            return phi_21
+
+        Z_10 = IA_Zeff(Zf, [5.7, 5.7, 5.7, 5.7, 5.7, 6])
+        phi_10 = IA_bound_free_1S(E, Z_10)
+
+        Z_20 = IA_Zeff(Zf, [3.25, 3.6, 3.95, 4.3, 4.3, 5.15])
+        phi_20 = IA_bound_free_2S(E, Z_20)
+
+        Z_21 = IA_Zeff(Zf, [3.25, 3.6, 3.6, 3.95, 4.3, 5.15])
+        phi_21 = IA_bound_free_2P(E, Z_21)
+
+        continuum_edge = 1 / (1 + np.exp(-1 * ((beam_energy - energy_grid(beam_energy)))))
+        k_edgeC = 1 / (1 + np.exp(-1 * ((beam_energy - energy_grid(beam_energy)) - 284.2)))  # Carbon K-edge = 284.2
+
+        return phi_10 * k_edgeC, phi_20 * continuum_edge, phi_21 * continuum_edge
+
+    def _normalization(self, spectrum, Z, energy_axis, k, beam_energy):
+        Z = Z + 1e-6
+        I_in = np.trapezoid(beam_energy - energy_axis, spectrum * (beam_energy - energy_axis))
+        Cx = (I_in * (2 * ELECTRON_MASS)) / (Z * DIRAC_CONSTANT * (k * k)) / ELEMENTARY_CHARGE
+        return spectrum / Cx
+
+    def fletcher_modified_IA(self, angle, Te, rho, Zl, Zk, beam_energy):
+
+        def energy_grid(beam_energy):
+            return beam_energy + (5000 - np.arange(1, 10001))
+
+        T_temp = 17
+        rho_temp = 1
+        Z_temp = 4
+
+        k = 2 * beam_energy * eV_TO_J / (DIRAC_CONSTANT * SPEED_OF_LIGHT) * np.sin((angle * PI / 180) / 2)
+        w = beam_energy * eV_TO_J - energy_grid(beam_energy) * eV_TO_J
+
+        temp_state = PlasmaState(
+            electron_temperature=T_temp * eV_TO_K,
+            ion_temperature=T_temp * eV_TO_K,
+            mass_density=rho_temp * g_per_cm3_TO_kg_per_m3,
+            charge_state=Z_temp,
+            atomic_number=6,
+            atomic_mass=12,
+            binding_energies=None,
+        )
+        valence_carbon_solid = FreeFreeDSF(state=temp_state).get_dsf(k=k, w=w, lfc=0.0, model="DANDREA_FIT")  # [1/J]
+        valence_carbon_solid /= J_TO_eV
+        bf_edge_mask = w < 0
+        valence_carbon_solid[bf_edge_mask] = 0
+        valence_carbon_solid = -1 * self._normalization(
+            spectrum=valence_carbon_solid,
+            Z=Z_temp,
+            energy_axis=energy_grid(beam_energy),
+            k=k,
+            beam_energy=beam_energy,
+        )
+        if rho > 4.5:
+            spl = UnivariateSpline(w * J_TO_eV, Sff, s=0)
+            Sff = spl((w * J_TO_eV - 432) / 0.95)
+
+        phi_10, phi_20, phi_21 = self._XRTS_bound_free_Zeff_C(angle, 0.1, beam_energy)
+
+        phi_L = -1 * self._normalization(phi_21 + phi_20, 4 - Zl, energy_grid(beam_energy), k, beam_energy)
+        carbon_Kshell = -1 * self._normalization(phi_10, 2 - Zk, energy_grid(beam_energy), k, beam_energy)
+
+        valence_carbon = (np.sum(phi_L) / np.sum(valence_carbon_solid)) * valence_carbon_solid
+
+        C = 1.827e3  # ????
+        return (
+            energy_grid(beam_energy),
+            C * 0.9964219451371571 * carbon_Kshell,
+            C * 1.0547927578124998 * valence_carbon,
+        )
+
+    def fletcher_modified_IA_new(self, ZA, Zb, Zf, k, w, Eb, Zl, Zk, angle, beam_energy):
         """
         Modified impulse approximation specifically designed for carbon.
         The valence electrons are treated using RPA.
@@ -432,7 +596,9 @@ class BoundFreeDSF:
         # w *= J_TO_eV
         assert ZA == 6, f"You are using a BF model calibrated to carbon."
 
-        Zf = 0.1
+        print(f"k = {k}")
+
+        # Zf = 0.1
 
         # Empirical shift to match Compton for normalization (Numerical differences from the energy range En?)
         # convert energy to frequency domain
@@ -443,7 +609,7 @@ class BoundFreeDSF:
 
         # TODO(HB): check units in the k-vector
 
-        Z_10 = self._fletcher_effective_charge_state(Zf, [5.7, 5.7, 5.7, 5.7, 5.7, 6])  # [ ]
+        Z_10 = self._fletcher_effective_charge_state(0.1, [5.7, 5.7, 5.7, 5.7, 5.7, 6])  # [ ]
         n = 1
         l = 0
         Y10 = (
@@ -463,7 +629,7 @@ class BoundFreeDSF:
         # phi_10 = 1 / (3 * (Ynl**2)) # Initial settings per Schumacher, Bloch above leads to a sharper peak and faster decay
         phi_10 = A_10 * phi_10  # [ ]
 
-        Z_20 = self._fletcher_effective_charge_state(Zf, [3.25, 3.6, 3.95, 4.3, 4.3, 5.15])  # [ ]
+        Z_20 = self._fletcher_effective_charge_state(0.1, [3.25, 3.6, 3.95, 4.3, 4.3, 5.15])  # [ ]
         n = 2
         l = 0
         Y20 = (
@@ -482,7 +648,7 @@ class BoundFreeDSF:
         phi_20 = 4 * ((1 / (3 * (Y20**3))) - (1 / (Y20**4)) + (4 / (5 * (Y20**5))))  # [ ]
         phi_20 = A_20 * phi_20  # [ ]
 
-        Z_21 = self._fletcher_effective_charge_state(Zf, [3.25, 3.6, 3.6, 3.95, 4.3, 5.15])  # [ ]
+        Z_21 = self._fletcher_effective_charge_state(0.1, [3.25, 3.6, 3.6, 3.95, 4.3, 5.15])  # [ ]
         n = 2
         l = 0
         Y21 = (
@@ -514,35 +680,46 @@ class BoundFreeDSF:
         phi_20 *= continuum_edge
         phi_21 *= continuum_edge
 
-        phi_L = -1 * self._bf_normalization(dsf=phi_21 + phi_20, Z=4 - Zl, w=w, k=k, beam_energy=beam_energy)
-        carbon_Kshell = -1 * self._bf_normalization(dsf=phi_10, Z=2 - Zk, w=w, k=k, beam_energy=beam_energy)
+        # if Zf <= 4:
+        #     Zl = Zf
+        #     Zk = 0
+        # else:
+        #     Zl = 4
+        #     Zk = 6 - Zf
+
+        phi_L = -1.0 * self._bf_normalization(dsf=phi_21 + phi_20, Z=4 - Zl, w=w, k=k)
+        carbon_Kshell = -1.0 * self._bf_normalization(dsf=phi_10, Z=2 - Zk, w=w, k=k)
 
         C = 1.827e3  # ????
 
+        T_temp = 17
+        rho_temp = 1
+        Z_temp = 4
+
         temp_state = PlasmaState(
-            electron_temperature=17 * eV_TO_K,
-            ion_temperature=17 * eV_TO_K,
-            mass_density=1 * g_per_cm3_TO_kg_per_m3,
-            charge_state=4,
-            atomic_number=1,
-            atomic_mass=1,
+            electron_temperature=T_temp * eV_TO_K,
+            ion_temperature=T_temp * eV_TO_K,
+            mass_density=rho_temp * g_per_cm3_TO_kg_per_m3,
+            charge_state=Z_temp,
+            atomic_number=6,
+            atomic_mass=12,
             binding_energies=None,
         )
+        print(f"ne = {temp_state.free_electron_number_density}")
         # temp_state.free_electron_number_density /= 2
-        valence_carbon_solid = Zf * FreeFreeDSF(state=temp_state).get_dsf(
-            k=k, w=w, lfc=0.0, model="DANDREA_FIT"
-        )  # [1/J]
+        valence_carbon_solid = FreeFreeDSF(state=temp_state).get_dsf(k=k, w=w, lfc=0.0, model="DANDREA_FIT")  # [1/J]
         # tmp_energy, valence_carbon_solid = FreeFreeDSF(state=temp_state).landen_dsf(
         #     angle=angle, beam_energy=beam_energy
         # )
-        valence_carbon_solid = self._bf_normalization(
-            dsf=valence_carbon_solid, w=w, k=k, Z=4 - Zl, beam_energy=beam_energy
-        )
+        valence_carbon_solid = -1 * self._bf_normalization(dsf=valence_carbon_solid, w=w, k=k, Z=Z_temp)
         bf_edge_mask = w < 0
         valence_carbon_solid[bf_edge_mask] = 0
         # valence_carbon_solid = np.interp(x=w, xp=tmp_energy[::-1] * eV_TO_J, fp=valence_carbon_solid[::-1] / eV_TO_J)
         valence_carbon = (np.sum(phi_L) / np.sum(valence_carbon_solid)) * valence_carbon_solid
 
-        C1 = 3.84
-        C2 = 1.158415636393724
-        return carbon_Kshell * DIRAC_CONSTANT / C1, valence_carbon * DIRAC_CONSTANT / C2
+        # C1 = 3.84
+        # C2 = 1 / 0.48474907904142617
+        C1 = 4.68
+        C2 = 1.89
+        C = 1  # 2.87
+        return carbon_Kshell * DIRAC_CONSTANT / C, valence_carbon * DIRAC_CONSTANT / C
