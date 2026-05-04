@@ -66,7 +66,7 @@ class ModelOptions:
             "\nModel options\n"
             "---------------\n"
             "free electron dielectric function: DANDREA_FIT, LINDHARD, NUMERICAL, MERMIN\n"
-            "bound-free dynamic structure factor: SCHUMACHER, HR_CORRECTION, TRUNCATED_IA\n"
+            "bound-free dynamic structure factor: SCHUMACHER, HR_CORRECTION, TRUNCATED_IA, MODIFIED_BF_CARBON\n"
             "OCP ion-ion static structure factor: HNC, MSA, xHNC\n"
             "MCP ion-ion static structure factor: HNC\n"
             "local field correction: DORNHEIM_ESA, NONE, PADE_INTERP, UI, GV, FARID, USER_DEFINED\n"

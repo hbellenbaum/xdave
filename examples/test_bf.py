@@ -254,7 +254,7 @@ def test_modified_bf():
         [[Zk, Zl]],
     )
 
-    fig, axes = plt.subplots(2, 2, figsize=(14, 10))
+    fig, axes = plt.subplots(1, 2, figsize=(14, 10))
 
     colors = ["crimson", "navy", "magenta", "dodgerblue", "lightgreen"]
 
@@ -271,33 +271,33 @@ def test_modified_bf():
         f1 = "examples/comparison_data/bf_dsf/modified_bf_feature/angle=130/carbon_xrts_example_T=20_md=3_Zk=0_Zl=0_angle=130.csv"
         dat = np.genfromtxt(comparison_file, delimiter=" ")
 
-        # models = ModelOptions(
-        #     ei_potential="YUKAWA",
-        #     ii_potential="YUKAWA",
-        #     ee_potential="COULOMB",
-        #     polarisation_model="NUMERICAL",
-        #     sf_model="HNC",
-        #     lfc_model="DORNHEIM_ESA",
-        #     ipd_model="NONE",
-        #     bf_model="SCHUMACHER",
-        #     screening_model="FINITE_WAVELENGTH",
-        # )
+        models = ModelOptions(
+            ei_potential="YUKAWA",
+            ii_potential="YUKAWA",
+            ee_potential="COULOMB",
+            polarisation_model="NUMERICAL",
+            sf_model="HNC",
+            lfc_model="DORNHEIM_ESA",
+            ipd_model="NONE",
+            bf_model="MODIFIED_BF_CARBON",
+            screening_model="FINITE_WAVELENGTH",
+        )
 
-        # kernel = xDave(
-        #     mass_density=rho,
-        #     electron_temperature=Te,
-        #     ion_temperature=Te,
-        #     elements=np.array(["C", "C"]),
-        #     charge_states=np.array([3, 4]),
-        #     partial_densities=np.array([0.5, 0.5]),
-        #     models=models,
-        #     enforce_fsum=False,
-        #     user_defined_inputs=None,
-        #     verbose=True,
-        #     hnc_max_iterations=10000,
-        #     hnc_mix_fraction=0.99,
-        #     hnc_delta=1.0e-7,
-        # )
+        kernel = xDave(
+            mass_density=rho,
+            electron_temperature=Te,
+            ion_temperature=Te,
+            elements=np.array(["C", "C"]),
+            charge_states=np.array([3, 4]),
+            partial_densities=np.array([0.5, 0.5]),
+            models=models,
+            enforce_fsum=False,
+            user_defined_inputs=dict({"Zl": Zl, "Zk": Zk}),
+            verbose=True,
+            hnc_max_iterations=10000,
+            hnc_mix_fraction=0.99,
+            hnc_delta=1.0e-7,
+        )
 
         w = np.linspace(-1000, 1000, 1000)
         w = np.arange(-1000, 1000, 1)
@@ -309,9 +309,9 @@ def test_modified_bf():
         k_SI = k / BOHR_RADIUS
 
         state = PlasmaState(
-            electron_temperature=17 * eV_TO_K,
-            ion_temperature=17 * eV_TO_K,
-            mass_density=6 * g_per_cm3_TO_kg_per_m3,
+            electron_temperature=Te * eV_TO_K,
+            ion_temperature=Te * eV_TO_K,
+            mass_density=rho * g_per_cm3_TO_kg_per_m3,
             charge_state=Zf,
             atomic_mass=12,
             atomic_number=6,
@@ -326,53 +326,42 @@ def test_modified_bf():
             angle=angle, Te=Te, rho=rho, Zl=Zl, Zk=Zk, beam_energy=beam_energy
         )
 
-        # test_L_shell /= J_TO_eV
-        # test_K_shell /= J_TO_eV
+        bf_tot, ff_tot, dsf, rayleigh_weight, ff_i, bf_i = kernel.run(angle=angle, beam_energy=beam_energy, k=k, w=w)
 
-        # dat_l_interp = np.interp(x=w, xp=beam_energy - dat[:, 0], fp=dat[:, 1])
-        # dat_k_interp = np.interp(x=w, xp=beam_energy - dat[:, 0], fp=dat[:, 2])
+        axes[0].plot(test_En, test_K_shell, label=f"K, Zk={Zk}", marker="x", c=c, ls=":", markevery=20)
+        axes[0].plot(dat[:, 0], dat[:, 1], label=f"LF: K, Zk={Zk}", ls="solid", c=c)
+        axes[0].plot(
+            beam_energy - w,
+            bf_i[0],
+            label=f"Full xDave: K, Zk={Zk}",
+            ls=":",
+            c=c,
+            alpha=0.7,
+            marker="o",
+            markevery=100,
+        )
+        axes[1].plot(test_En, test_L_shell, label=f"L, Zl={Zl}", marker="x", ls=":", markevery=20, c=c)
+        axes[1].plot(dat[:, 0], dat[:, 2], label=f"LF: L, Zl={Zl}", ls="solid", c=c)
+        axes[1].plot(
+            beam_energy - w,
+            bf_i[1],
+            label=f"Full xDave: L, Zl={Zl}",
+            ls=":",
+            c=c,
+            alpha=0.7,
+            marker="o",
+            markevery=100,
+        )
 
-        # diff_L = test_L_shell / (np.interp(x=w, xp=beam_energy - dat[:, 0], fp=dat[:, 2]))
-        # diff_K = test_K_shell / (np.interp(x=w, xp=beam_energy - dat[:, 0], fp=dat[:, 1]))
+    axes[0].set_title("K-shell")
+    axes[1].set_title("L-shell")
+    axes[0].set_xlabel(r"$\omega$ [eV]")
+    axes[0].set_ylabel(r"DSF [1/eV]")
+    axes[1].set_xlabel(r"$\omega$ [eV]")
+    axes[1].set_ylabel(r"DSF [1/eV]")
 
-        # idx = np.argmax(test_L_shell)
-
-        # print(diff_L[idx])
-        # print(diff_K[1400])
-
-        # idx = np.argmax(test_K_shell)
-        # lk_max = np.interp(x=w, xp=beam_energy - dat[:, 0], fp=dat[:, 1])[idx]
-
-        axes[0, 0].plot(test_En, test_K_shell, label=f"K, Zk={Zk}", marker="x", c=c, ls=":", markevery=20)
-        axes[0, 0].plot(dat[:, 0], dat[:, 1], label=f"LF: K, Zk={Zk}", ls="solid", c=c)
-        # axes[0, 1].plot(w, diff_K, c=c, label=f"Zk={Zk}")
-        axes[1, 0].plot(test_En, test_L_shell, label=f"L, Zl={Zl}", marker="x", ls=":", markevery=20, c=c)
-        axes[1, 0].plot(dat[:, 0], dat[:, 2], label=f"LF: L, Zl={Zl}", ls="solid", c=c)
-        # axes[1, 1].plot(w, diff_L, c=c, label=f"Zl={Zl}")
-
-    # axes[0, 0].set_xlim(-100, 800)
-    # axes[1, 0].set_xlim(-100, 800)
-    # axes[0, 1].set_xlim(-100, 800)
-    # axes[1, 1].set_xlim(-100, 800)
-    # axes[0, 1].set_ylim(-100, 400)
-    # axes[1, 1].set_ylim(-1, 10)
-
-    axes[0, 0].set_title("K-shell")
-    axes[1, 0].set_title("L-shell")
-    axes[0, 1].set_title("Diff K-shell")
-    axes[1, 1].set_title("Diff L-shell")
-
-    axes[0, 0].set_xlabel(r"$\omega$ [eV]")
-    axes[0, 0].set_ylabel(r"DSF [1/eV]")
-    axes[0, 1].set_xlabel(r"$\omega$ [eV]")
-    axes[0, 1].set_ylabel(r"Ratio")
-    axes[1, 0].set_xlabel(r"$\omega$ [eV]")
-    axes[1, 0].set_ylabel(r"DSF [1/eV]")
-    axes[1, 1].set_xlabel(r"$\omega$ [eV]")
-    axes[1, 1].set_ylabel(r"Ratio")
-
-    axes[0, 0].legend()
-    axes[1, 0].legend()
+    axes[0].legend()
+    axes[1].legend()
     plt.tight_layout()
     plt.show()
 

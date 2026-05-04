@@ -118,6 +118,8 @@ class xDave:
             self.srr_sigma_parameter = (
                 user_defined_inputs["srr_sigma_parameter"] if "srr_sigma_parameter" in keys else None
             )
+            self.user_defined_Zl = user_defined_inputs["Zl"] if "Zl" in keys else None
+            self.user_defined_Zk = user_defined_inputs["Zk"] if "Zk" in keys else None
 
             # Few options to check here for the Crowley constant
             crowley_force_constant = (
@@ -158,6 +160,8 @@ class xDave:
             self.sec_core_power = None
             self.srr_sigma_parameter = None
             self.crowley_force_constant = 0.9
+            self.user_defined_Zl = None
+            self.user_defined_Zk = None
 
         self.user_defined_inputs = user_defined_inputs
 
@@ -197,6 +201,11 @@ class xDave:
             assert any(
                 x is not None for x in self.ion_core_radii
             ), "You forgot to set the ion core radius for the SRR potential."
+
+        if self.models.bf_model == "MODIFIED_BF_CARBON":
+            assert (self.user_defined_Zk is not None) and (
+                self.user_defined_Zl is not None
+            ), f"You need to set the K and L-shell ionization states to use this the MODIFIED_BF_CARBON model."
 
     def get_mean_and_all_states(self, elements):
         """
@@ -333,6 +342,7 @@ class xDave:
                 beam_energy = 8.0e3
                 print(f"Assuming beam energy of 8 keV.") if self.verbose else None
             angle = calculate_angle(q=k, energy=beam_energy)
+
         elif k is None:
             assert angle is not None, f"You have to set either the angle or the scattering wave number."
             assert beam_energy is not None, f"If you set an angle, you also need to specify the beam energy."
@@ -340,6 +350,9 @@ class xDave:
 
         k_SI = k / BOHR_RADIUS
         w_SI = w * eV_TO_J
+
+        self.beam_energy = beam_energy
+        self.angle = angle
 
         if mode == "DYNAMIC":
             return self._run_dynamic_mode(k=k_SI, w=w_SI)
@@ -358,6 +371,63 @@ class xDave:
         dF_bf = np.polyfit(self.tau_array[:3], F_wbf[:3], deg=1)[0]
         A = -1 / dF_bf * (f_sum + dF_ff)
         return A
+
+    def _get_bf_component(
+        self,
+        w,
+        k,
+        state_ipds,
+    ):
+
+        if self.models.bf_model == "MODIFIED_BF_CARBON":
+            assert np.isclose(
+                self.overlord_state.atomic_number, 6, atol=1.0e-2
+            ), f"This model only works for pure Carbon states. Check your setup."
+
+            Te = self.overlord_state.electron_temperature * K_TO_eV
+            rho = self.overlord_state.mass_density * kg_per_m3_TO_g_per_cm3
+            Zl = self.user_defined_Zl
+            Zk = self.user_defined_Zk
+            bf = BoundFreeDSF(state=self.overlord_state)
+            En, K_shell, L_shell = bf.fletcher_modified_IA(
+                angle=self.angle, Te=Te, rho=rho, Zl=Zl, Zk=Zk, beam_energy=self.beam_energy
+            )
+
+            K_shell_interp = np.interp(w, xp=self.beam_energy * eV_TO_J - En * eV_TO_J, fp=K_shell / eV_TO_J)
+            L_shell_interp = np.interp(w, xp=self.beam_energy * eV_TO_J - En * eV_TO_J, fp=L_shell / eV_TO_J)
+
+            bf_i = np.array([K_shell_interp, L_shell_interp])
+            bf_tot = K_shell_interp + L_shell_interp
+
+        else:
+            bf_tot = np.zeros_like(w)
+            bf_i = np.zeros((len(self.states), len(w)))
+
+            for i in range(0, len(self.states)):
+                state: PlasmaState = self.states[i]
+                x = self.partial_densities[i]
+                ipd = state_ipds[i]
+                if self.verbose:
+                    print(f"\nRunning state {i} with Z={state.charge_state} and x={x}")
+
+                    if self.ipd_eV is None:
+                        print(f"Calculated IPD for state {i}={ipd * J_TO_eV} eV\n")
+
+                binding_energies = state.binding_energies * eV_TO_J
+
+                Eb = binding_energies - ipd
+
+                if np.any(ipd < binding_energies[binding_energies < 0.0]):
+                    warnings.warn(
+                        f"IPD {ipd * J_TO_eV} is larger than the binding energy of state {i}: {binding_energies[binding_energies < 0.]* J_TO_eV}. Consider increasing your ionization degree. The bound-free feature is being set to zero."
+                    )
+
+                bf = BoundFreeDSF(state=state)
+                bf_dsf = bf.get_dsf(ZA=state.atomic_number, Zb=state.Zb, k=k, w=w, Eb=Eb, model=self.models.bf_model)
+                bf_tot += x * bf_dsf
+                bf_i[i] = x * bf_dsf
+
+        return bf_i, bf_tot
 
     def _run_dynamic_mode(self, k, w):
         """
@@ -403,39 +473,47 @@ class xDave:
             ff_dsf = np.zeros_like(w)
 
         ff_tot = ff_dsf * self.overlord_state.charge_state
-
-        bf_tot = np.zeros_like(w)
         ff_i = np.zeros((len(self.states), len(w)))
-        bf_i = np.zeros((len(self.states), len(w)))
+
+        for i in range(0, len(self.states)):
+            # TODO(HB): I still haven't decided whether this is useful or even correct
+            x = self.partial_densities[i]
+            ff_i[i] = x * ff_dsf
+
+        # bf_tot = np.zeros_like(w)
+        # ff_i = np.zeros((len(self.states), len(w)))
+        # bf_i = np.zeros((len(self.states), len(w)))
 
         if self.verbose:
             print(f"Mean charge state = {self.overlord_state.charge_state}.")
 
-        for i in range(0, len(self.states)):
-            state: PlasmaState = self.states[i]
-            x = self.partial_densities[i]
-            ipd = state_ipds[i]
-            if self.verbose:
-                print(f"\nRunning state {i} with Z={state.charge_state} and x={x}")
+        bf_i, bf_tot = self._get_bf_component(w=w, k=k, state_ipds=state_ipds)
 
-                if self.ipd_eV is None:
-                    print(f"Calculated IPD for state {i}={ipd * J_TO_eV} eV\n")
+        # for i in range(0, len(self.states)):
+        #     state: PlasmaState = self.states[i]
+        #     x = self.partial_densities[i]
+        #     ipd = state_ipds[i]
+        #     if self.verbose:
+        #         print(f"\nRunning state {i} with Z={state.charge_state} and x={x}")
 
-            binding_energies = state.binding_energies * eV_TO_J
+        #         if self.ipd_eV is None:
+        #             print(f"Calculated IPD for state {i}={ipd * J_TO_eV} eV\n")
 
-            ff_i[i] = x * ff_dsf
+        #     binding_energies = state.binding_energies * eV_TO_J
 
-            Eb = binding_energies - ipd
+        #     ff_i[i] = x * ff_dsf
 
-            if np.any(ipd < binding_energies[binding_energies < 0.0]):
-                warnings.warn(
-                    f"IPD {ipd * J_TO_eV} is larger than the binding energy of state {i}: {binding_energies[binding_energies < 0.]* J_TO_eV}. Consider increasing your ionization degree. The bound-free feature is being set to zero."
-                )
+        #     Eb = binding_energies - ipd
 
-            bf = BoundFreeDSF(state=state)
-            bf_dsf = bf.get_dsf(ZA=state.atomic_number, Zb=state.Zb, k=k, w=w, Eb=Eb, model=self.models.bf_model)
-            bf_tot += x * bf_dsf
-            bf_i[i] = x * bf_dsf
+        #     if np.any(ipd < binding_energies[binding_energies < 0.0]):
+        #         warnings.warn(
+        #             f"IPD {ipd * J_TO_eV} is larger than the binding energy of state {i}: {binding_energies[binding_energies < 0.]* J_TO_eV}. Consider increasing your ionization degree. The bound-free feature is being set to zero."
+        #         )
+
+        #     bf = BoundFreeDSF(state=state)
+        #     bf_dsf = bf.get_dsf(ZA=state.atomic_number, Zb=state.Zb, k=k, w=w, Eb=Eb, model=self.models.bf_model)
+        #     bf_tot += x * bf_dsf
+        #     bf_i[i] = x * bf_dsf
 
         # Calculate the Rayleigh weight
         if self.ocp_flag:
@@ -482,7 +560,7 @@ class xDave:
                 # bf_i[i] *= self._bf_norm(w=w, ff=ff_tot, bf=bf_i[i], k=k)
             bf_tot /= self.overlord_state.Zb
             # bf_tot *= self._bf_norm(w=w, ff=ff_tot, bf=bf_tot, k=k)
-            ff_i /= self.overlord_state.charge_state
+            # ff_i /= self.overlord_state.charge_state
             ff_tot /= self.overlord_state.charge_state
             rayleigh_weight /= self.overlord_state.atomic_number
 
@@ -490,7 +568,7 @@ class xDave:
         bf_tot /= J_TO_eV
         ff_tot /= J_TO_eV
         dsf /= J_TO_eV
-        ff_i /= J_TO_eV
+        # ff_i /= J_TO_eV
         bf_i /= J_TO_eV
 
         if self.save_to_json:
@@ -501,7 +579,7 @@ class xDave:
                 {
                     "w": list(w * J_TO_eV),
                     "lfc": float(lfc),
-                    "ipd": ipd * J_TO_eV,
+                    "ipd": list(state_ipds * J_TO_eV),
                     "ff": list(ff_tot),
                     "bf": {
                         "tot": list(bf_tot),
@@ -654,6 +732,8 @@ class xDave:
             ), f"If you set an angle, you also need to specify the beam energy. I can't read your fucking mind."
             k = calculate_q(angle=angle, energy=beam_energy)
 
+        self.angle = angle
+        self.beam_energy = beam_energy
         k_SI = k / BOHR_RADIUS
         w_SI = w * eV_TO_J
 
@@ -682,36 +762,48 @@ class xDave:
         ff_dsf = ff.get_dsf(k=k_SI, w=w_SI, lfc=lfc, model=self.models.polarisation_model)
         ff_tot = ff_dsf * self.overlord_state.charge_state
 
-        bf_tot = np.zeros_like(w_SI)
-        ff_i = np.zeros((len(self.states), len(w_SI)))
-        bf_i = np.zeros((len(self.states), len(w_SI)))
+        ff_tot = ff_dsf * self.overlord_state.charge_state
+        ff_i = np.zeros((len(self.states), len(w)))
+
+        for i in range(0, len(self.states)):
+            # TODO(HB): I still haven't decided whether this is useful or even correct
+            x = self.partial_densities
+            ff_i[i] = x * ff_dsf
+
+        # bf_tot = np.zeros_like(w)
+        # ff_i = np.zeros((len(self.states), len(w)))
+        # bf_i = np.zeros((len(self.states), len(w)))
 
         if self.verbose:
             print(f"Mean charge state = {self.overlord_state.charge_state}.")
 
-        for i in range(0, len(self.states)):
-            state: PlasmaState = self.states[i]
-            x = self.partial_densities[i]
-            ipd = state_ipds[i]
-            if self.verbose:
-                print(f"\nRunning state {i} with Z={state.charge_state} and x={x}\n")
-                print(f"Calculated IPD for state {i}={ipd * J_TO_eV} eV\n")
+        bf_i, bf_tot = self._get_bf_component(w=w, k=k, state_ipds=state_ipds)
 
-            binding_energies = state.binding_energies * eV_TO_J
+        # for i in range(0, len(self.states)):
+        #     state: PlasmaState = self.states[i]
+        #     x = self.partial_densities[i]
+        #     ipd = state_ipds[i]
+        #     if self.verbose:
+        #         print(f"\nRunning state {i} with Z={state.charge_state} and x={x}")
 
-            ff_i[i] = x * ff_dsf
+        #         if self.ipd_eV is None:
+        #             print(f"Calculated IPD for state {i}={ipd * J_TO_eV} eV\n")
 
-            Eb = binding_energies - ipd
+        #     binding_energies = state.binding_energies * eV_TO_J
 
-            if np.any(ipd < binding_energies[binding_energies < 0.0]):
-                warnings.warn(
-                    f"IPD {ipd * J_TO_eV} is larger than the binding energy of state {i}: {binding_energies[binding_energies < 0.]* J_TO_eV}. Consider increasing your ionization degree. The bound-free feature is being set to zero."
-                )
+        #     ff_i[i] = x * ff_dsf
 
-            bf = BoundFreeDSF(state=state)
-            bf_dsf = bf.get_dsf(ZA=state.atomic_number, Zb=state.Zb, k=k_SI, w=w_SI, Eb=Eb, model=self.models.bf_model)
-            bf_tot += x * bf_dsf
-            bf_i[i] = x * bf_dsf
+        #     Eb = binding_energies - ipd
+
+        #     if np.any(ipd < binding_energies[binding_energies < 0.0]):
+        #         warnings.warn(
+        #             f"IPD {ipd * J_TO_eV} is larger than the binding energy of state {i}: {binding_energies[binding_energies < 0.]* J_TO_eV}. Consider increasing your ionization degree. The bound-free feature is being set to zero."
+        #         )
+
+        #     bf = BoundFreeDSF(state=state)
+        #     bf_dsf = bf.get_dsf(ZA=state.atomic_number, Zb=state.Zb, k=k, w=w, Eb=Eb, model=self.models.bf_model)
+        #     bf_tot += x * bf_dsf
+        #     bf_i[i] = x * bf_dsf
 
         if self.enforce_fsum:
             if self.verbose:
@@ -739,7 +831,7 @@ class xDave:
                 {
                     "w": list(w * J_TO_eV),
                     "lfc": float(lfc),
-                    "ipd": ipd * J_TO_eV,
+                    "ipd": list(state_ipds * J_TO_eV),
                     "ff": list(ff_tot),
                     "bf": {
                         "tot": list(bf_tot),
@@ -810,12 +902,21 @@ class xDave:
     ## --------------------- ##
 
     def convolve_with_sif(
-        self, omega, bf, ff, dsf, Wr, beam_energy, 
-        type="GAUSSIAN", 
-        fwhm=10, 
-        sigma_left=None, sigma_right=None,
-        gamma_left=None, gamma_right=None,
-        source_energy=None, source=None
+        self,
+        omega,
+        bf,
+        ff,
+        dsf,
+        Wr,
+        beam_energy,
+        type="GAUSSIAN",
+        fwhm=10,
+        sigma_left=None,
+        sigma_right=None,
+        gamma_left=None,
+        gamma_right=None,
+        source_energy=None,
+        source=None,
     ):
         """
         Convolve DSF with a source instrument function. You can either specify an analytic type (Gaussian only for now) or input your own
@@ -851,7 +952,7 @@ class xDave:
             assert sigma_left is not None
             assert sigma_right is not None
             sigma = np.where(omega < 0, sigma_left, sigma_right)
-            norm = np.sqrt(np.pi / 2.0) * (sigma_left + sigma_right) 
+            norm = np.sqrt(np.pi / 2.0) * (sigma_left + sigma_right)
             source = 1 / norm * np.exp(-0.5 * (omega / sigma) ** 2)
             source_energy = spec_energy
         elif type == "ASYM_VOIGT":
