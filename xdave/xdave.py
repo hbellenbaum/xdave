@@ -767,7 +767,7 @@ class xDave:
 
         for i in range(0, len(self.states)):
             # TODO(HB): I still haven't decided whether this is useful or even correct
-            x = self.partial_densities
+            x = self.partial_densities[i]
             ff_i[i] = x * ff_dsf
 
         # bf_tot = np.zeros_like(w)
