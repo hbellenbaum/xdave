@@ -7,7 +7,6 @@ from .unit_conversions import *
 from .fermi_integrals import fdi
 
 import numpy as np
-
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
@@ -39,6 +38,9 @@ def get_ipd(
     Zis = plasma.charge_states
     csd = plasma.partial_densities
     _, Zns = get_atomic_data_for_all_elements(plasma.elements)
+
+    if ne == 0:
+        return np.zeros_like(csd)
 
     if model == "STEWART_PYATT":
         return ipd_stewart_pyatt(csd=csd, Zis=Zis, ne=ne, ni=ni, Te=Te, Ti=Ti)
