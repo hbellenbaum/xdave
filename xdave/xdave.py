@@ -168,6 +168,11 @@ class xDave:
 
         self.states, self.overlord_state = self.get_mean_and_all_states(elements)
 
+        # for i in range(0, len(self.states)):
+        #     Z = self.states[i].charge_state
+        #     if Z == self.states[i].atomic_number:  #  and not (self.models.ipd_model == "NONE")
+        #         warnings.warn(f"Trying to calculate IPD for a fully ionised state. This will not work.")
+
         if save_to_json:
             assert output_file_name is not None, f"Please specify the output file name."
             _, extension = os.path.splitext(output_file_name)
@@ -810,12 +815,21 @@ class xDave:
     ## --------------------- ##
 
     def convolve_with_sif(
-        self, omega, bf, ff, dsf, Wr, beam_energy, 
-        type="GAUSSIAN", 
-        fwhm=10, 
-        sigma_left=None, sigma_right=None,
-        gamma_left=None, gamma_right=None,
-        source_energy=None, source=None
+        self,
+        omega,
+        bf,
+        ff,
+        dsf,
+        Wr,
+        beam_energy,
+        type="GAUSSIAN",
+        fwhm=10,
+        sigma_left=None,
+        sigma_right=None,
+        gamma_left=None,
+        gamma_right=None,
+        source_energy=None,
+        source=None,
     ):
         """
         Convolve DSF with a source instrument function. You can either specify an analytic type (Gaussian only for now) or input your own
@@ -851,7 +865,7 @@ class xDave:
             assert sigma_left is not None
             assert sigma_right is not None
             sigma = np.where(omega < 0, sigma_left, sigma_right)
-            norm = np.sqrt(np.pi / 2.0) * (sigma_left + sigma_right) 
+            norm = np.sqrt(np.pi / 2.0) * (sigma_left + sigma_right)
             source = 1 / norm * np.exp(-0.5 * (omega / sigma) ** 2)
             source_energy = spec_energy
         elif type == "ASYM_VOIGT":
@@ -917,6 +931,134 @@ class xDave:
             inelastic = inelastic[::-1]
             elastic = elastic[::-1]
         return spec_energy, inelastic, elastic, spectrum
+
+    def convolve_with_sif_detail(
+        self,
+        omega,
+        bf,
+        ff,
+        dsf,
+        Wr,
+        beam_energy,
+        type="GAUSSIAN",
+        fwhm=10,
+        sigma_left=None,
+        sigma_right=None,
+        gamma_left=None,
+        gamma_right=None,
+        source_energy=None,
+        source=None,
+    ):
+        """
+        Convolve DSF with a source instrument function. You can either specify an analytic type (Gaussian only for now) or input your own
+        using the inputs.
+
+        Parameters
+            omega (array): energy grid in units of eV
+            dsf (array): dynamic structure factor in units of 1/eV
+            Wr (float): rayleigh weight describing the elastic feature
+            beam_energy (float): energy of the probe beam in units of eV
+            type (float, optional): specifies the type of SIF, either analytic or USER_DEFINED
+            fwhm (float): defines the full-width-half-maximum of the analytic SIF, only applied if type is "GAUSSIAN"
+            sigma_left/right (float): defines the width of the analytic SIF, only applied if type is "ASYM_GAUSSIAN" or "ASYM_VOIGT"
+            gamma_left/right (float): defines the wings of the analytic SIF, only applied if type is "ASYM_VOIGT"
+            source_energ (array): energy grid corresponding to the source in units of eV
+            source (array): source intensity in arbitrary units
+
+        Returns:
+            array: energy grid of the output spectrum in units of eV
+            array: convolved inelastic component spectrum in arbitrary units
+            array: convolved elastic component spectrum in arbitrary units
+            array: convolved spectrum in arbitrary units
+        """
+
+        spec_energy = beam_energy - omega
+
+        if type == "GAUSSIAN":
+            assert fwhm is not None
+            sigma = fwhm / 2.355
+            source = 1 / np.sqrt(2 * np.pi * sigma**2) * np.exp(-(omega**2) / (2 * sigma**2))
+            source_energy = spec_energy
+        elif type == "ASYM_GAUSSIAN":
+            assert sigma_left is not None
+            assert sigma_right is not None
+            sigma = np.where(omega < 0, sigma_left, sigma_right)
+            norm = np.sqrt(np.pi / 2.0) * (sigma_left + sigma_right)
+            source = 1 / norm * np.exp(-0.5 * (omega / sigma) ** 2)
+            source_energy = spec_energy
+        elif type == "ASYM_VOIGT":
+            assert sigma_left is not None
+            assert sigma_right is not None
+            assert gamma_left is not None
+            assert gamma_right is not None
+            V0_left = voigt_profile(0, sigma_left, gamma_left)
+            V0_right = voigt_profile(0, sigma_right, gamma_right)
+            A_left = 2 * V0_right / (V0_left + V0_right)
+            A_right = 2 * V0_left / (V0_left + V0_right)
+            V_left = A_left * voigt_profile(omega[omega < 0], sigma_left, gamma_left)
+            V_right = A_right * voigt_profile(omega[omega >= 0], sigma_right, gamma_right)
+            source = np.concatenate((V_left, V_right))
+            source_energy = spec_energy
+        elif type == "USER_DEFINED":
+            assert source_energy is not None, f"If you want to use a user-defined sif, you need to define it."
+            assert source is not None, f"If you want to use a user-defined sif, you need to define it."
+
+        # Safety check on the variables
+        if spec_energy[1] - spec_energy[0] < 0:
+            spec_energy = spec_energy[::-1]
+            flip_spec_ene = True
+        else:
+            flip_spec_ene = False
+
+        if omega[1] - omega[0] > 0:
+            om = omega[::-1]
+            S = dsf[::-1]
+            S_inel = bf[::-1] + ff[::-1]
+            S_bf = bf[::-1]
+            S_ff = ff[::-1]
+        else:
+            om = omega
+            S = dsf
+            S_inel = bf + ff
+            S_bf = bf
+            S_ff = ff
+
+        if source_energy[1] - source_energy[0] < 0:
+            source_energy = source_energy[::-1]
+            source_spectrum = source[::-1]
+        else:
+            source_energy = source_energy
+            source_spectrum = source
+
+        spectrum = np.zeros_like(spec_energy)
+        inelastic = np.zeros_like(spec_energy)
+        source_spectrum /= np.sum(source_spectrum)  # Normalise for convolution
+        spectrum_bf = np.zeros_like(spec_energy)
+        spectrum_ff = np.zeros_like(spec_energy)
+
+        for i, Ei in enumerate(source_energy):
+            Bi = source_spectrum[i]
+            scttr_spc = S * (1.0 - om / Ei) ** 2
+            scttr_spc_ff = S_ff * (1.0 - om / Ei) ** 2
+            scttr_spc_bf = S_bf * (1.0 - om / Ei) ** 2
+            scttr_ene = Ei - om
+            spectrum += np.interp(x=spec_energy, xp=scttr_ene, fp=scttr_spc) * Bi
+            spectrum_bf += np.interp(x=spec_energy, xp=scttr_ene, fp=scttr_spc_bf) * Bi
+            spectrum_ff += np.interp(x=spec_energy, xp=scttr_ene, fp=scttr_spc_ff) * Bi
+
+        new_source = np.interp(x=spec_energy, xp=source_energy, fp=source_spectrum)
+        new_source /= np.sum(new_source)
+        inelastic = spectrum.copy()
+        elastic = new_source * Wr / (spec_energy[1] - spec_energy[0])
+        spectrum += elastic
+        if flip_spec_ene:
+            spec_energy = spec_energy[::-1]
+            spectrum = spectrum[::-1]
+            inelastic = inelastic[::-1]
+            elastic = elastic[::-1]
+            spectrum_bf = spectrum_bf[::-1]
+            spectrum_ff = spectrum_ff[::-1]
+        return spec_energy, inelastic, spectrum_bf, spectrum_ff, elastic, spectrum
 
     def get_itcf(self, w, ff, bf, tau=None):
         """
