@@ -94,7 +94,7 @@ class OCPRayleighWeight:
             qs = np.zeros_like(k)
         fs = PaulingShermanIonicFormFactor().calculate_form_factor(Z=self.state.atomic_number, Z_b=self.state.Zb, k=k)
 
-        rayleigh_weight = (fs + qs) * Siik
+        rayleigh_weight = (fs + qs) ** 2 * Siik
 
         if return_full:
             return k, Siik, np.array([rayleigh_weight]), qs, fs
