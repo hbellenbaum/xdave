@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "xdave"
-version = "0.0.1a0"
+version = "0.1.1"
 description = "X-Ray Diagnostics, Analysis, Verification and Exploration Code"
 readme = "README.md"
 requires-python = ">=3.10"
