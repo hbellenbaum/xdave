@@ -1243,6 +1243,20 @@ class PaulingShermanIonicFormFactor:
         elif n == 4:
             if l == 0:
                 Z_eff_nl = Z - self.screening_table.c4s(Z, Zb)
+            elif l == 1:
+                Z_eff_nl = Z - self.screening_table.c4p(Z, Zb)
+            elif l == 2:
+                Z_eff_nl = Z - self.screening_table.c4d(Z, Zb)
+            else:
+                print("Error! These charge-states are not yet implemented!")
+                exit(1)
+
+        elif n == 5:
+            if l == 0:
+                Z_eff_nl = Z - self.screening_table.c5s(Z, Zb)
+            elif l == 1:
+                Z_eff_nl = Z - self.screening_table.c5p(Z, Zb)
+
             else:
                 print("Error! These charge-states are not yet implemented!")
                 exit(1)
@@ -1255,7 +1269,7 @@ class PaulingShermanIonicFormFactor:
 
     def calculate_form_factor(self, Z, Z_b, k):  # ZA, Zb,
         """
-        Function to calculate an effective charge state for a given ion.
+        Function to calculate a form factor for a given ion.
 
         Parameters:
             Z (float): mean charge state
