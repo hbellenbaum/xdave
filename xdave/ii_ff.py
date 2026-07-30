@@ -1,6 +1,8 @@
 # Ionic form factors
 from .constants import BOHR_RADIUS
-from numpy import zeros
+from numpy import zeros, genfromtxt
+
+from importlib.resources import files
 
 
 class ScreeningConstants(object):
@@ -1113,6 +1115,84 @@ class ScreeningConstants(object):
         return s[ZA - 1, Zb - 1]
 
 
+class ScreeningConstantsInterp:
+
+    _ZA_max = 35
+
+    def __init__(self, fn="ScreeningConstants_Interpolated.csv"):
+        data_path = files("xdave") / "data" / fn
+        self.sc_data = genfromtxt(data_path, skip_header=1, delimiter=",")
+        self.sc_data_Z = self.sc_data[:, 0]
+
+    def c1s(self, ZA, Zb):
+        i = 1
+        return self.sc_data[:, i][Zb - 1]
+
+    def c2s(self, ZA, Zb):
+        i = 2
+        return self.sc_data[:, i][Zb - 1]
+
+    def c2p(self, ZA, Zb):
+        i = 3
+        return self.sc_data[:, i][Zb - 1]
+
+    def c3s(self, ZA, Zb):
+        i = 4
+        return self.sc_data[:, i][Zb - 1]
+
+    def c3p(self, ZA, Zb):
+        i = 5
+        return self.sc_data[:, i][Zb - 1]
+
+    def c3d(self, ZA, Zb):
+        i = 6
+        return self.sc_data[:, i][Zb - 1]
+
+    def c4s(self, ZA, Zb):
+        i = 7
+        return self.sc_data[:, i][Zb - 1]
+
+    def c4p(self, ZA, Zb):
+        i = 8
+        return self.sc_data[:, i][Zb - 1]
+
+    def c4d(self, ZA, Zb):
+        i = 9
+        return self.sc_data[:, i][Zb - 1]
+
+    def c4f(self, ZA, Zb):
+        i = 10
+        return self.sc_data[:, i][Zb - 1]
+
+    def c5s(self, ZA, Zb):
+        i = 11
+        return self.sc_data[:, i][Zb - 1]
+
+    def c5p(self, ZA, Zb):
+        i = 12
+        return self.sc_data[:, i][Zb - 1]
+
+    def c5d(self, ZA, Zb):
+        i = 13
+        return self.sc_data[:, i][Zb - 1]
+
+    def c6s(self, ZA, Zb):
+        i = 14
+        return self.sc_data[:, i][Zb - 1]
+
+    def c6p(self, ZA, Zb):
+        i = 15
+        return self.sc_data[:, i][Zb - 1]
+
+    def c6d(self, ZA, Zb):
+        i = 16
+        return self.sc_data[:, i][Zb - 1]
+
+    def c7s(self, ZA, Zb):
+        i = 17
+        return self.sc_data[:, i][Zb - 1]
+
+
 class PaulingShermanIonicFormFactor:
     """
     Class containing the ionic form factors based on Pauling
@@ -1123,7 +1203,8 @@ class PaulingShermanIonicFormFactor:
     """
 
     def __init__(self) -> None:
-        self.screening_table = ScreeningConstants()
+        # self.screening_table = ScreeningConstants()
+        self.screening_table = ScreeningConstantsInterp()
 
     def calculate_effective_charge_state(self, Z, Zb, n, l):
         """
