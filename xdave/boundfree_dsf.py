@@ -86,6 +86,11 @@ class BoundFreeDSF:
             c3p = 0
             c4s = 0
             c3d = 0
+            c3d = 0
+            c4p = 0
+            c5s = 0
+            c4d = 0
+            c5p = 0
 
             if Zb > 0:
                 c1s = int(min([2, Zb]))
