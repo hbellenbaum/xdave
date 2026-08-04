@@ -1311,6 +1311,12 @@ class PaulingShermanIonicFormFactor:
         c5s = 0
         c4d = 0
         c5p = 0
+        c6s = 0
+        c4f = 0
+        c5d = 0
+        c6p = 0
+        c7s = 0
+        c5f = 0
 
         if Z_b > 0:
             c1s = min([2, Z_b])
@@ -1327,13 +1333,25 @@ class PaulingShermanIonicFormFactor:
         if Z_b > 20:
             c3d = min([10, Z_b - 20])
         if Z_b > 30:
-            c4p = int(min([6, Z_b - 30]))
+            c4p = min([6, Z_b - 30])
         if Z_b > 36:
-            c5s = int(min([2, Z_b - 36]))
+            c5s = min([2, Z_b - 36])
         if Z_b > 38:
-            c4d = int(min([10, Z_b - 38]))
+            c4d = min([10, Z_b - 38])
         if Z_b > 48:
-            c5p = int(min([2, Z_b - 48]))
+            c5p = min([2, Z_b - 48])
+        if Z_b > 54:
+            c6s = min([2, Z_b - 54])
+        if Z_b > 56:
+            c4f = min([14, Z_b - 56])
+        if Z_b > 70:
+            c5d = min([10, Z_b - 70])
+        if Z_b > 80:
+            c6p = min([6, Z_b - 80])
+        if Z_b > 86:
+            c7s = min([2, Z_b - 86])
+        if Z_b > 88:
+            c5f = min([14, Z_b - 88])
 
         # Add the 1s form-factor
         if c1s > 0:
@@ -1430,5 +1448,43 @@ class PaulingShermanIonicFormFactor:
             Znl = self.calculate_effective_charge_state(Z, Z_b, n, l)
             xnl = n * BOHR_RADIUS * k / (2.0 * Znl)
             ff += c5p * (1 - 18 * xnl**2 + 45 * xnl**4 - 20 * xnl**6)
+
+        if c6s > 0:
+            n = 6
+            l = 0
+            Znl = self.calculate_effective_charge_state(Z, Z_b, n, l)
+            xnl = n * BOHR_RADIUS * k / (2.0 * Znl)
+            ff += c6s * (1 - 30 * xnl**2 + 150 * xnl**4 - 200 * xnl**6 + 75 * xnl**8 - 6 * xnl**10)
+
+        if c4f > 0:
+            n = 4
+            l = 3
+            Znl = self.calculate_effective_charge_state(Z, Z_b, n, l)
+            xnl = n * BOHR_RADIUS * k / (2.0 * Znl)
+            ff += c4f * (1 - xnl**2) * (1 - 6 * xnl**2 + xnl**4) / (1 + xnl**2) ** 8
+
+        if c5d > 0:
+            n = 5
+            l = 2
+            Znl = self.calculate_effective_charge_state(Z, Z_b, n, l)
+            xnl = n * BOHR_RADIUS * k / (2.0 * Znl)
+            ff += c5d * (1 - 14 * xnl**2 + 21 * xnl**4)
+
+        if c6p > 0:
+            n = 6
+            l = 1
+            Znl = self.calculate_effective_charge_state(Z, Z_b, n, l)
+            xnl = n * BOHR_RADIUS * k / (2.0 * Znl)
+            ff += c6p * (1 - 28 * xnl**2 + 126 * xnl**4 - 140 * xnl**6 + 35 * xnl**8)
+
+        if c7s > 0:
+            n = 7
+            l = 0
+            Znl = self.calculate_effective_charge_state(Z, Z_b, n, l)
+            xnl = n * BOHR_RADIUS * k / (2.0 * Znl)
+            ff += c7s * (1 - 42 * xnl**2 + 315 * xnl**4 - 700 * xnl**6 + 525 * xnl**8 - 126 * xnl**10 + 7 * xnl**12)
+
+        if c5f > 0:
+            raise NotImplementedError(f"Subshells beyonnd 7s have not been implemented.")
 
         return ff
