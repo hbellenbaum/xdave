@@ -1269,7 +1269,8 @@ class PaulingShermanIonicFormFactor:
 
     def calculate_form_factor(self, Z, Z_b, k):  # ZA, Zb,
         """
-        Function to calculate a form factor for a given ion.
+        Function to calculate a form factor for a given ion,
+        taken from Table 6 in Pauling and Sherman, Zeitschrift für Kristallographie - Crystalline Materials 81 (1932)
 
         Parameters:
             Z (float): mean charge state
@@ -1286,13 +1287,30 @@ class PaulingShermanIonicFormFactor:
         if Z_b == 0:
             return ff
 
-        c1s = self.screening_table.c1s(Z, Z_b)
-        c2s = self.screening_table.c2s(Z, Z_b)
-        c2p = self.screening_table.c2p(Z, Z_b)
-        c3s = self.screening_table.c3s(Z, Z_b)
-        c3p = self.screening_table.c3p(Z, Z_b)
-        c4s = self.screening_table.c4s(Z, Z_b)
-        c3d = self.screening_table.c3d(Z, Z_b)
+        # c1s = self.screening_table.c1s(Z, Z_b)
+        # c2s = self.screening_table.c2s(Z, Z_b)
+        # c2p = self.screening_table.c2p(Z, Z_b)
+        # c3s = self.screening_table.c3s(Z, Z_b)
+        # c3p = self.screening_table.c3p(Z, Z_b)
+        # c4s = self.screening_table.c4s(Z, Z_b)
+        # c3d = self.screening_table.c3d(Z, Z_b)
+        # c4p = self.screening_table.c4p(Z, Z_b)
+        # c5s = self.screening_table.c5s(Z, Z_b)
+        # c4d = self.screening_table.c4d(Z, Z_b)
+        # c5p = self.screening_table.c5p(Z, Z_b)
+
+        c1s = 0
+        c2s = 0
+        c2p = 0
+        c3s = 0
+        c3p = 0
+        c4s = 0
+        c3d = 0
+        c3d = 0
+        c4p = 0
+        c5s = 0
+        c4d = 0
+        c5p = 0
 
         if Z_b > 0:
             c1s = min([2, Z_b])
@@ -1308,6 +1326,14 @@ class PaulingShermanIonicFormFactor:
             c4s = min([2, Z_b - 18])
         if Z_b > 20:
             c3d = min([10, Z_b - 20])
+        if Z_b > 30:
+            c4p = int(min([6, Z_b - 30]))
+        if Z_b > 36:
+            c5s = int(min([2, Z_b - 36]))
+        if Z_b > 38:
+            c4d = int(min([10, Z_b - 38]))
+        if Z_b > 48:
+            c5p = int(min([2, Z_b - 48]))
 
         # Add the 1s form-factor
         if c1s > 0:
@@ -1376,5 +1402,33 @@ class PaulingShermanIonicFormFactor:
             Znl = self.calculate_effective_charge_state(Z, Z_b, n, l)
             xnl = n * BOHR_RADIUS * k / (2.0 * Znl)
             ff += c3d * (1.0 - 3.0 * xnl**2.0) * (3.0 - xnl**2.0) / (3.0 * (1.0 + xnl**2.0) ** 6.0)
+
+        if c4p > 0:
+            n = 4
+            l = 1
+            Znl = self.calculate_effective_charge_state(Z, Z_b, n, l)
+            xnl = n * BOHR_RADIUS * k / (2.0 * Znl)
+            ff += c4p * (1 - 10 * xnl**2 + 10 * xnl**4)
+
+        if c5s > 0:
+            n = 5
+            l = 0
+            Znl = self.calculate_effective_charge_state(Z, Z_b, n, l)
+            xnl = n * BOHR_RADIUS * k / (2.0 * Znl)
+            ff += c5s * (1 - 20 * xnl**2 + 60 * xnl**4 - 40 * xnl**6 + 5 * xnl**8)
+
+        if c4d > 0:
+            n = 4
+            l = 2
+            Znl = self.calculate_effective_charge_state(Z, Z_b, n, l)
+            xnl = n * BOHR_RADIUS * k / (2.0 * Znl)
+            ff += c4d * (1 - 6 * xnl**2)
+
+        if c5p > 0:
+            n = 5
+            l = 1
+            Znl = self.calculate_effective_charge_state(Z, Z_b, n, l)
+            xnl = n * BOHR_RADIUS * k / (2.0 * Znl)
+            ff += c5p * (1 - 18 * xnl**2 + 45 * xnl**4 - 20 * xnl**6)
 
         return ff
