@@ -1256,7 +1256,7 @@ class PaulingShermanIonicFormFactor:
             xnl = n * BOHR_RADIUS * k / (2.0 * Znl)
             ff += (
                 c3p
-                * (1.0 - 6.0 * xnl**2.0 + 3.0 * xnl**4.0)
+                * (1 - 4 * xnl**2)
                 * (1.0 - 3.0 * xnl**2.0)
                 * (3.0 - xnl**2.0)
                 / (3.0 * (1.0 + xnl**2.0) ** 6.0)
@@ -1269,7 +1269,7 @@ class PaulingShermanIonicFormFactor:
             xnl = n * BOHR_RADIUS * k / (2.0 * Znl)
             ff += (
                 c4s
-                * (1.0 - 1.2 * xnl**2.0 + 1.8e1 * xnl**4.0 - 4.0 * xnl**6.0)
+                * (1.0 - 12.0 * xnl**2.0 + 1.8e1 * xnl**4.0 - 4.0 * xnl**6.0)
                 * (1.0 - xnl**2.0)
                 * (1.0 - 6.0 * xnl**2.0 + xnl**4.0)
                 / (1.0 + xnl**2.0) ** 8.0
