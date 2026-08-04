@@ -1,4 +1,4 @@
-from .ii_ff import PaulingShermanIonicFormFactor, ScreeningConstants
+from .ii_ff import PaulingShermanIonicFormFactor, ScreeningConstantsInterp
 from .plasma_state import PlasmaState
 from .unit_conversions import *
 from .constants import *
@@ -21,7 +21,7 @@ class BoundFreeDSF:
     def __init__(self, state: PlasmaState) -> None:
         self.state = state
         self.ff_model = PaulingShermanIonicFormFactor()
-        self.screening_constants = ScreeningConstants
+        self.screening_constants = ScreeningConstantsInterp
         # self.bf_model = models.bf_model
 
     def get_dsf(self, ZA, Zb, k, w, Eb, model="SCHUMACHER"):
@@ -86,6 +86,11 @@ class BoundFreeDSF:
             c3p = 0
             c4s = 0
             c3d = 0
+            c3d = 0
+            c4p = 0
+            c5s = 0
+            c4d = 0
+            c5p = 0
 
             if Zb > 0:
                 c1s = int(min([2, Zb]))
@@ -101,6 +106,14 @@ class BoundFreeDSF:
                 c4s = int(min([2, Zb - 18]))
             if Zb > 20:
                 c3d = int(min([10, Zb - 20]))
+            if Zb > 30:
+                c4p = int(min([6, Zb - 30]))
+            if Zb > 36:
+                c5s = int(min([2, Zb - 36]))
+            if Zb > 38:
+                c4d = int(min([10, Zb - 38]))
+            if Zb > 48:
+                c5p = int(min([2, Zb - 48]))
 
             E = np.abs(w)  # * J_TO_eV  # PLANCK_CONSTANT *
             w_freq = np.abs(w) / DIRAC_CONSTANT  # convert the energy range to an actual frequency: E = \hbar \omega
@@ -244,6 +257,108 @@ class BoundFreeDSF:
 
                 J += c_32 * Jnl * np.heaviside(E + Eb[7], 1)
                 J += c_52 * Jnl * np.heaviside(E + Eb[8], 1)
+
+            # 4p
+            if (c4p > 0) and ((Eb[10] <= 0) or (Eb[11] <= 0)):
+                n = 4
+                l = 1
+
+                Znl = self.ff_model.calculate_effective_charge_state(ZA, Zb, n, l)
+                xnl = 1.0 / (1.0 + (n * q / (Znl * FINE_STRUCTURE_CONSTANT)) ** 2.0)
+                Jnl = (
+                    self._shell_amplitude(Znl, n, l)
+                    * 4
+                    * (25 / 4 * xnl**4 - 53 * xnl**5 + 176 * xnl**6 - 1968 / 7 * xnl**7 + 216 * xnl**8 - 64 * xnl**9)
+                )
+
+                # Divide c4p between the states
+                c_12 = 0
+                c_32 = 0
+                while c4p > 0:
+                    if (c_12 < 2) and (Eb[10] <= 0):
+                        c_12 += 1
+                    elif (c_32 < 4) and (Eb[11] <= 0):
+                        c_32 += 1
+                    c4p -= 1
+
+                J += c_12 * Jnl * np.heaviside(E + Eb[10], 1)
+                J += c_32 * Jnl * np.heaviside(E + Eb[11], 1)
+
+            # 5s
+            if (c5s > 0) and (Eb[12] <= 0):
+                n = 5
+                l = 0
+
+                Znl = self.ff_model.calculate_effective_charge_state(ZA, Zb, n, l)
+                xnl = 1.0 / (1.0 + (n * q / (Znl * FINE_STRUCTURE_CONSTANT)) ** 2.0)
+                Jnl = self._shell_amplitude(Znl, n, l) * (
+                    25 / 3 * xnl**3
+                    - 200 * xnl**4
+                    + 1952 * xnl**5
+                    - 29440 / 3 * xnl**6
+                    + 197376 / 7 * xnl**7
+                    - 48128 * xnl**8
+                    + 434176 / 9 * xnl**9
+                    - 131072 / 5 * xnl**10
+                    + 65536 / 11 * xnl**11
+                )
+
+                J += c5s * Jnl * np.heaviside(E + Eb[12], 1)
+
+            # 4d
+            if (c4d > 0) and ((Eb[13] <= 0) or (Eb[14] <= 0)):
+                n = 4
+                l = 2
+
+                Znl = self.ff_model.calculate_effective_charge_state(ZA, Zb, n, l)
+                xnl = 1.0 / (1.0 + (n * q / (Znl * FINE_STRUCTURE_CONSTANT)) ** 2.0)
+                Jnl = self._shell_amplitude(Znl, n, l) * (
+                    36 * (1 / 5 * xnl**5 - xnl**6 + 13 / 7 * xnl**7 - 3 / 2 * xnl**8 + 4 / 9 * xnl**9)
+                )
+
+                # Divide c3d between the states
+                c_32 = 0
+                c_52 = 0
+                while c4d > 0:
+                    if (c_32 < 4) and (Eb[13] <= 0):
+                        c_32 += 1
+                    elif (c_52 < 6) and (Eb[14] <= 0):
+                        c_52 += 1
+                    c4d -= 1
+
+                J += c_32 * Jnl * np.heaviside(E + Eb[13], 1)
+                J += c_52 * Jnl * np.heaviside(E + Eb[14], 1)
+
+            # 5p
+            if (c5p > 0) and ((Eb[15] <= 0) or (Eb[16] <= 0)):
+                n = 5
+                l = 1
+
+                Znl = self.ff_model.calculate_effective_charge_state(ZA, Zb, n, l)
+                xnl = 1.0 / (1.0 + (n * q / (Znl * FINE_STRUCTURE_CONSTANT)) ** 2.0)
+                Jnl = self._shell_amplitude(Znl, n, l) * (
+                    100 * xnl**4
+                    - 1424 * xnl**5
+                    + 8384 * xnl**6
+                    - 182848 / 7 * xnl**7
+                    + 46592 * xnl**8
+                    - 143360 / 3 * xnl**9
+                    + 131072 / 5 * xnl**10
+                    - 65536 / 11 * xnl**11
+                )
+
+                # Divide c5p between the states
+                c_12 = 0
+                c_32 = 0
+                while c5p > 0:
+                    if (c_12 < 2) and (Eb[15] <= 0):
+                        c_12 += 1
+                    elif (c_32 < 4) and (Eb[16] <= 0):
+                        c_32 += 1
+                    c5p -= 1
+
+                J += c_12 * Jnl * np.heaviside(E + Eb[15], 1)
+                J += c_32 * Jnl * np.heaviside(E + Eb[16], 1)
 
             # Sce = (c1s * Jnl10 + c2s * Jnl20 + c2p * Jnl21) / (SPEED_OF_LIGHT * k)
             Sce = J / (SPEED_OF_LIGHT * k)
