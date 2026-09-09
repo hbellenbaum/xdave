@@ -73,7 +73,7 @@ class xDave:
         save_to_json: bool = False,
         output_file_name: str = None,
     ):
-        assert np.sum(partial_densities) == 1.0, f"Fractional densities do not add up 1."
+        assert np.isclose(np.sum(partial_densities), 1.0), f"Fractional densities do not add up 1."
         assert electron_temperature > 0.0, f"Ensure your temperature is positive."
         assert mass_density > 0.0, f"Ensure your mass density is positive."
         assert len(charge_states) == len(
