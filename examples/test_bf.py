@@ -238,9 +238,88 @@ def test_multispecies_bf():
     plt.savefig("bf_example.pdf", dpi=200)
 
 
+def test_bf_plot_all_shells():
+
+    # Zf = 2.0
+    # ZA = 4
+    # Zb = ZA - Zf
+    # ne = 1.8e24 * per_cm3_TO_per_m3
+    # ni = ne / Zf
+
+    rho = 10 * g_per_cm3_TO_kg_per_m3
+    T = 10 * eV_TO_K
+
+    atomic_mass = 127
+    atomic_number = 53
+
+    charge_states = np.arange(1, 50, 4)
+
+    fig, ax = plt.subplots(1, 1, figsize=(14, 10))
+
+    omega_array = np.linspace(-300, 2000, 1000) * eV_TO_J
+    binding_energies = (
+        np.array(
+            [
+                -33169,
+                -5188,
+                -4852,
+                -4557,
+                -1072,
+                -931,
+                -875,
+                -630.8,
+                -619.3,
+                -186,
+                -123,
+                -123,
+                -123,
+                -123,
+                -123,
+                -123,
+                -123,
+                -123,
+                -123,
+            ]
+        )
+        * eV_TO_J
+    )
+    q_approx = 10.2  # 1/Angstrom
+    A_TO_m = 1.0e-10
+    k = q_approx / A_TO_m
+
+    for Zf in charge_states:
+        print(f"Zf = {Zf}\n")
+
+        ZA = atomic_number
+        Zb = ZA - Zf
+
+        state = PlasmaState(
+            electron_temperature=T,
+            ion_temperature=T,
+            mass_density=rho,
+            charge_state=Zf,
+            atomic_mass=atomic_mass,
+            atomic_number=atomic_number,
+            binding_energies=binding_energies,
+        )
+
+        bf_dsf = BoundFreeDSF(state=state)
+        xdave_bf_IA = bf_dsf.get_dsf(ZA=ZA, Zb=Zb, k=k, w=omega_array, Eb=binding_energies, model="SCHUMACHER")
+
+        ax.plot(omega_array * J_TO_eV, xdave_bf_IA / J_TO_eV, label=f"Zf={Zf}", ls="-.")
+
+    ax.legend()
+    ax.set_xlabel(r"$\omega$ [eV]")
+    ax.set_ylabel(r"$S^{bf}(k,\omega)$ [1/eV]")
+    ax.set_title(f"BF DSF at T={T/eV_TO_K}, rho={rho / g_per_cm3_TO_kg_per_m3}, k={q_approx}A")
+    plt.tight_layout()
+    plt.show()
+
+
 if __name__ == "__main__":
 
     # plt.style.use("~/my_style.mplstyle")
     # test_multispecies_bf()
-    test_bf_mcss()
-    # test_be_bf()
+    # test_bf_mcss()
+    test_be_bf()
+    # test_bf_plot_all_shells()
