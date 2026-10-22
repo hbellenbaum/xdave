@@ -1,6 +1,8 @@
 # Ionic form factors
 from .constants import BOHR_RADIUS
-from numpy import zeros
+from numpy import zeros, genfromtxt
+
+from importlib.resources import files
 
 
 class ScreeningConstants(object):
@@ -1113,6 +1115,84 @@ class ScreeningConstants(object):
         return s[ZA - 1, Zb - 1]
 
 
+class ScreeningConstantsInterp:
+
+    _ZA_max = 35
+
+    def __init__(self, fn="ScreeningConstants_Interpolated.csv"):
+        data_path = files("xdave") / "data" / fn
+        self.sc_data = genfromtxt(data_path, skip_header=1, delimiter=",")
+        self.sc_data_Z = self.sc_data[:, 0]
+
+    def c1s(self, ZA, Zb):
+        i = 1
+        return self.sc_data[:, i][Zb - 1]
+
+    def c2s(self, ZA, Zb):
+        i = 2
+        return self.sc_data[:, i][Zb - 1]
+
+    def c2p(self, ZA, Zb):
+        i = 3
+        return self.sc_data[:, i][Zb - 1]
+
+    def c3s(self, ZA, Zb):
+        i = 4
+        return self.sc_data[:, i][Zb - 1]
+
+    def c3p(self, ZA, Zb):
+        i = 5
+        return self.sc_data[:, i][Zb - 1]
+
+    def c3d(self, ZA, Zb):
+        i = 6
+        return self.sc_data[:, i][Zb - 1]
+
+    def c4s(self, ZA, Zb):
+        i = 7
+        return self.sc_data[:, i][Zb - 1]
+
+    def c4p(self, ZA, Zb):
+        i = 8
+        return self.sc_data[:, i][Zb - 1]
+
+    def c4d(self, ZA, Zb):
+        i = 9
+        return self.sc_data[:, i][Zb - 1]
+
+    def c4f(self, ZA, Zb):
+        i = 10
+        return self.sc_data[:, i][Zb - 1]
+
+    def c5s(self, ZA, Zb):
+        i = 11
+        return self.sc_data[:, i][Zb - 1]
+
+    def c5p(self, ZA, Zb):
+        i = 12
+        return self.sc_data[:, i][Zb - 1]
+
+    def c5d(self, ZA, Zb):
+        i = 13
+        return self.sc_data[:, i][Zb - 1]
+
+    def c6s(self, ZA, Zb):
+        i = 14
+        return self.sc_data[:, i][Zb - 1]
+
+    def c6p(self, ZA, Zb):
+        i = 15
+        return self.sc_data[:, i][Zb - 1]
+
+    def c6d(self, ZA, Zb):
+        i = 16
+        return self.sc_data[:, i][Zb - 1]
+
+    def c7s(self, ZA, Zb):
+        i = 17
+        return self.sc_data[:, i][Zb - 1]
+
+
 class PaulingShermanIonicFormFactor:
     """
     Class containing the ionic form factors based on Pauling
@@ -1123,7 +1203,8 @@ class PaulingShermanIonicFormFactor:
     """
 
     def __init__(self) -> None:
-        self.screening_table = ScreeningConstants()
+        # self.screening_table = ScreeningConstants()
+        self.screening_table = ScreeningConstantsInterp()
 
     def calculate_effective_charge_state(self, Z, Zb, n, l):
         """
@@ -1162,6 +1243,20 @@ class PaulingShermanIonicFormFactor:
         elif n == 4:
             if l == 0:
                 Z_eff_nl = Z - self.screening_table.c4s(Z, Zb)
+            elif l == 1:
+                Z_eff_nl = Z - self.screening_table.c4p(Z, Zb)
+            elif l == 2:
+                Z_eff_nl = Z - self.screening_table.c4d(Z, Zb)
+            else:
+                print("Error! These charge-states are not yet implemented!")
+                exit(1)
+
+        elif n == 5:
+            if l == 0:
+                Z_eff_nl = Z - self.screening_table.c5s(Z, Zb)
+            elif l == 1:
+                Z_eff_nl = Z - self.screening_table.c5p(Z, Zb)
+
             else:
                 print("Error! These charge-states are not yet implemented!")
                 exit(1)
@@ -1174,7 +1269,8 @@ class PaulingShermanIonicFormFactor:
 
     def calculate_form_factor(self, Z, Z_b, k):  # ZA, Zb,
         """
-        Function to calculate an effective charge state for a given ion.
+        Function to calculate a form factor for a given ion,
+        taken from Table 6 in Pauling and Sherman, Zeitschrift für Kristallographie - Crystalline Materials 81 (1932)
 
         Parameters:
             Z (float): mean charge state
@@ -1191,13 +1287,36 @@ class PaulingShermanIonicFormFactor:
         if Z_b == 0:
             return ff
 
-        c1s = self.screening_table.c1s(Z, Z_b)
-        c2s = self.screening_table.c2s(Z, Z_b)
-        c2p = self.screening_table.c2p(Z, Z_b)
-        c3s = self.screening_table.c3s(Z, Z_b)
-        c3p = self.screening_table.c3p(Z, Z_b)
-        c4s = self.screening_table.c4s(Z, Z_b)
-        c3d = self.screening_table.c3d(Z, Z_b)
+        # c1s = self.screening_table.c1s(Z, Z_b)
+        # c2s = self.screening_table.c2s(Z, Z_b)
+        # c2p = self.screening_table.c2p(Z, Z_b)
+        # c3s = self.screening_table.c3s(Z, Z_b)
+        # c3p = self.screening_table.c3p(Z, Z_b)
+        # c4s = self.screening_table.c4s(Z, Z_b)
+        # c3d = self.screening_table.c3d(Z, Z_b)
+        # c4p = self.screening_table.c4p(Z, Z_b)
+        # c5s = self.screening_table.c5s(Z, Z_b)
+        # c4d = self.screening_table.c4d(Z, Z_b)
+        # c5p = self.screening_table.c5p(Z, Z_b)
+
+        c1s = 0
+        c2s = 0
+        c2p = 0
+        c3s = 0
+        c3p = 0
+        c4s = 0
+        c3d = 0
+        c3d = 0
+        c4p = 0
+        c5s = 0
+        c4d = 0
+        c5p = 0
+        c6s = 0
+        c4f = 0
+        c5d = 0
+        c6p = 0
+        c7s = 0
+        c5f = 0
 
         if Z_b > 0:
             c1s = min([2, Z_b])
@@ -1213,6 +1332,26 @@ class PaulingShermanIonicFormFactor:
             c4s = min([2, Z_b - 18])
         if Z_b > 20:
             c3d = min([10, Z_b - 20])
+        if Z_b > 30:
+            c4p = min([6, Z_b - 30])
+        if Z_b > 36:
+            c5s = min([2, Z_b - 36])
+        if Z_b > 38:
+            c4d = min([10, Z_b - 38])
+        if Z_b > 48:
+            c5p = min([2, Z_b - 48])
+        if Z_b > 54:
+            c6s = min([2, Z_b - 54])
+        if Z_b > 56:
+            c4f = min([14, Z_b - 56])
+        if Z_b > 70:
+            c5d = min([10, Z_b - 70])
+        if Z_b > 80:
+            c6p = min([6, Z_b - 80])
+        if Z_b > 86:
+            c7s = min([2, Z_b - 86])
+        if Z_b > 88:
+            c5f = min([14, Z_b - 88])
 
         # Add the 1s form-factor
         if c1s > 0:
@@ -1281,5 +1420,71 @@ class PaulingShermanIonicFormFactor:
             Znl = self.calculate_effective_charge_state(Z, Z_b, n, l)
             xnl = n * BOHR_RADIUS * k / (2.0 * Znl)
             ff += c3d * (1.0 - 3.0 * xnl**2.0) * (3.0 - xnl**2.0) / (3.0 * (1.0 + xnl**2.0) ** 6.0)
+
+        if c4p > 0:
+            n = 4
+            l = 1
+            Znl = self.calculate_effective_charge_state(Z, Z_b, n, l)
+            xnl = n * BOHR_RADIUS * k / (2.0 * Znl)
+            ff += c4p * (1 - 10 * xnl**2 + 10 * xnl**4)
+
+        if c5s > 0:
+            n = 5
+            l = 0
+            Znl = self.calculate_effective_charge_state(Z, Z_b, n, l)
+            xnl = n * BOHR_RADIUS * k / (2.0 * Znl)
+            ff += c5s * (1 - 20 * xnl**2 + 60 * xnl**4 - 40 * xnl**6 + 5 * xnl**8)
+
+        if c4d > 0:
+            n = 4
+            l = 2
+            Znl = self.calculate_effective_charge_state(Z, Z_b, n, l)
+            xnl = n * BOHR_RADIUS * k / (2.0 * Znl)
+            ff += c4d * (1 - 6 * xnl**2)
+
+        if c5p > 0:
+            n = 5
+            l = 1
+            Znl = self.calculate_effective_charge_state(Z, Z_b, n, l)
+            xnl = n * BOHR_RADIUS * k / (2.0 * Znl)
+            ff += c5p * (1 - 18 * xnl**2 + 45 * xnl**4 - 20 * xnl**6)
+
+        if c6s > 0:
+            n = 6
+            l = 0
+            Znl = self.calculate_effective_charge_state(Z, Z_b, n, l)
+            xnl = n * BOHR_RADIUS * k / (2.0 * Znl)
+            ff += c6s * (1 - 30 * xnl**2 + 150 * xnl**4 - 200 * xnl**6 + 75 * xnl**8 - 6 * xnl**10)
+
+        if c4f > 0:
+            n = 4
+            l = 3
+            Znl = self.calculate_effective_charge_state(Z, Z_b, n, l)
+            xnl = n * BOHR_RADIUS * k / (2.0 * Znl)
+            ff += c4f * (1 - xnl**2) * (1 - 6 * xnl**2 + xnl**4) / (1 + xnl**2) ** 8
+
+        if c5d > 0:
+            n = 5
+            l = 2
+            Znl = self.calculate_effective_charge_state(Z, Z_b, n, l)
+            xnl = n * BOHR_RADIUS * k / (2.0 * Znl)
+            ff += c5d * (1 - 14 * xnl**2 + 21 * xnl**4)
+
+        if c6p > 0:
+            n = 6
+            l = 1
+            Znl = self.calculate_effective_charge_state(Z, Z_b, n, l)
+            xnl = n * BOHR_RADIUS * k / (2.0 * Znl)
+            ff += c6p * (1 - 28 * xnl**2 + 126 * xnl**4 - 140 * xnl**6 + 35 * xnl**8)
+
+        if c7s > 0:
+            n = 7
+            l = 0
+            Znl = self.calculate_effective_charge_state(Z, Z_b, n, l)
+            xnl = n * BOHR_RADIUS * k / (2.0 * Znl)
+            ff += c7s * (1 - 42 * xnl**2 + 315 * xnl**4 - 700 * xnl**6 + 525 * xnl**8 - 126 * xnl**10 + 7 * xnl**12)
+
+        if c5f > 0:
+            raise NotImplementedError(f"Subshells beyonnd 7s have not been implemented.")
 
         return ff
